@@ -31,6 +31,7 @@ import LargeDataAlert from '../variable-inspect/large-data-alert'
 import { AgentLogTrigger } from './agent-log'
 import { IterationLogTrigger } from './iteration-log'
 import { LoopLogTrigger } from './loop-log'
+import ParallelEnsembleTraceTrigger from './parallel-ensemble-trace/parallel-ensemble-trace-trigger'
 import { RetryLogTrigger } from './retry-log'
 
 type Props = {
@@ -107,6 +108,7 @@ const NodePanel: FC<Props> = ({
   const isRetryNode = hasRetryNode(nodeInfo.node_type) && !!nodeInfo.retryDetail?.length
   const isAgentNode = nodeInfo.node_type === BlockEnum.Agent && !!nodeInfo.agentLog?.length
   const isToolNode = nodeInfo.node_type === BlockEnum.Tool && !!nodeInfo.agentLog?.length
+  const isParallelEnsembleNode = nodeInfo.node_type === BlockEnum.ParallelEnsemble
 
   const inputsTitle = useMemo(() => {
     let text = t('common.input', { ns: 'workflow' })
@@ -218,6 +220,11 @@ const NodePanel: FC<Props> = ({
                   nodeInfo={nodeInfo}
                   onShowAgentOrToolLog={onShowAgentOrToolLog}
                 />
+              )
+            }
+            {
+              isParallelEnsembleNode && (
+                <ParallelEnsembleTraceTrigger nodeInfo={nodeInfo} />
               )
             }
             <div className={cn('mb-1', hideInfo && 'px-2! py-0.5!')}>

@@ -31,6 +31,12 @@ export type AgentLogItem = {
     elapsed_time?: number
     provider?: string
     icon?: string
+    // Extension nodes can ride a discriminator key here so the SSE
+    // ``agent_log`` channel can carry node-specific structured payloads
+    // (e.g. parallel-ensemble per-step trace) without polluting the
+    // agent-log UI. The base type stays open-string; consumers narrow
+    // by const value.
+    kind?: string
   }
 }
 
@@ -321,6 +327,49 @@ export type AgentLogResponse = {
   task_id: string
   event: string
   data: AgentLogItemWithChildren
+}
+
+// Real-time per-step trace from the parallel-ensemble node. Rides on
+// the ``agent_log`` SSE event (graphon's ``AgentLogEvent`` direct-collect
+// path bypasses the response coordinator that buffers
+// ``StreamChunkEvent``s) and is discriminated by
+// ``data.metadata.kind === PARALLEL_ENSEMBLE_TRACE_STEP_KIND`` so the
+// agent-log UI does not pick it up. ``data.data`` carries the same
+// filtered ``TokenStepTraceEntry`` the backend's ``TraceCollector``
+// recorded — toggling the diagnostics ``include_*`` flags governs both
+// the persisted trace and this live stream.
+export const PARALLEL_ENSEMBLE_TRACE_STEP_KIND = 'parallel_ensemble_trace_step' as const
+
+export type ParallelEnsembleTraceCandidate = {
+  token: string
+  prob: number
+}
+
+export type ParallelEnsembleTraceStep = {
+  // ``message_id`` is the backend-deterministic
+  // ``"<execution_id>:trace:<step>"``; the store keys dedup off it so a
+  // re-emit cannot insert a duplicate row.
+  message_id?: string
+  step: number
+  selected_token: string
+  selected_score: number
+  elapsed_ms: number
+  per_model?: Record<string, ParallelEnsembleTraceCandidate[]>
+  per_model_errors?: Record<string, string>
+  aggregator_reasoning?: Record<string, unknown> | null
+}
+
+export type ParallelEnsembleTraceStepData = AgentLogItem & {
+  data: ParallelEnsembleTraceStep
+  metadata: AgentLogItem['metadata'] & {
+    kind: typeof PARALLEL_ENSEMBLE_TRACE_STEP_KIND
+  }
+}
+
+export type ParallelEnsembleTraceStepResponse = {
+  task_id: string
+  event: string
+  data: ParallelEnsembleTraceStepData
 }
 
 export type HumanInputFormData = {

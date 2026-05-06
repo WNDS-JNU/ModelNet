@@ -695,6 +695,82 @@ class TestEventSequence:
         assert nrr.inputs["sources"] == ["s0", "s1"]
         assert nrr.inputs["models"] == ["m1", "m2"]
 
+    def test_trace_step_translated_to_agent_log_event(self):
+        """``TraceStepEvent`` from the runner → ``AgentLogEvent`` with the
+        ``parallel_ensemble_trace_step`` metadata kind. The
+        discriminator is what ``web/service/base.ts`` routes on; if the
+        node emitted a bare ``StreamChunkEvent`` instead, the response
+        coordinator would buffer the trace and the live panel would
+        flat-line. ``message_id`` is deterministic so a re-emit dedups
+        on the frontend store."""
+        from graphon.node_events.agent import AgentLogEvent
+
+        from core.workflow.nodes.parallel_ensemble.node import (
+            TRACE_STREAM_AGENT_LOG_KIND,
+        )
+
+        _ScriptedRunner.scripted_events = [
+            {
+                "kind": "trace_step",
+                "payload": {
+                    "step": 0,
+                    "selected_token": "hel",
+                    "selected_score": 0.84,
+                    "elapsed_ms": 12,
+                    "per_model": {"s0": [{"token": "hel", "prob": 0.9, "logit": None}]},
+                },
+            },  # type: ignore[list-item]
+            TokenEvent(kind="token", delta="hel"),
+            DoneEvent(kind="done", text="hel", metadata={}),
+        ]
+        node = _make_node()
+        node._node_execution_id = "exec_42"  # type: ignore[assignment]
+        events = list(node._run())
+
+        log_events = [e for e in events if isinstance(e, AgentLogEvent)]
+        assert len(log_events) == 1, "trace step must yield exactly one AgentLogEvent"
+        evt = log_events[0]
+        assert evt.metadata["kind"] == TRACE_STREAM_AGENT_LOG_KIND
+        # Deterministic dedup key: ``<execution>:trace:<step>``.
+        assert evt.message_id == "exec_42:trace:0"
+        assert evt.node_id == "pe_1"
+        assert evt.node_execution_id == "exec_42"
+        # Payload survives intact — frontend reads the full step shape
+        # off ``data``.
+        assert evt.data["selected_token"] == "hel"
+        assert evt.data["selected_score"] == 0.84
+        assert evt.data["per_model"]["s0"][0]["token"] == "hel"
+
+    def test_trace_step_does_not_pollute_text_chunks(self):
+        """Cross-event sanity: a trace_step in the runner stream must
+        NOT also produce a StreamChunkEvent on the ``text`` selector —
+        otherwise the JSON payload would leak into the user-facing
+        answer text via the existing text_chunk hook."""
+        _ScriptedRunner.scripted_events = [
+            {
+                "kind": "trace_step",
+                "payload": {
+                    "step": 0,
+                    "selected_token": "x",
+                    "selected_score": 0.5,
+                    "elapsed_ms": 1,
+                },
+            },  # type: ignore[list-item]
+            DoneEvent(kind="done", text="", metadata={}),
+        ]
+        node = _make_node()
+        node._node_execution_id = "exec_1"  # type: ignore[assignment]
+        events = list(node._run())
+
+        text_chunks = [
+            e for e in events
+            if isinstance(e, StreamChunkEvent) and e.selector == ["pe_1", "text"]
+        ]
+        # Only the closing chunk; no chunk carrying the trace payload.
+        assert len(text_chunks) == 1
+        assert text_chunks[0].is_final is True
+        assert text_chunks[0].chunk == ""
+
 
 # ── §9 startup validation ────────────────────────────────────────────────
 

@@ -38,6 +38,7 @@ export const usePipelineRun = () => {
     handleWorkflowNodeLoopFinished,
     handleWorkflowNodeRetry,
     handleWorkflowAgentLog,
+    handleWorkflowParallelEnsembleTrace,
     handleWorkflowTextChunk,
     handleWorkflowTextReplace,
   } = useWorkflowRunEvent()
@@ -129,6 +130,7 @@ export const usePipelineRun = () => {
       onLoopFinish,
       onNodeRetry,
       onAgentLog,
+      onParallelEnsembleTraceStep,
       onError,
       ...restCallback
     } = callback || {}
@@ -271,6 +273,12 @@ export const usePipelineRun = () => {
           if (onAgentLog)
             onAgentLog(params)
         },
+        onParallelEnsembleTraceStep: (params) => {
+          handleWorkflowParallelEnsembleTrace(params)
+
+          if (onParallelEnsembleTraceStep)
+            onParallelEnsembleTraceStep(params)
+        },
         onTextChunk: (params) => {
           handleWorkflowTextChunk(params)
         },
@@ -280,7 +288,7 @@ export const usePipelineRun = () => {
         ...restCallback,
       },
     )
-  }, [store, doSyncWorkflowDraft, workflowStore, handleWorkflowStarted, handleWorkflowFinished, fetchInspectVars, invalidAllLastRun, invalidateRunHistory, handleWorkflowFailed, handleWorkflowNodeStarted, handleWorkflowNodeFinished, handleWorkflowNodeIterationStarted, handleWorkflowNodeIterationNext, handleWorkflowNodeIterationFinished, handleWorkflowNodeLoopStarted, handleWorkflowNodeLoopNext, handleWorkflowNodeLoopFinished, handleWorkflowNodeRetry, handleWorkflowAgentLog, handleWorkflowTextChunk, handleWorkflowTextReplace])
+  }, [store, doSyncWorkflowDraft, workflowStore, handleWorkflowStarted, handleWorkflowFinished, fetchInspectVars, invalidAllLastRun, invalidateRunHistory, handleWorkflowFailed, handleWorkflowNodeStarted, handleWorkflowNodeFinished, handleWorkflowNodeIterationStarted, handleWorkflowNodeIterationNext, handleWorkflowNodeIterationFinished, handleWorkflowNodeLoopStarted, handleWorkflowNodeLoopNext, handleWorkflowNodeLoopFinished, handleWorkflowNodeRetry, handleWorkflowAgentLog, handleWorkflowParallelEnsembleTrace, handleWorkflowTextChunk, handleWorkflowTextReplace])
 
   const handleStopRun = useCallback((taskId: string) => {
     const { pipelineId } = workflowStore.getState()

@@ -64,7 +64,7 @@ from ..spi.aggregator import (
 from ..spi.backend import BackendInfo, ModelBackend, TokenCandidate, TokenStepParams
 from ..spi.capability import Capability
 from ..spi.requirements import Requirement, ValidationIssue
-from ..spi.runner import DoneEvent, EnsembleRunner, RunnerEvent, SourceInput, TokenEvent
+from ..spi.runner import DoneEvent, EnsembleRunner, RunnerEvent, SourceInput, TokenEvent, TraceStepEvent
 from ..spi.trace import TokenStepTraceEntry, TraceCollector
 from .think_phase import ThinkPhaseRunner
 
@@ -342,7 +342,7 @@ class TokenStepRunner(EnsembleRunner[TokenStepConfig]):
             )
 
             elapsed_ms = int((time.perf_counter() - step_start) * 1000)
-            trace.record_token_step(
+            recorded = trace.record_token_step(
                 TokenStepTraceEntry(
                     step=step,
                     selected_token=pick["token"],
@@ -353,6 +353,13 @@ class TokenStepRunner(EnsembleRunner[TokenStepConfig]):
                     aggregator_reasoning=pick["reasoning"],
                 )
             )
+            # Live trace stream: re-emit the *same* filtered entry the
+            # store recorded so include_* gating governs the wire too
+            # (no separate redaction path). Off by default
+            # (``enable_trace_stream=False``); only research-mode runs
+            # pay the SSE cost.
+            if trace.config.enable_trace_stream:
+                yield TraceStepEvent(kind="trace_step", payload=recorded)
 
             token = pick["token"]
             if token == _END_TOKEN_SENTINEL:

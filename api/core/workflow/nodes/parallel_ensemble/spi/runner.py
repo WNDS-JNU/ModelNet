@@ -30,7 +30,7 @@ from .aggregator import Aggregator
 from .backend import ModelBackend, TokenStepParams
 from .capability import Capability
 from .requirements import Requirement, ValidationIssue
-from .trace import TraceCollector
+from .trace import TokenStepTraceEntry, TraceCollector
 
 if TYPE_CHECKING:  # avoid registry ↔ spi import cycle at runtime
     from ..registry.model_registry import ModelRegistry
@@ -90,7 +90,29 @@ class DoneEvent(TypedDict):
     metadata: dict
 
 
-RunnerEvent = TokenEvent | FullResponseEvent | DoneEvent
+class TraceStepEvent(TypedDict):
+    """Per-step trace ping the runner can yield in real time.
+
+    Emitted only when ``DiagnosticsConfig.enable_trace_stream`` is on:
+    the runner re-emits the same filtered entry the trace store records,
+    so toggling ``include_*`` flags affects both the persisted trace and
+    the live stream. The node binds this to a ``graphon.AgentLogEvent``
+    side-channel (``metadata.kind = "parallel_ensemble_trace_step"``)
+    that the frontend routes to a dedicated trace panel — keeping the
+    SSE wire decoupled from the per-token text stream that
+    ``StreamChunkEvent`` already owns.
+
+    The ``payload`` is the *same dict reference* the trace store
+    appended; consumers must not mutate it (the runner does not deep-
+    copy on the hot path). Stream order matches the order
+    ``record_token_step`` is called.
+    """
+
+    kind: Literal["trace_step"]
+    payload: TokenStepTraceEntry
+
+
+RunnerEvent = TokenEvent | FullResponseEvent | DoneEvent | TraceStepEvent
 
 
 class SourceInput(TypedDict):

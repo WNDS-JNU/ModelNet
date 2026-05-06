@@ -32,11 +32,11 @@ const buildDiagnostics = (overrides: Partial<DiagnosticsConfig> = {}): Diagnosti
 
 describe('parallel-ensemble/diagnostics-config', () => {
   describe('Rendering', () => {
-    // Seven switches + two non-toggle controls (max_trace_tokens
+    // Eight switches + two non-toggle controls (max_trace_tokens
     // number input + storage select). The form is the source of truth
     // for how many surfaces DiagnosticsConfig exposes; if a knob is
     // added without bumping this count the test catches the gap.
-    it('renders all 7 boolean toggles, the trace cap and the storage select', () => {
+    it('renders all 8 boolean toggles, the trace cap and the storage select', () => {
       render(
         <DiagnosticsConfigForm
           readonly={false}
@@ -45,11 +45,13 @@ describe('parallel-ensemble/diagnostics-config', () => {
         />,
       )
 
-      // 7 switches — one per ``include_*`` boolean field on
-      // ``DiagnosticsConfig`` (entities.py). If a future landing adds
-      // an 8th include flag, this number bumps in the same patch.
+      // 8 switches: 7 ``include_*`` boolean fields + the
+      // ``enable_trace_stream`` toggle that gates real-time trace
+      // emission to the run panel. Both groups live on
+      // ``DiagnosticsConfig`` (entities.py); a future landing that
+      // adds a new boolean flag bumps this count in the same patch.
       const switches = screen.getAllByRole('switch')
-      expect(switches).toHaveLength(7)
+      expect(switches).toHaveLength(8)
 
       // Trace token cap renders as a number input.
       const numberInput = document.querySelector('input[type="number"]') as HTMLInputElement

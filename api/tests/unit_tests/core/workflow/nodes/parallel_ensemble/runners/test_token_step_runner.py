@@ -446,3 +446,125 @@ class _FakeRegistry:
 
     def get(self, alias: str) -> _RegSpec:
         return self._specs[alias]
+
+
+# ── Trace-stream emission gating ──────────────────────────────────────
+
+
+def test_token_step_emits_trace_step_per_token_when_enabled(executor, cand):
+    """``enable_trace_stream=True`` → one ``TraceStepEvent`` per joint
+    token, interleaved with the user-facing ``TokenEvent`` stream. The
+    runner reuses the filtered entry the trace store recorded, so
+    ``include_*`` redaction governs the wire shape uniformly. The
+    discriminator on the wire (``kind="trace_step"``) is what the node
+    matches on to translate into ``AgentLogEvent`` — losing this would
+    silently flat-line the live trace panel without breaking the rest
+    of the run."""
+    backends = {
+        "m1": FakeBackend(
+            "m1",
+            scripted_steps=[
+                [cand("hi", 0.8), cand("yo", 0.2)],
+                [cand("<end>", 1.0)],
+            ],
+        ),
+        "m2": FakeBackend(
+            "m2",
+            scripted_steps=[
+                [cand("hi", 0.7), cand("hey", 0.3)],
+                [cand("<end>", 1.0)],
+            ],
+        ),
+    }
+    runner = TokenStepRunner(executor=executor, aggregator_config=SumScoreConfig())
+    diagnostics = DiagnosticsConfig(
+        enable_trace_stream=True,
+        include_token_candidates=True,
+        include_aggregator_reasoning=True,
+    )
+    trace = TraceCollector(diagnostics)
+    events = list(
+        runner.run(
+            sources=make_sources(backends),
+            backends=backends,
+            aggregator=SumScoreAggregator(),
+            config=TokenStepConfig(max_len=4, enable_think=False),
+            trace=trace,
+        )
+    )
+    trace_events = [e for e in events if e["kind"] == "trace_step"]
+    token_events = [e for e in events if e["kind"] == "token"]
+    # One ``trace_step`` per aggregator pick — including the final EOS
+    # pick, which records to trace but breaks before yielding a
+    # ``TokenEvent``. So trace_events = token_events + 1 on the EOS
+    # path; the persisted token_trace and the streamed payloads share
+    # a single record call site (same dict reference).
+    assert len(trace_events) == len(token_events) + 1
+    # First trace_step matches the first user-facing token; the last
+    # carries the EOS sentinel pick so debuggers can see *why* the
+    # joint loop stopped.
+    payload = trace_events[0]["payload"]  # type: ignore[typeddict-item]
+    assert payload["selected_token"] == token_events[0]["delta"]  # type: ignore[typeddict-item]
+    assert payload["step"] == 0
+    assert "per_model" in payload
+    assert "aggregator_reasoning" in payload
+    eos_payload = trace_events[-1]["payload"]  # type: ignore[typeddict-item]
+    assert eos_payload["selected_token"] == "<end>"
+
+
+def test_token_step_no_trace_step_when_disabled(executor, cand):
+    """Default config (``enable_trace_stream=False``) → runner does not
+    yield ``TraceStepEvent``s. Pins the off-by-default contract — the
+    SSE bill stays at the existing baseline for runs that never enabled
+    the live panel."""
+    backends = {
+        "m1": FakeBackend("m1", scripted_steps=[[cand("hi", 1.0)], [cand("<end>", 1.0)]]),
+        "m2": FakeBackend("m2", scripted_steps=[[cand("hi", 1.0)], [cand("<end>", 1.0)]]),
+    }
+    runner = TokenStepRunner(executor=executor, aggregator_config=SumScoreConfig())
+    trace = TraceCollector(DiagnosticsConfig())
+    events = list(
+        runner.run(
+            sources=make_sources(backends),
+            backends=backends,
+            aggregator=SumScoreAggregator(),
+            config=TokenStepConfig(max_len=4, enable_think=False),
+            trace=trace,
+        )
+    )
+    assert all(e["kind"] != "trace_step" for e in events)
+
+
+def test_token_step_trace_stream_redacts_with_include_flags(executor, cand):
+    """Same redaction as the persisted trace: with
+    ``include_token_candidates=False`` the streamed payload also drops
+    ``per_model`` so a research-mode toggle cannot accidentally leak
+    candidate tokens to the wire while the persisted trace stayed
+    redacted."""
+    backends = {
+        "m1": FakeBackend("m1", scripted_steps=[[cand("hi", 1.0)], [cand("<end>", 1.0)]]),
+        "m2": FakeBackend("m2", scripted_steps=[[cand("hi", 1.0)], [cand("<end>", 1.0)]]),
+    }
+    runner = TokenStepRunner(executor=executor, aggregator_config=SumScoreConfig())
+    diagnostics = DiagnosticsConfig(
+        enable_trace_stream=True,
+        include_token_candidates=False,
+        include_aggregator_reasoning=False,
+    )
+    trace = TraceCollector(diagnostics)
+    events = list(
+        runner.run(
+            sources=make_sources(backends),
+            backends=backends,
+            aggregator=SumScoreAggregator(),
+            config=TokenStepConfig(max_len=4, enable_think=False),
+            trace=trace,
+        )
+    )
+    trace_events = [e for e in events if e["kind"] == "trace_step"]
+    assert trace_events, "trace stream must emit at least one event"
+    for ev in trace_events:
+        payload = ev["payload"]  # type: ignore[typeddict-item]
+        assert "per_model" not in payload
+        assert "aggregator_reasoning" not in payload
+        assert payload["selected_token"]  # lightweight fields survive

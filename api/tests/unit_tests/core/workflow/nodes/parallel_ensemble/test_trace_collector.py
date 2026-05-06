@@ -252,3 +252,60 @@ def test_trace_collector_truncation_preserves_field_redaction():
         assert "aggregator_reasoning" not in row
     assert final["summary"]["truncated"] is True
     assert final["summary"]["truncated_token_steps"] == 3
+
+
+# ── Streaming hook: filtered entry returned for trace_stream ──────────
+
+
+def test_record_token_step_returns_filtered_entry_with_redaction():
+    """Pins the streaming contract: ``record_token_step`` returns the
+    filtered entry the runner should yield on the trace stream — same
+    shape that landed in the persisted store, no separate redaction
+    path. Off flags drop fields from the *returned* entry too."""
+    cfg = DiagnosticsConfig(
+        include_token_candidates=False,
+        include_per_backend_errors=False,
+        include_aggregator_reasoning=False,
+    )
+    collector = TraceCollector(cfg)
+    returned = collector.record_token_step(_token_entry(0))
+    assert returned["step"] == 0
+    assert returned["selected_token"] == "t0"
+    assert "per_model" not in returned
+    assert "per_model_errors" not in returned
+    assert "aggregator_reasoning" not in returned
+
+
+def test_record_token_step_returned_entry_matches_stored_reference():
+    """The returned object is the same reference appended to the store —
+    so the caller cannot mutate one without mutating the other. This is
+    a deliberate decision (zero-copy hot path); the SPI doc on
+    ``TraceStepEvent`` calls it out."""
+    cfg = DiagnosticsConfig(
+        include_token_candidates=True,
+        include_per_backend_errors=True,
+        include_aggregator_reasoning=True,
+    )
+    collector = TraceCollector(cfg)
+    returned = collector.record_token_step(_token_entry(0))
+    final = collector.finalize(
+        runner_name="r",
+        runner_config={},
+        aggregator_name="a",
+        aggregator_config={},
+        backends=[],
+    )
+    # ``finalize`` does ``list(self._token)`` which creates a new outer
+    # list but keeps the same dict references — so the entry the runner
+    # streamed is the same dict the persisted trace carries.
+    assert final["token_trace"][0] is returned
+
+
+def test_diagnostics_config_enable_trace_stream_default_off():
+    """``enable_trace_stream`` must default to ``False`` so existing
+    workflows do not start paying SSE cost without an explicit opt-in.
+    The runner reads ``trace.config.enable_trace_stream`` to decide
+    whether to yield ``TraceStepEvent``s — flipping this default would
+    silently re-bill every parallel-ensemble run."""
+    cfg = DiagnosticsConfig()
+    assert cfg.enable_trace_stream is False

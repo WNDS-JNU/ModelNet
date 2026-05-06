@@ -414,6 +414,7 @@ export const runTriggerDebug = async ({
         baseSseOptions.onTTSEnd,
         baseSseOptions.onTextReplace,
         baseSseOptions.onAgentLog,
+        baseSseOptions.onParallelEnsembleTraceStep,
         baseSseOptions.onHumanInputRequired,
         baseSseOptions.onHumanInputFormFilled,
         baseSseOptions.onHumanInputFormTimeout,

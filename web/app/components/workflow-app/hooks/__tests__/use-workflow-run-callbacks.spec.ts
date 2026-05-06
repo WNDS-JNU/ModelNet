@@ -38,6 +38,7 @@ const createHandlers = () => ({
   handleWorkflowNodeLoopFinished: vi.fn(),
   handleWorkflowNodeRetry: vi.fn(),
   handleWorkflowAgentLog: vi.fn(),
+  handleWorkflowParallelEnsembleTrace: vi.fn(),
   handleWorkflowTextChunk: vi.fn(),
   handleWorkflowTextReplace: vi.fn(),
   handleWorkflowPaused: vi.fn(),

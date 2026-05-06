@@ -15,6 +15,7 @@ export const useWorkflowStarted = () => {
       workflowRunningData,
       setWorkflowRunningData,
       setIterParallelLogMap,
+      resetParallelEnsembleTrace,
     } = workflowStore.getState()
     const {
       getNodes,
@@ -32,6 +33,14 @@ export const useWorkflowStarted = () => {
       return
     }
     setIterParallelLogMap(new Map())
+    // Drop any parallel-ensemble trace steps left behind by a previous
+    // run on the same canvas; without this the run panel would
+    // pre-render the prior session's steps and append the new
+    // execution's steps after them, making it look like the joint loop
+    // ran twice as long. ``message_id`` dedup does NOT save us — the
+    // ``<execution_id>:trace:<step>`` key changes every run, so the
+    // store would just keep accumulating.
+    resetParallelEnsembleTrace()
     setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
       draft.task_id = task_id
       draft.result = {

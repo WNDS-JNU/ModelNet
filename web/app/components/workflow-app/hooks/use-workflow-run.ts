@@ -84,6 +84,7 @@ export const useWorkflowRun = () => {
     handleWorkflowNodeLoopFinished,
     handleWorkflowNodeRetry,
     handleWorkflowAgentLog,
+    handleWorkflowParallelEnsembleTrace,
     handleWorkflowTextChunk,
     handleWorkflowTextReplace,
     handleWorkflowPaused,
@@ -173,6 +174,7 @@ export const useWorkflowRun = () => {
       onLoopFinish,
       onNodeRetry,
       onAgentLog,
+      onParallelEnsembleTraceStep,
       onError,
       onWorkflowPaused,
       onHumanInputRequired,
@@ -272,6 +274,7 @@ export const useWorkflowRun = () => {
       handleWorkflowNodeLoopFinished,
       handleWorkflowNodeRetry,
       handleWorkflowAgentLog,
+      handleWorkflowParallelEnsembleTrace,
       handleWorkflowTextChunk,
       handleWorkflowTextReplace,
       handleWorkflowPaused,
@@ -289,6 +292,7 @@ export const useWorkflowRun = () => {
       onLoopFinish,
       onNodeRetry,
       onAgentLog,
+      onParallelEnsembleTraceStep,
       onError,
       onWorkflowPaused,
       onHumanInputRequired,
@@ -364,7 +368,7 @@ export const useWorkflowRun = () => {
       },
       finalCallbacks,
     )
-  }, [store, doSyncWorkflowDraft, workflowStore, pathname, handleWorkflowFailed, flowId, handleWorkflowStarted, handleWorkflowFinished, fetchInspectVars, invalidAllLastRun, invalidateRunHistory, handleWorkflowNodeStarted, handleWorkflowNodeFinished, handleWorkflowNodeIterationStarted, handleWorkflowNodeIterationNext, handleWorkflowNodeIterationFinished, handleWorkflowNodeLoopStarted, handleWorkflowNodeLoopNext, handleWorkflowNodeLoopFinished, handleWorkflowNodeRetry, handleWorkflowAgentLog, handleWorkflowTextChunk, handleWorkflowTextReplace, handleWorkflowPaused, handleWorkflowNodeHumanInputRequired, handleWorkflowNodeHumanInputFormFilled, handleWorkflowNodeHumanInputFormTimeout])
+  }, [store, doSyncWorkflowDraft, workflowStore, pathname, handleWorkflowFailed, flowId, handleWorkflowStarted, handleWorkflowFinished, fetchInspectVars, invalidAllLastRun, invalidateRunHistory, handleWorkflowNodeStarted, handleWorkflowNodeFinished, handleWorkflowNodeIterationStarted, handleWorkflowNodeIterationNext, handleWorkflowNodeIterationFinished, handleWorkflowNodeLoopStarted, handleWorkflowNodeLoopNext, handleWorkflowNodeLoopFinished, handleWorkflowNodeRetry, handleWorkflowAgentLog, handleWorkflowParallelEnsembleTrace, handleWorkflowTextChunk, handleWorkflowTextReplace, handleWorkflowPaused, handleWorkflowNodeHumanInputRequired, handleWorkflowNodeHumanInputFormFilled, handleWorkflowNodeHumanInputFormTimeout])
 
   const handleStopRun = useCallback((taskId: string) => {
     const setStoppedState = () => {

@@ -105,6 +105,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from pydantic import ValidationError
 
 from graphon.enums import NodeType, WorkflowNodeExecutionStatus
+from graphon.node_events.agent import AgentLogEvent
 from graphon.node_events.base import NodeEventBase, NodeRunResult
 from graphon.node_events.node import StreamChunkEvent, StreamCompletedEvent
 from graphon.nodes.base.node import Node
@@ -130,6 +131,19 @@ if TYPE_CHECKING:
     from .registry.runner_registry import RunnerRegistry
 
 logger = logging.getLogger(__name__)
+
+
+TRACE_STREAM_AGENT_LOG_KIND: str = "parallel_ensemble_trace_step"
+"""Discriminator the frontend uses to route trace stream events.
+
+Carried on ``AgentLogEvent.metadata.kind``. The frontend's agent-log
+handler short-circuits on this value (so the trace stream does not
+pollute the agent-log UI) and forwards the payload to a dedicated
+``parallelEnsembleTraceByNodeId`` store. This constant is the *single
+source of truth* shared between backend emission and frontend routing
+— hardcoding the literal in two places is exactly how protocol drift
+would creep in.
+"""
 
 
 _REQUIRED_SPEC_KEYS: frozenset[str] = frozenset({"model_alias", "prompt", "sampling_params"})
@@ -302,6 +316,33 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                         "parallel-ensemble node %s saw full_response from %s",
                         self._node_id,
                         source_id,
+                    )
+                case {"kind": "trace_step", "payload": payload}:
+                    # Real-time trace stream: ride graphon's
+                    # ``AgentLogEvent`` direct-collect path
+                    # (``event_handlers.py:115-130`` — no response
+                    # coordinator interception, unlike StreamChunkEvent).
+                    # The dedicated ``metadata.kind`` discriminator lets
+                    # the frontend route this off the agent-log UI into
+                    # the parallel-ensemble trace panel.
+                    #
+                    # ``message_id`` is deterministic (execution_id +
+                    # step) so a re-emit cannot duplicate a row in the
+                    # frontend store; ``label`` is a researcher-facing
+                    # short summary that the panel can fall back to if
+                    # ``data`` ever fails to render.
+                    step_index = payload.get("step", 0)
+                    selected_token = payload.get("selected_token", "")
+                    yield AgentLogEvent(
+                        message_id=f"{self._node_execution_id}:trace:{step_index}",
+                        label=f"Step {step_index}: {selected_token!r}",
+                        node_execution_id=self._node_execution_id,
+                        parent_id=None,
+                        error=None,
+                        status="success",
+                        data=dict(payload),
+                        metadata={"kind": TRACE_STREAM_AGENT_LOG_KIND},
+                        node_id=self._node_id,
                     )
                 case _:
                     # Defensive: ``RunnerEvent`` is a closed union

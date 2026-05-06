@@ -25,6 +25,7 @@ type WorkflowRunEventHandlers = {
   handleWorkflowNodeLoopFinished: NonNullable<IOtherOptions['onLoopFinish']>
   handleWorkflowNodeRetry: NonNullable<IOtherOptions['onNodeRetry']>
   handleWorkflowAgentLog: NonNullable<IOtherOptions['onAgentLog']>
+  handleWorkflowParallelEnsembleTrace: NonNullable<IOtherOptions['onParallelEnsembleTraceStep']>
   handleWorkflowTextChunk: NonNullable<IOtherOptions['onTextChunk']>
   handleWorkflowTextReplace: NonNullable<IOtherOptions['onTextReplace']>
   handleWorkflowPaused: () => void
@@ -43,6 +44,7 @@ type UserCallbackHandlers = {
   onLoopFinish?: IOtherOptions['onLoopFinish']
   onNodeRetry?: IOtherOptions['onNodeRetry']
   onAgentLog?: IOtherOptions['onAgentLog']
+  onParallelEnsembleTraceStep?: IOtherOptions['onParallelEnsembleTraceStep']
   onError?: IOtherOptions['onError']
   onWorkflowPaused?: IOtherOptions['onWorkflowPaused']
   onHumanInputRequired?: IOtherOptions['onHumanInputRequired']
@@ -110,6 +112,7 @@ export const createBaseWorkflowRunCallbacks = ({
     handleWorkflowNodeLoopFinished,
     handleWorkflowNodeRetry,
     handleWorkflowAgentLog,
+    handleWorkflowParallelEnsembleTrace,
     handleWorkflowTextChunk,
     handleWorkflowTextReplace,
     handleWorkflowPaused,
@@ -127,6 +130,7 @@ export const createBaseWorkflowRunCallbacks = ({
     onLoopFinish,
     onNodeRetry,
     onAgentLog,
+    onParallelEnsembleTraceStep,
     onError,
     onWorkflowPaused,
     onHumanInputRequired,
@@ -235,6 +239,12 @@ export const createBaseWorkflowRunCallbacks = ({
       if (onAgentLog)
         onAgentLog(params)
     },
+    onParallelEnsembleTraceStep: (params) => {
+      handleWorkflowParallelEnsembleTrace(params)
+
+      if (onParallelEnsembleTraceStep)
+        onParallelEnsembleTraceStep(params)
+    },
     onTextChunk: (params) => {
       handleWorkflowTextChunk(params)
     },
@@ -319,6 +329,7 @@ export const createFinalWorkflowRunCallbacks = ({
     handleWorkflowNodeLoopFinished,
     handleWorkflowNodeRetry,
     handleWorkflowAgentLog,
+    handleWorkflowParallelEnsembleTrace,
     handleWorkflowTextChunk,
     handleWorkflowTextReplace,
     handleWorkflowPaused,
@@ -335,6 +346,7 @@ export const createFinalWorkflowRunCallbacks = ({
     onLoopFinish,
     onNodeRetry,
     onAgentLog,
+    onParallelEnsembleTraceStep,
     onError,
     onWorkflowPaused,
     onHumanInputRequired,
@@ -424,6 +436,12 @@ export const createFinalWorkflowRunCallbacks = ({
 
       if (onAgentLog)
         onAgentLog(params)
+    },
+    onParallelEnsembleTraceStep: (params) => {
+      handleWorkflowParallelEnsembleTrace(params)
+
+      if (onParallelEnsembleTraceStep)
+        onParallelEnsembleTraceStep(params)
     },
     onTextChunk: (params) => {
       handleWorkflowTextChunk(params)

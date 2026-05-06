@@ -3,6 +3,12 @@ import { produce } from 'immer'
 import { useCallback } from 'react'
 import { useWorkflowStore } from '@/app/components/workflow/store'
 
+// Node-extension structured payloads (e.g. parallel-ensemble per-step
+// trace) ride the same ``agent_log`` SSE channel but are split off at
+// the SSE boundary in ``web/service/base.ts`` based on
+// ``data.metadata.kind``. By the time this hook is called, the
+// payload is guaranteed to be a real agent log — the trace stream
+// goes to ``useWorkflowParallelEnsembleTrace`` instead.
 export const useWorkflowAgentLog = () => {
   const workflowStore = useWorkflowStore()
 

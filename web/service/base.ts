@@ -21,6 +21,7 @@ import type {
   NodeStartedResponse,
   ParallelBranchFinishedResponse,
   ParallelBranchStartedResponse,
+  ParallelEnsembleTraceStepResponse,
   TextChunkResponse,
   TextReplaceResponse,
   WorkflowFinishedResponse,
@@ -30,6 +31,7 @@ import type {
 import { toast } from '@langgenius/dify-ui/toast'
 import Cookies from 'js-cookie'
 import { API_PREFIX, CSRF_COOKIE_NAME, CSRF_HEADER_NAME, IS_CE_EDITION, PASSPORT_HEADER_NAME, PUBLIC_API_PREFIX, WEB_APP_SHARE_CODE_HEADER_NAME } from '@/config'
+import { PARALLEL_ENSEMBLE_TRACE_STEP_KIND } from '@/types/workflow'
 import { asyncRunSafe } from '@/utils'
 import { basePath } from '@/utils/var'
 import { base, ContentType, getBaseOptions } from './fetch'
@@ -72,6 +74,7 @@ type IOnLoopStarted = (workflowStarted: LoopStartedResponse) => void
 type IOnLoopNext = (workflowStarted: LoopNextResponse) => void
 type IOnLoopFinished = (workflowFinished: LoopFinishedResponse) => void
 type IOnAgentLog = (agentLog: AgentLogResponse) => void
+type IOnParallelEnsembleTraceStep = (step: ParallelEnsembleTraceStepResponse) => void
 
 type IOHumanInputRequired = (humanInputRequired: HumanInputRequiredResponse) => void
 type IOnHumanInputFormFilled = (humanInputFormFilled: HumanInputFormFilledResponse) => void
@@ -120,6 +123,7 @@ export type IOtherOptions = {
   onLoopNext?: IOnLoopNext
   onLoopFinish?: IOnLoopFinished
   onAgentLog?: IOnAgentLog
+  onParallelEnsembleTraceStep?: IOnParallelEnsembleTraceStep
   onHumanInputRequired?: IOHumanInputRequired
   onHumanInputFormFilled?: IOnHumanInputFormFilled
   onHumanInputFormTimeout?: IOnHumanInputFormTimeout
@@ -212,6 +216,7 @@ export const handleStream = (
   onTTSEnd?: IOnTTSEnd,
   onTextReplace?: IOnTextReplace,
   onAgentLog?: IOnAgentLog,
+  onParallelEnsembleTraceStep?: IOnParallelEnsembleTraceStep,
   onHumanInputRequired?: IOHumanInputRequired,
   onHumanInputFormFilled?: IOnHumanInputFormFilled,
   onHumanInputFormTimeout?: IOnHumanInputFormTimeout,
@@ -344,7 +349,17 @@ export const handleStream = (
               onTextReplace?.(bufferObj as TextReplaceResponse)
             }
             else if (bufferObj.event === 'agent_log') {
-              onAgentLog?.(bufferObj as AgentLogResponse)
+              // Discriminate by ``data.metadata.kind`` so node-specific
+              // structured payloads (parallel-ensemble per-step trace,
+              // future ones) can ride the ``agent_log`` SSE channel
+              // without polluting the agent-log UI. The literal lives
+              // alongside the type in ``types/workflow.ts`` and on the
+              // backend in ``parallel_ensemble/node.py``.
+              const data = bufferObj.data as { metadata?: { kind?: string } } | undefined
+              if (data?.metadata?.kind === PARALLEL_ENSEMBLE_TRACE_STEP_KIND)
+                onParallelEnsembleTraceStep?.(bufferObj as ParallelEnsembleTraceStepResponse)
+              else
+                onAgentLog?.(bufferObj as AgentLogResponse)
             }
             else if (bufferObj.event === 'tts_message') {
               onTTSChunk?.(bufferObj.message_id, bufferObj.audio, bufferObj.audio_type)
@@ -481,6 +496,7 @@ export const ssePost = async (
     onTTSEnd,
     onTextReplace,
     onAgentLog,
+    onParallelEnsembleTraceStep,
     onError,
     getAbortController,
     onLoopStart,
@@ -591,6 +607,7 @@ export const ssePost = async (
         onTTSEnd,
         onTextReplace,
         onAgentLog,
+        onParallelEnsembleTraceStep,
         onHumanInputRequired,
         onHumanInputFormFilled,
         onHumanInputFormTimeout,
@@ -635,6 +652,7 @@ export const sseGet = async (
     onTTSEnd,
     onTextReplace,
     onAgentLog,
+    onParallelEnsembleTraceStep,
     onError,
     getAbortController,
     onLoopStart,
@@ -738,6 +756,7 @@ export const sseGet = async (
         onTTSEnd,
         onTextReplace,
         onAgentLog,
+        onParallelEnsembleTraceStep,
         onHumanInputRequired,
         onHumanInputFormFilled,
         onHumanInputFormTimeout,

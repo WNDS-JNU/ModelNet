@@ -92,6 +92,13 @@ export type DiagnosticsConfig = {
   include_think_trace: boolean
   include_per_backend_errors: boolean
   storage: DiagnosticsStorage
+  // Mirrors backend ``DiagnosticsConfig.enable_trace_stream``. Off by
+  // default; turning it on makes the runner emit one
+  // ``AgentLogEvent`` per recorded token-step (kind=
+  // parallel_ensemble_trace_step) so the run panel can render a live
+  // trace. The same include_* flags govern the streamed payload —
+  // toggling them changes both wire and persisted trace.
+  enable_trace_stream: boolean
 }
 
 // runner_config / aggregator_config are ``dict[str, object]`` server-
@@ -161,6 +168,7 @@ export const DEFAULT_DIAGNOSTICS: DiagnosticsConfig = {
   include_think_trace: false,
   include_per_backend_errors: true,
   storage: 'metadata',
+  enable_trace_stream: false,
 }
 
 // Top-level keys the backend ``ParallelEnsembleNodeData`` hard-rejects

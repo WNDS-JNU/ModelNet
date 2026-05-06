@@ -160,6 +160,19 @@ const DiagnosticsConfigForm: FC<Props> = ({ readonly, value, onChange }) => {
         )}
       />
       <Field
+        title={t(`${i18nPrefix}.enableTraceStream.label`, { ns: 'workflow' })}
+        tooltip={t(`${i18nPrefix}.enableTraceStream.tooltip`, { ns: 'workflow' })}
+        inline
+        operations={(
+          <Switch
+            checked={value.enable_trace_stream}
+            onCheckedChange={c => handleToggle('enable_trace_stream', c)}
+            size="md"
+            disabled={readonly}
+          />
+        )}
+      />
+      <Field
         title={t(`${i18nPrefix}.maxTraceTokens.label`, { ns: 'workflow' })}
         tooltip={t(`${i18nPrefix}.maxTraceTokens.tooltip`, { ns: 'workflow' })}
       >

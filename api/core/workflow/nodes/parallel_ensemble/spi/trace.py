@@ -52,6 +52,19 @@ class DiagnosticsConfig(BaseModel):
 
     storage: Literal["inline", "metadata"] = "metadata"
 
+    enable_trace_stream: bool = False
+    """When ``True`` the runner streams every recorded ``TokenStepTraceEntry``
+    to the frontend in real time (via the parallel-ensemble node's
+    ``AgentLogEvent`` side-channel; see ``parallel_ensemble/node.py``).
+
+    Off by default because the per-step payload — top-k candidates × N
+    backends — can be large and is research-mode telemetry, not something
+    every workflow run should carry across the SSE wire. Each step the
+    streamer emits the *same* filtered entry the trace store records,
+    so toggling ``include_token_candidates`` / ``include_logits`` /
+    ``include_aggregator_reasoning`` controls both the persisted trace
+    and the live stream — no separate redaction path."""
+
 
 class TokenStepTraceEntry(TypedDict, total=False):
     """One token-step row.
@@ -163,8 +176,16 @@ class TraceCollector:
             filtered["error"] = entry.get("error")
         self._response.append(filtered)
 
-    def record_token_step(self, entry: TokenStepTraceEntry) -> None:
-        """Persist one token-step entry (last-N capped at ``max_trace_tokens``)."""
+    def record_token_step(self, entry: TokenStepTraceEntry) -> TokenStepTraceEntry:
+        """Persist one token-step entry (last-N capped at ``max_trace_tokens``).
+
+        Returns the *filtered* entry so the runner can stream the same
+        redacted payload via ``enable_trace_stream`` without re-running
+        the include_* gating itself — single source of truth, single
+        place to extend when a new diagnostics flag lands. The returned
+        dict is the value appended to the in-memory store; the caller
+        must not mutate it (the store keeps the same reference).
+        """
         filtered: TokenStepTraceEntry = {
             "step": entry.get("step", 0),
             "selected_token": entry.get("selected_token", ""),
@@ -184,6 +205,7 @@ class TraceCollector:
             drop = len(self._token) - self._config.max_trace_tokens
             self._token = self._token[drop:]
             self._truncated_token_steps += drop
+        return filtered
 
     def record_think(self, entry: ThinkTraceEntry) -> None:
         if self._config.include_think_trace:

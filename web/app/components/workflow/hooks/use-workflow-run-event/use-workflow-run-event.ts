@@ -19,6 +19,7 @@ import {
   useWorkflowTextChunk,
   useWorkflowTextReplace,
 } from '.'
+import { useWorkflowParallelEnsembleTrace } from './use-workflow-parallel-ensemble-trace'
 
 export const useWorkflowRunEvent = () => {
   const { handleWorkflowStarted } = useWorkflowStarted()
@@ -36,6 +37,7 @@ export const useWorkflowRunEvent = () => {
   const { handleWorkflowTextChunk } = useWorkflowTextChunk()
   const { handleWorkflowTextReplace } = useWorkflowTextReplace()
   const { handleWorkflowAgentLog } = useWorkflowAgentLog()
+  const { handleWorkflowParallelEnsembleTrace } = useWorkflowParallelEnsembleTrace()
   const { handleWorkflowPaused } = useWorkflowPaused()
   const { handleWorkflowNodeHumanInputRequired } = useWorkflowNodeHumanInputRequired()
   const { handleWorkflowNodeHumanInputFormFilled } = useWorkflowNodeHumanInputFormFilled()
@@ -57,6 +59,7 @@ export const useWorkflowRunEvent = () => {
     handleWorkflowTextChunk,
     handleWorkflowTextReplace,
     handleWorkflowAgentLog,
+    handleWorkflowParallelEnsembleTrace,
     handleWorkflowPaused,
     handleWorkflowNodeHumanInputFormFilled,
     handleWorkflowNodeHumanInputRequired,
