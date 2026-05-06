@@ -20,12 +20,12 @@ experiments.
    - llama.cpp fork exposes raw logits at `POST /completion?post_sampling_probs=false`
    - `LlamaCppBackend` declares `Capability.LOGITS_RAW` when the spec sets `expose_raw_logits: true`
    - `parse_top_probs()` populates `TokenCandidate.logit` and synthesises `prob` via softmax when the wire payload only carries logits
-2. **Bring up 4 llama.cpp endpoints** for the paper's models (Table 1):
-   - q1: Qwen1.5-7B-Chat
-   - q2: Qwen2.5-7B-Instruct
-   - g4: GLM-4-9B-Chat
-   - L3: Meta-Llama-3.1-8B-Instruct
-   Add each as an alias in `api/configs/model_net.yaml` with `expose_raw_logits: true`.
+2. **Bring up 4 llama.cpp endpoints** for the reproduction models:
+   - q1 → alias `29`: Qwen2.5-3B (q8)
+   - q2 → alias `5`: Qwen2.5-7B-Instruct
+   - g4 → alias `6`: GLM-4-9B-Chat
+   - L3 → alias `2`: Meta-Llama-3.1-8B-Instruct
+   Each numeric alias in `api/configs/model_net.yaml` must set `expose_raw_logits: true`.
 3. **Generate the DSLs**:
    ```sh
    python dev/modelnet/generate_duet_net_dsls.py

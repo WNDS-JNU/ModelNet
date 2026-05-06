@@ -6,18 +6,16 @@ Produces 8 DSLs in ``docs/ModelNet/examples/workflow_mode/``:
     duet_net_<combo>.yml
 
 where ``<combo>`` is one of the 6 dual-model pairs from the paper
-(Tables 4-5) plus one 3-model and one 4-model variant. Each emitted
-DSL is a deterministic transformation of the canonical 2-model
-``duet_net_q1q2.yml`` template — only the per-source nodes and the
-``token_sources`` list change; the runner/aggregator config and the
-End wiring are constant.
+(Tables 4-5) plus one 3-model and one 4-model variant. The q1/q2/g4/L3
+labels stay as source IDs for paper readability, while ``model_alias``
+points at the numeric aliases currently registered in ``model_net.yaml``.
 
 Run:
 
     python dev/modelnet/generate_duet_net_dsls.py
 
-Idempotent — overwrites existing files. Aliases must already be
-declared in ``api/configs/model_net.yaml`` with
+Idempotent — overwrites existing files. Numeric aliases must already
+be declared in ``api/configs/model_net.yaml`` with
 ``expose_raw_logits: true``; otherwise ``duet_net`` will refuse to
 aggregate at the first decode step (CapabilityNotSupportedError).
 """
@@ -31,12 +29,21 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES_DIR = REPO_ROOT / "docs" / "ModelNet" / "examples" / "workflow_mode"
 
-# Paper's four self-hosted models (Table 1).
+# Logical labels for the paper combinations. q1 uses the small Qwen model
+# available in the current registry; q2/g4/L3 follow the closest registered
+# DuetNet-paper counterparts.
 ALIAS_DESCRIPTIONS: dict[str, str] = {
-    "q1": "Qwen1.5-7B-Chat",
+    "q1": "Qwen2.5-3B (q8)",
     "q2": "Qwen2.5-7B-Instruct",
     "g4": "GLM-4-9B-Chat",
     "L3": "Meta-Llama-3.1-8B-Instruct",
+}
+
+ALIAS_TO_MODEL_ALIAS: dict[str, str] = {
+    "q1": "29",
+    "q2": "5",
+    "g4": "6",
+    "L3": "2",
 }
 
 # Combinations from the paper:
@@ -153,9 +160,11 @@ def _start_node() -> dict:
 
 
 def _token_source_node(alias: str, y: int) -> dict:
+    model_alias = ALIAS_TO_MODEL_ALIAS[alias]
     desc = (
-        f"Renders the prompt for {alias} ({ALIAS_DESCRIPTIONS[alias]}) — yields a "
-        "ModelInvocationSpec; does NOT call the model directly."
+        f"Renders the prompt for {alias} ({ALIAS_DESCRIPTIONS[alias]}, "
+        f"model_alias={model_alias}) — yields a ModelInvocationSpec; "
+        "does NOT call the model directly."
     )
     return {
         "id": f"{alias}_source",
@@ -163,7 +172,7 @@ def _token_source_node(alias: str, y: int) -> dict:
         "data": {
             "desc": desc,
             "extra": {},
-            "model_alias": alias,
+            "model_alias": model_alias,
             "prompt_template": "{{#start_node.question#}}",
             "sampling_params": {
                 "max_tokens": 1024,
@@ -280,7 +289,8 @@ def build_dsl(aliases: tuple[str, ...]) -> dict:
         f"Token sources: {pretty}.\n\n"
         "Each token-model-source node renders the prompt; the parallel-ensemble "
         "node drives token_step runner + duet_net aggregator with paper defaults "
-        "(τ_K=10, τ_P=0.75, T=1). Every spec must declare LOGITS_RAW (set "
+        "(τ_K=10, τ_P=0.75, T=1). Logical labels map to numeric model aliases "
+        f"{ALIAS_TO_MODEL_ALIAS}. Every spec must declare LOGITS_RAW (set "
         "expose_raw_logits: true on the matching alias in "
         "api/configs/model_net.yaml). Vary aggregator_config to reproduce "
         "the parameter sweeps from paper Figs. 12-13."

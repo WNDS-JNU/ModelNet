@@ -7,9 +7,10 @@ app:
 
     Each token-model-source node renders the prompt; the parallel-ensemble node drives
     token_step runner + duet_net aggregator with paper defaults (τ_K=10, τ_P=0.75,
-    T=1). Every spec must declare LOGITS_RAW (set expose_raw_logits: true on the matching
-    alias in api/configs/model_net.yaml). Vary aggregator_config to reproduce the
-    parameter sweeps from paper Figs. 12-13.'
+    T=1). Logical labels map to numeric model aliases {''q1'': ''29'', ''q2'': ''5'',
+    ''g4'': ''6'', ''L3'': ''2''}. Every spec must declare LOGITS_RAW (set expose_raw_logits:
+    true on the matching alias in api/configs/model_net.yaml). Vary aggregator_config
+    to reproduce the parameter sweeps from paper Figs. 12-13.'
   icon: 🎵
   icon_background: '#DCE5FF'
   mode: workflow
@@ -124,10 +125,10 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Renders the prompt for g4 (GLM-4-9B-Chat) — yields a ModelInvocationSpec;
-          does NOT call the model directly.
+        desc: Renders the prompt for g4 (GLM-4-9B-Chat, model_alias=6) — yields a
+          ModelInvocationSpec; does NOT call the model directly.
         extra: {}
-        model_alias: g4
+        model_alias: '6'
         prompt_template: '{{#start_node.question#}}'
         sampling_params:
           max_tokens: 1024
@@ -150,10 +151,10 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Renders the prompt for L3 (Meta-Llama-3.1-8B-Instruct) — yields a ModelInvocationSpec;
-          does NOT call the model directly.
+        desc: Renders the prompt for L3 (Meta-Llama-3.1-8B-Instruct, model_alias=2)
+          — yields a ModelInvocationSpec; does NOT call the model directly.
         extra: {}
-        model_alias: L3
+        model_alias: '2'
         prompt_template: '{{#start_node.question#}}'
         sampling_params:
           max_tokens: 1024
