@@ -1,0 +1,41 @@
+# Sample config for dev/modelnet/duet_net_eval.py.
+# Copy to eval.yaml, fill in workflow API keys, then:
+#   python dev/modelnet/duet_net_eval.py --config dev/modelnet/eval.yaml
+
+base_url: http://localhost:5001/v1
+user: duet-net-eval
+response_mode: blocking
+request_timeout_s: 600
+
+# Each entry pairs a label with the workflow's API key (Dify console →
+# the workflow app → API → API key). The label can be anything; it just
+# tags rows in the final report. Add as many as you want compared in one
+# run.
+workflow_keys:
+  duet_net_q1_q2: app-PASTE_KEY_HERE
+  duet_net_q1_g4: app-PASTE_KEY_HERE
+  duet_net_q1_L3: app-PASTE_KEY_HERE
+  duet_net_q2_g4: app-PASTE_KEY_HERE
+  duet_net_q2_L3: app-PASTE_KEY_HERE
+  duet_net_g4_L3: app-PASTE_KEY_HERE
+  duet_net_q1_q2_g4: app-PASTE_KEY_HERE
+  duet_net_q1_q2_g4_L3: app-PASTE_KEY_HERE
+
+  # Optional baselines (you decide what these workflows do).
+  # sum_score_q1_q2: app-PASTE_KEY_HERE   # GaC-equivalent: probs sum, no logits
+  # single_q1: app-PASTE_KEY_HERE
+  # single_q2: app-PASTE_KEY_HERE
+
+datasets:
+  simple_math:
+    n: 50
+    seed: 42
+  c_eval:
+    n: 50
+  bool_q:
+    n: 50
+  mmlu:
+    n: 50
+
+checkpoint_path: dev/modelnet/eval_checkpoint.json
+report_path:     dev/modelnet/eval_report.json

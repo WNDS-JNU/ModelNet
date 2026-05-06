@@ -18,6 +18,7 @@ from core.workflow.nodes.parallel_ensemble.spi import (
     DiagnosticsConfig,
     TraceCollector,
 )
+from core.workflow.nodes.parallel_ensemble.spi.capability import Capability
 
 
 @pytest.fixture
@@ -26,7 +27,10 @@ def make_ctx():
 
     Defaults are wide-open: empty backends list, equal weights set by
     the caller, ``runner_name`` is generic. Tests override only the
-    fields that matter to them.
+    fields that matter to them. ``capabilities`` defaults to ``{}`` so
+    existing aggregator tests that don't gate on capability keep
+    passing untouched; aggregators that *do* gate (``duet_net``) pass
+    a populated ``capabilities`` map per source.
     """
 
     def _build(
@@ -34,6 +38,7 @@ def make_ctx():
         runner_name: str = "test_runner",
         runner_config: dict | None = None,
         step_index: int | None = 0,
+        capabilities: dict[str, frozenset[Capability]] | None = None,
     ) -> BackendAggregationContext:
         diagnostics = DiagnosticsConfig()
         trace = TraceCollector(diagnostics)
@@ -47,7 +52,7 @@ def make_ctx():
             strategy_config={},
             backends=[],
             weights=resolved_weights,
-            capabilities={},
+            capabilities=capabilities or {},
             runner_name=runner_name,
             runner_config=runner_config or {},
             trace=trace,
