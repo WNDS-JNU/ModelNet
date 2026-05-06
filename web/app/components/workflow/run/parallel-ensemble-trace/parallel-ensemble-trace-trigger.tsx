@@ -6,6 +6,7 @@ import { RiArrowRightSLine } from '@remixicon/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '@/app/components/workflow/store'
+import { NodeRunningStatus } from '@/app/components/workflow/types'
 import ParallelEnsembleTraceStepRow from './parallel-ensemble-trace-step'
 
 type Props = {
@@ -43,12 +44,15 @@ const ParallelEnsembleTraceTrigger: FC<Props> = ({ nodeInfo }) => {
       el.scrollTop = el.scrollHeight
   }, [steps.length, expanded])
 
-  // Hide entirely when no steps have arrived. The user enables the
-  // trace stream via ``DiagnosticsConfig.enable_trace_stream`` on the
-  // node panel; if it stayed off this whole run, there is nothing to
-  // show — keeping the trigger out of the DOM is less noisy than a
-  // disabled card.
-  if (steps.length === 0)
+  // Keep the trigger mounted while the node is running so an early
+  // expand (before step 1 streams in) doesn't look like the panel is
+  // broken — the user gets immediate confirmation that the trace
+  // channel is wired up, and the rows fill in as steps arrive. After
+  // the node finishes with zero steps, hide entirely: that means
+  // ``DiagnosticsConfig.enable_trace_stream`` was off for this run, and
+  // a permanent empty card would be noise.
+  const isRunning = nodeInfo.status === NodeRunningStatus.Running
+  if (steps.length === 0 && !isRunning)
     return null
 
   return (
@@ -80,12 +84,18 @@ const ParallelEnsembleTraceTrigger: FC<Props> = ({ nodeInfo }) => {
           ref={stepsRef}
           className="max-h-80 space-y-1 overflow-auto px-2 pb-2"
         >
-          {visibleSteps.map(step => (
-            <ParallelEnsembleTraceStepRow
-              key={step.message_id ?? `${step.step}`}
-              step={step}
-            />
-          ))}
+          {visibleSteps.length === 0
+            ? (
+                <div className="px-2 py-3 system-xs-regular text-text-tertiary">
+                  {t('parallelEnsemble.trace.waiting', { ns: 'workflow' })}
+                </div>
+              )
+            : visibleSteps.map(step => (
+                <ParallelEnsembleTraceStepRow
+                  key={step.message_id ?? `${step.step}`}
+                  step={step}
+                />
+              ))}
         </div>
       )}
     </div>
