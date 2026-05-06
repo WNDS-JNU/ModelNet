@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from core.workflow.nodes.token_model_source import TOKEN_MODEL_SOURCE_NODE_TYPE
 from core.workflow.nodes.token_model_source.entities import (
+    ChatMessageTemplate,
     SamplingParams,
     TokenModelSourceNodeData,
 )
@@ -181,3 +182,198 @@ class TestTokenModelSourceNodeData:
                     "sampling_params": {"top_k": 10, "temprature": 0.7},
                 }
             )
+
+
+class TestChatMessageTemplate:
+    """``ChatMessageTemplate`` is the per-row pydantic shape behind
+    ``messages_template`` (chat mode). The DSL surface must reject
+    yaml typos via ``extra="forbid"`` and require non-blank roles —
+    same seat-belts as ``SamplingParams``."""
+
+    def test_minimal_happy_path(self):
+        msg = ChatMessageTemplate(role="user", content="Hello")
+        assert msg.role == "user"
+        assert msg.content == "Hello"
+
+    def test_empty_content_allowed(self):
+        # Empty content is a legitimate use case (system slot the user
+        # leaves blank intentionally; placeholder-only content that
+        # resolves to empty string at run time). Reject only at the
+        # role surface, not content.
+        msg = ChatMessageTemplate(role="system", content="")
+        assert msg.content == ""
+
+    def test_blank_role_rejected(self):
+        with pytest.raises(ValidationError):
+            ChatMessageTemplate(role="", content="hi")
+
+    def test_unknown_field_rejected(self):
+        # ``extra="forbid"`` — yaml typos like ``role: user, contentx: hi``
+        # must hard-fail here, not at the rendered-prompt layer.
+        with pytest.raises(ValidationError):
+            ChatMessageTemplate.model_validate({"role": "user", "contentx": "hi"})
+
+
+class TestMessagesTemplateField:
+    """``messages_template`` carries chat mode through the DSL.
+
+    Two surfaces this test pins down:
+    * the field accepts a list of ``{role, content}`` rows and renders
+      them through the same pydantic shape as the bare model;
+    * the model validator rejects ambiguous configurations
+      (``prompt_template`` and ``messages_template`` simultaneously, or
+      an empty ``messages_template`` set at all).
+    """
+
+    def test_messages_template_accepted(self):
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            messages_template=[
+                ChatMessageTemplate(role="system", content="You are a helpful assistant."),
+                ChatMessageTemplate(role="user", content="Answer: {{#start.q#}}"),
+            ],
+        )
+        assert nd.messages_template is not None
+        assert len(nd.messages_template) == 2
+        assert nd.messages_template[0].role == "system"
+        assert nd.messages_template[1].content == "Answer: {{#start.q#}}"
+        # Default ``prompt_template=""`` must remain in chat mode — the
+        # mutex only fires on a *non-empty* prompt_template.
+        assert nd.prompt_template == ""
+
+    def test_messages_template_dict_form_validates_through(self):
+        # Persisted DSL deserialises into raw dicts; pydantic must
+        # construct the inner ``ChatMessageTemplate`` model from them so
+        # the frontend save path round-trips.
+        nd = TokenModelSourceNodeData.model_validate(
+            {
+                "title": "src",
+                "type": TOKEN_MODEL_SOURCE_NODE_TYPE,
+                "model_alias": "qwen3-4b",
+                "messages_template": [
+                    {"role": "user", "content": "hi"},
+                ],
+            }
+        )
+        assert nd.messages_template is not None
+        assert nd.messages_template[0].role == "user"
+
+    def test_default_messages_template_is_none(self):
+        # Raw-completion mode is the default — ``messages_template=None``
+        # means "feature not used", distinct from ``[]`` (which the
+        # validator rejects below).
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            prompt_template="hi",
+        )
+        assert nd.messages_template is None
+
+    def test_both_set_rejected(self):
+        # The schema validator rules out the ambiguous "both set"
+        # combination at boot time; the run loop never has to choose
+        # which one wins (ADR-v3-16 wire-shape unambiguity).
+        with pytest.raises(ValidationError) as exc:
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="qwen3-4b",
+                prompt_template="raw text",
+                messages_template=[ChatMessageTemplate(role="user", content="hi")],
+            )
+        assert "mutually exclusive" in str(exc.value)
+
+    def test_empty_messages_template_rejected(self):
+        # ``messages_template=[]`` is "chat mode set but useless" —
+        # reject so the user cannot save a config that would render an
+        # empty messages list to the chat-template endpoint.
+        with pytest.raises(ValidationError) as exc:
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="qwen3-4b",
+                messages_template=[],
+            )
+        assert "must not be empty" in str(exc.value)
+
+    def test_empty_prompt_template_with_messages_template_allowed(self):
+        # The mutex fires on a *non-empty* ``prompt_template``; the
+        # default empty string is fine alongside ``messages_template``.
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            prompt_template="",
+            messages_template=[ChatMessageTemplate(role="user", content="hi")],
+        )
+        assert nd.messages_template is not None
+        assert nd.prompt_template == ""
+
+    def test_inner_validation_propagates(self):
+        # ``ChatMessageTemplate.role`` min_length=1 must surface through
+        # the parent so a typo'd messages list (empty role) is caught at
+        # boot, not at render time.
+        with pytest.raises(ValidationError):
+            TokenModelSourceNodeData.model_validate(
+                {
+                    "title": "src",
+                    "type": TOKEN_MODEL_SOURCE_NODE_TYPE,
+                    "model_alias": "qwen3-4b",
+                    "messages_template": [{"role": "", "content": "hi"}],
+                }
+            )
+
+
+class TestRawCompletionFlag:
+    """``raw_completion=True`` is the research escape hatch: opts out of
+    chat-template auto-wrap so chat-template-capable backends still
+    receive the rendered ``prompt_template`` verbatim (PN.py-style).
+    Default is ``False`` so existing graphs that only set
+    ``prompt_template`` get the bug-fix behaviour without a DSL change.
+    """
+
+    def test_default_is_false(self):
+        # Default flag exists on the schema and defaults to False so the
+        # auto-wrap default fires without explicit user opt-in.
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            prompt_template="hi",
+        )
+        assert nd.raw_completion is False
+
+    def test_explicit_true_round_trips(self):
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            prompt_template="research mode raw text",
+            raw_completion=True,
+        )
+        assert nd.raw_completion is True
+
+    def test_raw_completion_with_messages_template_rejected(self):
+        # ``raw_completion=True`` says "send prompt verbatim" — combining
+        # it with ``messages_template`` is a contradiction (the latter
+        # has no ``prompt`` slot to send). Schema validator must reject
+        # so the contradiction surfaces at boot, not silently at run
+        # time.
+        with pytest.raises(ValidationError) as exc:
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="qwen3-4b",
+                messages_template=[ChatMessageTemplate(role="user", content="hi")],
+                raw_completion=True,
+            )
+        assert "incompatible" in str(exc.value)
+
+    def test_raw_completion_with_prompt_template_allowed(self):
+        # The intended combo: raw_completion=True is *only* meaningful
+        # alongside prompt_template. Pin the happy path so a future
+        # validator tightening cannot accidentally lock out the
+        # research escape hatch.
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            prompt_template="raw priming text",
+            raw_completion=True,
+        )
+        assert nd.raw_completion is True
+        assert nd.prompt_template == "raw priming text"

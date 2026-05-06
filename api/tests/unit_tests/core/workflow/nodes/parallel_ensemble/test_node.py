@@ -79,6 +79,7 @@ from core.workflow.nodes.parallel_ensemble.entities import (
     ParallelEnsembleNodeData,
 )
 from core.workflow.nodes.parallel_ensemble.exceptions import (
+    ChatTemplateRenderError,
     InvalidSpecError,
     MissingSpecError,
     StructuredValidationError,
@@ -256,6 +257,49 @@ class _OpenAIStyleBackend(ModelBackend):
     def generate(self, prompt: str, params: GenerationParams) -> GenerationResult:
         del prompt, params
         return GenerationResult(text="", finish_reason="stop", metadata={})
+
+
+class _ChatTemplateBackend(ModelBackend):
+    """Token-step backend that *also* declares ``CHAT_TEMPLATE``.
+
+    Per-instance state records ``apply_template`` invocations so chat-mode
+    integration tests can assert *what* messages reached the backend and
+    *that* the rendered prompt landed on the runner's ``SourceInput``.
+
+    Returning a sentinel from ``apply_template`` (instead of mimicking a
+    real chat scaffold) keeps assertions terse — the test only cares
+    that the chat-mode branch fired, not that the scaffold is shaped
+    correctly. Backend-specific scaffold behaviour belongs in
+    ``test_llama_cpp_backend.py``.
+    """
+
+    name = "chat_template_backend"
+    spec_class: ClassVar[type[BaseSpec]] = _SyntheticSpec
+
+    def __init__(self, spec: BaseSpec, http: object) -> None:
+        super().__init__(spec=spec, http=http)
+        self.template_calls: list[list[dict[str, str]]] = []
+        self.rendered_prompt = "<<<TEMPLATED>>>"
+
+    @classmethod
+    def capabilities(cls, spec: BaseSpec) -> frozenset[Capability]:
+        del spec
+        return frozenset(
+            {Capability.TOKEN_STEP, Capability.TOP_PROBS, Capability.CHAT_TEMPLATE}
+        )
+
+    @classmethod
+    def validate_requirements(cls, spec: BaseSpec, requirements: list[Requirement]) -> list[ValidationIssue]:
+        del spec, requirements
+        return []
+
+    def generate(self, prompt: str, params: GenerationParams) -> GenerationResult:
+        del prompt, params
+        return GenerationResult(text="ok", finish_reason="stop", metadata={})
+
+    def apply_template(self, messages: list) -> str:  # type: ignore[override]
+        self.template_calls.append([dict(m) for m in messages])
+        return self.rendered_prompt
 
 
 # ── Synthetic runners ────────────────────────────────────────────────────
@@ -519,6 +563,7 @@ def _make_spec_dict(
     prompt: str = "hi",
     sampling_params: dict[str, Any] | None = None,
     extra: dict[str, Any] | None = None,
+    messages: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Build a ``ModelInvocationSpec``-shaped dict for the variable pool.
 
@@ -527,13 +572,22 @@ def _make_spec_dict(
     PN.py-friendly ``top_k=5`` so the synthetic ``_BigTopKRunner`` /
     requirements path lands on a value the §9 pipeline can compare
     against the runner's own ``min_top_k``.
+
+    ``messages`` is the optional chat-mode payload — when set the
+    parallel-ensemble node routes the source through
+    ``backend.apply_template`` instead of using ``prompt`` verbatim.
+    Most tests leave it ``None`` (raw mode) so coverage of the legacy
+    PN.py wire shape stays the default.
     """
-    return {
+    spec: dict[str, Any] = {
         "model_alias": model_alias,
         "prompt": prompt,
         "sampling_params": dict(sampling_params or {"top_k": 5}),
         "extra": dict(extra or {}),
     }
+    if messages is not None:
+        spec["messages"] = [dict(m) for m in messages]
+    return spec
 
 
 def _build_pool(
@@ -703,11 +757,10 @@ class TestEventSequence:
         coordinator would buffer the trace and the live panel would
         flat-line. ``message_id`` is deterministic so a re-emit dedups
         on the frontend store."""
-        from graphon.node_events.agent import AgentLogEvent
-
         from core.workflow.nodes.parallel_ensemble.node import (
             TRACE_STREAM_AGENT_LOG_KIND,
         )
+        from graphon.node_events.agent import AgentLogEvent
 
         _ScriptedRunner.scripted_events = [
             {
@@ -1198,6 +1251,472 @@ class TestSpecResolution:
             list(node._run())
         assert exc.value.source_id == "s1"
         assert "expected dict" in exc.value.reason
+
+
+# ── Chat-mode integration ────────────────────────────────────────────────
+
+
+class TestChatModeIntegration:
+    """``spec.messages`` (chat mode) routes through each backend's
+    ``apply_template`` before the runner sees the prompt; ``spec.prompt``
+    (raw mode) keeps the PN.py path unchanged. Three places to pin:
+
+    * ``apply_template`` is called exactly once per source per run,
+      with the spec's ``messages`` payload, before any token-step call.
+    * The string ``apply_template`` returns is what lands on
+      ``SourceInput.prompt`` for the runner — not the original
+      ``spec.prompt`` slot (chat mode zeroes that to make the failure
+      mode loud if the wiring ever regresses).
+    * Chat-mode sources whose backend lacks ``CHAT_TEMPLATE`` get
+      rejected at §9 startup so the SPI-default ``apply_template``
+      (naive ``role: content`` join) cannot silently produce a
+      non-model-specific scaffold.
+    """
+
+    @staticmethod
+    def _make_capturing_runner(captured: dict[str, Any]) -> type[EnsembleRunner]:
+        """Capturing runner that records ``sources`` and ``backends``
+        once per run so the test can assert what the runner *would*
+        have sent to ``backend.step_token``. Token-scope so the §9
+        scope alignment passes against ``_NoSignalTokenAggregator``."""
+
+        class _CapturingChatRunner(EnsembleRunner[_ScriptedConfig]):
+            name = "_capturing_chat"
+            config_class: ClassVar[type[BaseModel]] = _ScriptedConfig
+            aggregator_scope: ClassVar[str] = "token"
+            required_capabilities: ClassVar[frozenset[Capability]] = frozenset(
+                {Capability.TOKEN_STEP, Capability.TOP_PROBS}
+            )
+            i18n_key_prefix: ClassVar[str] = "test.capturingChat"
+            ui_schema: ClassVar[dict] = {}
+
+            def __init__(self, executor: ThreadPoolExecutor, aggregator_config: BaseModel) -> None:
+                del executor, aggregator_config
+
+            @classmethod
+            def requirements(cls, config: _ScriptedConfig) -> list[Requirement]:
+                del config
+                return []
+
+            def run(
+                self,
+                sources: dict[str, SourceInput],
+                backends: dict[str, ModelBackend],
+                aggregator: Aggregator,
+                config: _ScriptedConfig,
+                trace: TraceCollector,
+            ) -> Iterator[RunnerEvent]:
+                del aggregator, config, trace
+                captured["sources"] = sources
+                captured["backends"] = backends
+                yield DoneEvent(kind="done", text="ok", metadata={})
+
+        return _CapturingChatRunner
+
+    def test_apply_template_called_with_spec_messages(self):
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="",
+                messages=[
+                    {"role": "system", "content": "You are helpful."},
+                    {"role": "user", "content": "1+1=?"},
+                ],
+            ),
+        )
+        # s1 opts out of auto-wrap so this test can isolate the
+        # explicit-messages branch — without ``raw_completion=True``
+        # the chat-capable backend would auto-wrap s1 too and the
+        # assertion below would fire on s1's own auto-wrap call.
+        pool.add(
+            ["src_1", "spec"],
+            {**_make_spec_dict(model_alias="m2"), "raw_completion": True},
+        )
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        list(node._run())
+
+        # s0 (explicit messages) → apply_template called once with the spec's messages.
+        s0_backend = captured["backends"]["s0"]
+        assert s0_backend.template_calls == [
+            [
+                {"role": "system", "content": "You are helpful."},
+                {"role": "user", "content": "1+1=?"},
+            ]
+        ]
+        # s1 (raw_completion=True) — apply_template must NOT have
+        # fired even though the backend supports CHAT_TEMPLATE; the
+        # opt-out flag is the research escape hatch and has to win
+        # over the auto-wrap default. Per-instance state isolates the
+        # two sources cleanly even though both use the same class.
+        s1_backend = captured["backends"]["s1"]
+        assert s1_backend.template_calls == []
+
+    def test_rendered_prompt_lands_on_source_input(self):
+        # Chat mode replaces ``spec.prompt`` with the result of
+        # ``apply_template`` — pinned via the sentinel string the
+        # _ChatTemplateBackend returns.
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="<RAW-IGNORED>",  # chat mode must NOT use this
+                messages=[{"role": "user", "content": "hello"}],
+            ),
+        )
+        # s1 opts out of auto-wrap so its prompt rides through verbatim;
+        # without ``raw_completion=True`` the chat-capable backend would
+        # have replaced ``"raw-prompt-for-s1"`` with the auto-wrap
+        # sentinel and this assertion would no longer pin the raw path.
+        pool.add(
+            ["src_1", "spec"],
+            {
+                **_make_spec_dict(model_alias="m2", prompt="raw-prompt-for-s1"),
+                "raw_completion": True,
+            },
+        )
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        list(node._run())
+
+        # s0 picks up the ``apply_template`` return value (the sentinel).
+        assert captured["sources"]["s0"]["prompt"] == "<<<TEMPLATED>>>"
+        # s1 (raw_completion=True) keeps its spec.prompt verbatim — the
+        # auto-wrap default must NOT touch sources that opted into raw
+        # mode.
+        assert captured["sources"]["s1"]["prompt"] == "raw-prompt-for-s1"
+
+    def test_raw_completion_flag_opts_out_of_auto_wrap(self):
+        # Same shape as the rendered_prompt test but the assertion
+        # surface is ``backend.template_calls`` instead of the
+        # SourceInput prompt — pins the *call site* (was apply_template
+        # invoked?), not just the eventual string. A regression that
+        # auto-wraps but then discards the result would only surface
+        # here.
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            {**_make_spec_dict(model_alias="m1"), "raw_completion": True},
+        )
+        pool.add(
+            ["src_1", "spec"],
+            {**_make_spec_dict(model_alias="m2"), "raw_completion": True},
+        )
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        list(node._run())
+        for sid in ("s0", "s1"):
+            assert captured["backends"][sid].template_calls == []
+            # SourceInput.prompt comes straight from the default
+            # ``_make_spec_dict`` prompt slot.
+            assert captured["sources"][sid]["prompt"] == "hi"
+
+    def test_auto_wrap_fires_for_chat_backend_with_only_prompt_template(self):
+        # The fix that resolves the user's reported bug: existing graphs
+        # configured with only ``prompt_template`` (no
+        # ``messages_template``) now route through the backend's chat
+        # scaffold automatically when the backend supports it. Without
+        # this the model echoes the user's question back instead of
+        # answering — see the original ``：1+1等于几？`` failure mode.
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1", prompt="1+1=?"))
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2", prompt="1+1=?"))
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        list(node._run())
+
+        # apply_template fired for each source with the auto-wrap shape.
+        for sid in ("s0", "s1"):
+            assert captured["backends"][sid].template_calls == [
+                [{"role": "user", "content": "1+1=?"}]
+            ]
+            # Runner sees the *templated* string, not the raw prompt.
+            assert captured["sources"][sid]["prompt"] == "<<<TEMPLATED>>>"
+
+    def test_auto_wrap_skipped_for_non_chat_backend(self):
+        # Backend without CHAT_TEMPLATE — auto-wrap cannot fire because
+        # there is no model-specific scaffold to apply. The runner sees
+        # the raw prompt verbatim (PN.py-compatible path). Pinned so a
+        # regression that auto-wraps even non-chat backends — calling
+        # the SPI-default ``apply_template`` (naive ``role: content``
+        # join) — surfaces here.
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        node = _make_node(
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _TokenStepBackend},
+        )
+        list(node._run())
+        for sid in ("s0", "s1"):
+            assert captured["sources"][sid]["prompt"] == "hi"
+
+    def test_auto_wrap_skipped_for_empty_prompt(self):
+        # Empty prompt + chat backend → auto-wrapping ``""`` would
+        # produce a useless ``user: ""`` chat turn. Skip the wrap
+        # entirely so ``apply_template`` is not called and the runner
+        # sees the empty string (which is what the user authored).
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1", prompt=""))
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2", prompt=""))
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        list(node._run())
+        for sid in ("s0", "s1"):
+            assert captured["backends"][sid].template_calls == []
+            assert captured["sources"][sid]["prompt"] == ""
+
+    def test_apply_template_empty_result_raises_chat_template_render_error(self):
+        # Defensive: the documented llama.cpp behaviour on a malformed
+        # /apply-template payload is to return ``""``. Without this
+        # guard the runner would silently feed an empty prompt to
+        # step_token; surfacing as ``ChatTemplateRenderError`` lets the
+        # panel attribute the failure to a specific source / backend.
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1", prompt="hi"))
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2", prompt="hi"))
+
+        class _EmptyTemplateBackend(_ChatTemplateBackend):
+            name = "empty_template_backend"
+
+            def __init__(self, spec: BaseSpec, http: object) -> None:
+                super().__init__(spec=spec, http=http)
+                self.rendered_prompt = ""
+
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _EmptyTemplateBackend},
+        )
+        with pytest.raises(ChatTemplateRenderError) as exc:
+            list(node._run())
+        # First source surfaced — and carries enough attribution for
+        # the panel.
+        assert exc.value.source_id == "s0"
+        assert exc.value.backend == "empty_template_backend"
+        assert "auto-wrapped prompt" in exc.value.reason
+
+    def test_apply_template_empty_result_for_explicit_messages_raises(self):
+        # Same guard but for the explicit ``messages_template`` branch —
+        # an empty return is just as misleading there as for auto-wrap.
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="",
+                messages=[{"role": "user", "content": "hi"}],
+            ),
+        )
+        pool.add(
+            ["src_1", "spec"],
+            {**_make_spec_dict(model_alias="m2"), "raw_completion": True},
+        )
+
+        class _EmptyTemplateBackend(_ChatTemplateBackend):
+            name = "empty_template_backend"
+
+            def __init__(self, spec: BaseSpec, http: object) -> None:
+                super().__init__(spec=spec, http=http)
+                self.rendered_prompt = ""
+
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _EmptyTemplateBackend},
+        )
+        with pytest.raises(ChatTemplateRenderError) as exc:
+            list(node._run())
+        assert exc.value.source_id == "s0"
+        assert "explicit messages payload" in exc.value.reason
+
+    def test_chat_mode_with_non_chat_backend_rejected_at_startup(self):
+        # _TokenStepBackend declares TOKEN_STEP + TOP_PROBS but NOT
+        # CHAT_TEMPLATE. An *explicit* chat-mode source (messages_template)
+        # against it must surface as a §9 ``StructuredValidationError``
+        # so the user is told to pick a different backend or switch to
+        # ``prompt_template``. (Auto-wrap silently degrades to raw mode
+        # for non-chat backends — the explicit branch is the strict one.)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="",
+                messages=[{"role": "user", "content": "hi"}],
+            ),
+        )
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2"))
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _TokenStepBackend},
+        )
+        with pytest.raises(StructuredValidationError) as exc:
+            list(node._run())
+        # Surface the offending source so the panel error is precise.
+        messages = [issue["message"] for issue in exc.value.issues]
+        assert any("messages_template (chat mode)" in m and "s0" in m for m in messages)
+        # The chat-template gate must NOT fire for s1 (raw mode).
+        assert all("s1" not in m for m in messages)
+
+    def test_chat_mode_with_chat_capable_backend_passes_validation(self):
+        # Sibling check to the rejection test — the same shape against
+        # a CHAT_TEMPLATE-capable backend must succeed cleanly. Without
+        # this the rejection test could be passing due to an unrelated
+        # error (regression vector: tightening §9 too far).
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="",
+                messages=[{"role": "user", "content": "hi"}],
+            ),
+        )
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2"))
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        # No StructuredValidationError → chat mode is supported.
+        list(node._run())
+        assert "sources" in captured
+
+    def test_malformed_messages_shape_raises_invalid_spec_error(self):
+        # Wire-shape validation in _collect_specs — a stray non-dict
+        # row inside ``messages`` must surface as ``InvalidSpecError``
+        # against the offending source (same fail-fast contract as
+        # missing required keys).
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1"))
+        # s1: messages is a list but element is not a dict.
+        bad_spec = _make_spec_dict(model_alias="m2", prompt="")
+        bad_spec["messages"] = ["not-a-dict"]  # type: ignore[list-item]
+        pool.add(["src_1", "spec"], bad_spec)
+
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        with pytest.raises(InvalidSpecError) as exc:
+            list(node._run())
+        assert exc.value.source_id == "s1"
+        assert "messages[0]" in exc.value.reason
+
+    def test_messages_missing_role_raises_invalid_spec_error(self):
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1"))
+        bad_spec = _make_spec_dict(model_alias="m2", prompt="")
+        bad_spec["messages"] = [{"content": "no-role-key"}]
+        pool.add(["src_1", "spec"], bad_spec)
+
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        with pytest.raises(InvalidSpecError) as exc:
+            list(node._run())
+        assert exc.value.source_id == "s1"
+        assert "role" in exc.value.reason
+
+    def test_empty_messages_list_raises_invalid_spec_error(self):
+        # Defensive: the source-node validator already rejects
+        # ``messages_template=[]`` at boot, but a third-party producer
+        # node could synthesise an empty messages list and bypass that
+        # gate. The consumer-side fail-fast is the second seat-belt.
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1"))
+        bad_spec = _make_spec_dict(model_alias="m2", prompt="")
+        bad_spec["messages"] = []
+        pool.add(["src_1", "spec"], bad_spec)
+
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            backends={"synthetic": _ChatTemplateBackend},
+        )
+        with pytest.raises(InvalidSpecError) as exc:
+            list(node._run())
+        assert exc.value.source_id == "s1"
+        assert "non-empty" in exc.value.reason or "empty list" in exc.value.reason
 
 
 # ── Effective per-source TokenStepParams ─────────────────────────────────

@@ -32,7 +32,7 @@ from graphon.nodes.base.node import Node
 from graphon.nodes.base.variable_template_parser import VariableTemplateParser
 
 from . import TOKEN_MODEL_SOURCE_NODE_TYPE
-from .entities import ModelInvocationSpec, TokenModelSourceNodeData
+from .entities import ChatMessageDict, ChatMessageTemplate, ModelInvocationSpec, TokenModelSourceNodeData
 from .exceptions import PromptRenderError, TokenModelSourceNodeError
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,17 @@ class TokenModelSourceNode(Node[TokenModelSourceNodeData]):
     def _run(self) -> Generator[NodeEventBase, None, None]:
         node_data = self.node_data
         try:
-            rendered = self._render_prompt(node_data.prompt_template)
+            # Two render branches; the schema validator already ruled out
+            # the "both set" ambiguity. ``messages_template`` is rendered
+            # row-by-row so ``PromptRenderError`` blames the right
+            # surface (panel can show "row 2 system content references
+            # missing #foo#" instead of a generic prompt-render fail).
+            if node_data.messages_template is not None:
+                rendered_messages = self._render_messages(node_data.messages_template)
+                rendered_prompt = ""
+            else:
+                rendered_messages = None
+                rendered_prompt = self._render_prompt(node_data.prompt_template)
         except TokenModelSourceNodeError as exc:
             logger.warning(
                 "TokenModelSourceNode %s failed: %s",
@@ -68,13 +78,15 @@ class TokenModelSourceNode(Node[TokenModelSourceNodeData]):
 
         spec: ModelInvocationSpec = {
             "model_alias": node_data.model_alias,
-            "prompt": rendered,
+            "prompt": rendered_prompt,
             "sampling_params": node_data.sampling_params.model_dump(),
             # ``dict(...)`` decouples the spec from ``node_data.extra`` so
             # any downstream mutation (an aggregator that injects a
             # backend-private key per call) does not bleed back into the
             # parsed node-data instance.
             "extra": dict(node_data.extra),
+            "messages": rendered_messages,
+            "raw_completion": node_data.raw_completion,
         }
         # Surface ``model_alias`` as a top-level output too: downstream
         # nodes that only need the alias to fan out (panels / debug
@@ -90,6 +102,24 @@ class TokenModelSourceNode(Node[TokenModelSourceNodeData]):
                 },
             ),
         )
+
+    def _render_messages(
+        self,
+        templates: list[ChatMessageTemplate],
+    ) -> list[ChatMessageDict]:
+        """Render every ``content`` in ``messages_template`` against the pool.
+
+        Each row's ``role`` rides through verbatim (the chat scaffold
+        decides whether it is a valid role for the target model — the
+        backend's ``apply_template`` is the canonical authority on that).
+        ``content`` reuses :meth:`_render_prompt`'s rendering so research
+        configs that mix raw and chat sources see byte-identical
+        substitution semantics across both paths.
+        """
+        return [
+            {"role": tmpl.role, "content": self._render_prompt(tmpl.content)}
+            for tmpl in templates
+        ]
 
     def _render_prompt(self, template: str) -> str:
         """Resolve ``{{#node.field#}}`` placeholders against the variable pool.
@@ -143,8 +173,18 @@ class TokenModelSourceNode(Node[TokenModelSourceNodeData]):
         # ``Node.extract_variable_selector_to_variable_mapping``
         # docstring).
         mapping: dict[str, Sequence[str]] = {}
-        for selector in VariableTemplateParser(
-            node_data.prompt_template,
-        ).extract_variable_selectors():
-            mapping[f"{node_id}.{selector.variable}"] = list(selector.value_selector)
+        # Walk both surfaces — ``prompt_template`` and every
+        # ``messages_template[i].content`` — so the preload path
+        # materialises upstream values the chat-mode renderer needs too.
+        # The schema validator forbids both being set simultaneously, so
+        # in practice only one branch contributes; iterating both is
+        # cheaper than re-deriving "which mode?" here, and keeps the
+        # mapping correct if a future schema change ever loosens the
+        # mutex.
+        templates: list[str] = [node_data.prompt_template]
+        if node_data.messages_template is not None:
+            templates.extend(msg.content for msg in node_data.messages_template)
+        for template in templates:
+            for selector in VariableTemplateParser(template).extract_variable_selectors():
+                mapping[f"{node_id}.{selector.variable}"] = list(selector.value_selector)
         return mapping

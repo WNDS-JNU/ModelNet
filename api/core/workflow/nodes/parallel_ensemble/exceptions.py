@@ -87,6 +87,30 @@ class InvalidSpecError(ParallelEnsembleError):
         )
 
 
+class ChatTemplateRenderError(ParallelEnsembleError):
+    """Raised when a backend's ``apply_template`` returns an empty
+    string for a chat-mode source.
+
+    The SPI default ``apply_template`` (naive ``role: content`` join)
+    cannot return empty; only an overriding backend can — and when it
+    does, the runner would silently feed an empty prompt to
+    ``step_token``, producing the exact "model rambles / answers
+    nothing" symptom this whole feature exists to fix. Surface it as a
+    structured error with ``source_id`` + ``backend`` so the panel can
+    say *which* backend's chat-template endpoint misbehaved. Pinning
+    this here (rather than letting the runner fail later on an empty
+    prompt) keeps the failure attributable to the right layer.
+    """
+
+    def __init__(self, source_id: str, backend: str, reason: str = "apply_template returned empty string"):
+        self.source_id = source_id
+        self.backend = backend
+        self.reason = reason
+        super().__init__(
+            f"Source '{source_id}' (backend={backend}) failed chat-template render: {reason}"
+        )
+
+
 class WeightResolutionError(ParallelEnsembleError):
     """Raised when a dynamic ``TokenSourceRef.weight`` selector cannot resolve.
 

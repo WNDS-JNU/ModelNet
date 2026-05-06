@@ -49,12 +49,18 @@ def _payload(
     prompt_template: str = "Answer: {{#start.q#}}",
     sampling_params: dict | None = None,
     extra: dict | None = None,
+    messages_template: list[dict] | None = None,
 ) -> dict:
     payload: dict = {
         "title": "src",
         "model_alias": model_alias,
-        "prompt_template": prompt_template,
     }
+    # Only include ``prompt_template`` when chat-mode is not requested,
+    # so the mutex validator on the entity model does not fire.
+    if messages_template is not None:
+        payload["messages_template"] = messages_template
+    else:
+        payload["prompt_template"] = prompt_template
     if sampling_params is not None:
         payload["sampling_params"] = sampling_params
     if extra is not None:
@@ -90,6 +96,13 @@ class TestRunHappyPath:
             "stop": [],
         }
         assert spec["extra"] == {}
+        # Raw-completion mode emits ``messages: None`` so the
+        # parallel-ensemble consumer can branch on it cheaply.
+        assert spec["messages"] is None
+        # ``raw_completion`` defaults to False — chat-template auto-wrap
+        # path is the active default; pin so a regression to ``True``
+        # default would surface as a behaviour change here.
+        assert spec["raw_completion"] is False
         # ``model_alias`` surfaced top-level too for panels that only
         # want the alias without unpacking the spec dict.
         assert nrr.outputs["model_alias"] == "qwen3-4b"
@@ -161,6 +174,102 @@ class TestRunHappyPath:
         spec = list(node._run())[0].node_run_result.outputs["spec"]
         spec["extra"]["mutated"] = True
         assert "mutated" not in node._node_data.extra
+
+
+class TestChatModeRendering:
+    """``messages_template`` (chat mode) renders each ``content``
+    against the variable pool with the same semantics as
+    ``prompt_template`` (raw mode), and surfaces the result on
+    ``spec.messages`` so the parallel-ensemble node can route through
+    each backend's ``apply_template`` instead of sending raw completion
+    text.
+    """
+
+    def test_chat_mode_renders_each_content(self):
+        pool = VariablePool()
+        pool.add(["start", "q"], "what is 2+2")
+        pool.add(["ctx", "lang"], "english")
+        node = _make_node(
+            pool,
+            _payload(
+                messages_template=[
+                    {"role": "system", "content": "Reply in {{#ctx.lang#}}."},
+                    {"role": "user", "content": "Answer: {{#start.q#}}"},
+                ],
+            ),
+        )
+
+        events = list(node._run())
+        assert len(events) == 1
+        nrr = events[0].node_run_result
+        assert nrr.status == WorkflowNodeExecutionStatus.SUCCEEDED
+
+        spec = nrr.outputs["spec"]
+        # Chat mode emits the messages list and zeroes the prompt slot.
+        assert spec["messages"] == [
+            {"role": "system", "content": "Reply in english."},
+            {"role": "user", "content": "Answer: what is 2+2"},
+        ]
+        assert spec["prompt"] == ""
+        # Surfacing model_alias still works in chat mode.
+        assert nrr.outputs["model_alias"] == "qwen3-4b"
+
+    def test_chat_mode_constant_content_no_pool_lookup(self):
+        # No placeholders → renderer short-circuits without touching the
+        # pool (matches raw-mode behaviour).
+        pool = VariablePool()
+        node = _make_node(
+            pool,
+            _payload(
+                messages_template=[
+                    {"role": "user", "content": "What's the capital of France?"},
+                ],
+            ),
+        )
+
+        spec = list(node._run())[0].node_run_result.outputs["spec"]
+        assert spec["messages"] == [
+            {"role": "user", "content": "What's the capital of France?"},
+        ]
+        assert spec["prompt"] == ""
+
+    def test_chat_mode_missing_variable_fails_with_prompt_render_error(self):
+        # A missing upstream variable in any ``content`` must FAIL the
+        # node with the same ``PromptRenderError`` shape raw mode uses,
+        # so the panel error UX stays consistent across the two modes.
+        pool = VariablePool()
+        # ``start.q`` deliberately not added.
+        node = _make_node(
+            pool,
+            _payload(
+                messages_template=[
+                    {"role": "user", "content": "Answer: {{#start.q#}}"},
+                ],
+            ),
+        )
+
+        events = list(node._run())
+        nrr = events[0].node_run_result
+        assert nrr.status == WorkflowNodeExecutionStatus.FAILED
+        assert nrr.error_type == "PromptRenderError"
+        assert "#start.q#" in nrr.error
+
+    def test_chat_mode_role_passes_through_unchanged(self):
+        # The backend's ``apply_template`` is the canonical authority on
+        # role validity; the source node must not gate on role names so
+        # research configs with custom roles (e.g. ``"function"``,
+        # ``"tool"``, ``"developer"``) round-trip without surgery.
+        pool = VariablePool()
+        node = _make_node(
+            pool,
+            _payload(
+                messages_template=[
+                    {"role": "developer", "content": "Custom role test."},
+                ],
+            ),
+        )
+        spec = list(node._run())[0].node_run_result.outputs["spec"]
+        assert spec["messages"] == [{"role": "developer", "content": "Custom role test."}]
 
 
 class TestRenderPromptSegmentText:
@@ -285,6 +394,32 @@ class TestExtractVariableSelectorMapping:
                 "structured_output",
                 "city",
             ],
+        }
+
+    def test_messages_template_placeholders_exposed(self):
+        # Chat-mode placeholders must reach the preload pipeline too —
+        # otherwise ``_render_messages`` would race the variable pool
+        # at run time and fail with PromptRenderError on values the
+        # framework had time to materialise but didn't, because the
+        # mapping omitted them.
+        config = {
+            "id": "src_1",
+            "data": {
+                "title": "src",
+                "type": TOKEN_MODEL_SOURCE_NODE_TYPE,
+                "model_alias": "qwen3-4b",
+                "messages_template": [
+                    {"role": "system", "content": "Speak {{#ctx.lang#}}."},
+                    {"role": "user", "content": "Q: {{#start.q#}}"},
+                ],
+            },
+        }
+        mapping = TokenModelSourceNode.extract_variable_selector_to_variable_mapping(
+            graph_config={}, config=config
+        )
+        assert dict(mapping) == {
+            "src_1.#ctx.lang#": ["ctx", "lang"],
+            "src_1.#start.q#": ["start", "q"],
         }
 
 

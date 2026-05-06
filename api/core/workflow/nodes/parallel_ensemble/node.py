@@ -113,6 +113,7 @@ from graphon.nodes.base.node import Node
 from . import PARALLEL_ENSEMBLE_NODE_TYPE
 from .entities import ParallelEnsembleConfig, ParallelEnsembleNodeData, TokenSourceRef
 from .exceptions import (
+    ChatTemplateRenderError,
     InvalidSpecError,
     MissingSpecError,
     StructuredValidationError,
@@ -120,6 +121,7 @@ from .exceptions import (
 )
 from .spi.aggregator import Aggregator
 from .spi.backend import BaseSpec, ModelBackend, TokenStepParams
+from .spi.capability import Capability
 from .spi.requirements import Requirement, ValidationIssue
 from .spi.runner import EnsembleRunner, SourceInput
 from .spi.trace import EnsembleTrace, TraceCollector
@@ -263,7 +265,7 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
 
         backends = self._instantiate_backends(cfg.token_sources, specs)
         weights = self._resolve_weights(cfg.token_sources)
-        sources = self._build_source_inputs(cfg.token_sources, specs, effective_params, weights)
+        sources = self._build_source_inputs(cfg.token_sources, specs, effective_params, weights, backends)
 
         trace = TraceCollector(cfg.diagnostics)
         runner = self._instantiate_runner(runner_cls, aggregator_config)
@@ -443,6 +445,42 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                         f"sampling_params must be a dict, got {type(value['sampling_params']).__name__}"
                     ),
                 )
+            # Optional ``messages`` field carries the chat-mode payload
+            # the upstream ``token-model-source`` node produced when the
+            # user authored ``messages_template`` instead of
+            # ``prompt_template``. Validate the wire shape here — same
+            # fail-fast contract as the required keys — so a malformed
+            # upstream emit (the source node is the only producer today,
+            # but third-party sources are on the SPI roadmap) is caught
+            # before any backend is instantiated.
+            messages = value.get("messages")
+            if messages is not None:
+                if not isinstance(messages, list) or not messages:
+                    raise InvalidSpecError(
+                        source_id=ref.source_id,
+                        reason=(
+                            f"messages must be a non-empty list of {{role, content}} dicts when set, "
+                            f"got {type(messages).__name__ if not isinstance(messages, list) else 'empty list'}"
+                        ),
+                    )
+                for idx, msg in enumerate(messages):
+                    if not isinstance(msg, dict):
+                        raise InvalidSpecError(
+                            source_id=ref.source_id,
+                            reason=f"messages[{idx}] must be a dict, got {type(msg).__name__}",
+                        )
+                    role = msg.get("role")
+                    content = msg.get("content")
+                    if not isinstance(role, str) or not role:
+                        raise InvalidSpecError(
+                            source_id=ref.source_id,
+                            reason=f"messages[{idx}].role must be a non-empty string",
+                        )
+                    if not isinstance(content, str):
+                        raise InvalidSpecError(
+                            source_id=ref.source_id,
+                            reason=f"messages[{idx}].content must be a string",
+                        )
             specs[ref.source_id] = value
         return specs
 
@@ -592,8 +630,50 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         specs: dict[str, dict[str, Any]],
         effective_params: dict[str, TokenStepParams],
         weights: dict[str, float],
+        backends: dict[str, ModelBackend],
     ) -> dict[str, SourceInput]:
         """Bundle per-source data into the runner's ``SourceInput`` shape.
+
+        Three prompt-resolution branches per source, in priority order:
+
+        1. ``spec["messages"]`` set → explicit chat mode. Hand the
+           structured ``[{role, content}, ...]`` payload to the
+           backend's ``apply_template`` (e.g. llama.cpp's
+           ``/apply-template`` endpoint). Used when the source author
+           needs multi-role scaffolding (system + few-shot examples +
+           user turn).
+
+        2. ``spec["messages"]`` unset, ``raw_completion=False``, backend
+           declares ``CHAT_TEMPLATE``, ``spec["prompt"]`` non-empty →
+           chat-template auto-wrap. Wrap the rendered prompt as a
+           single user-role message and feed through ``apply_template``.
+           This is the default path for chat-template-capable backends
+           and is the layer that fixes existing graphs configured with
+           only ``prompt_template`` — without it, the model would see
+           naked completion text and echo the question back. The
+           wrapping is intentionally minimal (one user role); a
+           ``messages_template`` is the right answer for anything more
+           elaborate.
+
+        3. Otherwise → raw completion (the PN.py-compatible path). Use
+           ``spec["prompt"]`` verbatim. Reached when:
+           * ``raw_completion=True`` (research escape hatch — the user
+             explicitly opted out of auto-wrap); or
+           * the backend does not declare ``CHAT_TEMPLATE`` (no chat
+             scaffold available; sending raw completion is the closest
+             we can get); or
+           * the rendered prompt is empty (auto-wrapping ``""`` would
+             produce a useless ``user: ""`` turn — let it fall through
+             so the runner emits an empty event sequence rather than
+             a no-op chat call).
+
+        ``apply_template`` runs once per source per run (not per token),
+        so the extra HTTP call cost is bounded. An empty return from
+        ``apply_template`` (the documented behaviour for malformed
+        server payloads — see ``backends/llama_cpp.py:382-386``) raises
+        :class:`ChatTemplateRenderError` with the source / backend
+        attribution so a misbehaving chat-template endpoint surfaces
+        loudly instead of silently feeding empty prompts to the runner.
 
         Backend-private extras already ride on ``effective_params[sid].extra``
         (see :meth:`_build_effective_params`); ``SourceInput`` deliberately
@@ -603,12 +683,60 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         out: dict[str, SourceInput] = {}
         for ref in refs:
             spec = specs[ref.source_id]
+            backend = backends[ref.source_id]
+            prompt = self._resolve_effective_prompt(ref.source_id, spec, backend)
             out[ref.source_id] = SourceInput(
-                prompt=spec["prompt"],
+                prompt=prompt,
                 params=effective_params[ref.source_id],
                 weight=weights[ref.source_id],
             )
         return out
+
+    def _resolve_effective_prompt(
+        self,
+        source_id: str,
+        spec: dict[str, Any],
+        backend: ModelBackend,
+    ) -> str:
+        """Decide the runner-facing prompt for one source (3-branch logic).
+
+        See :meth:`_build_source_inputs` for the full branch table; the
+        helper exists so the per-source path is a flat function rather
+        than four levels of nesting in the loop body.
+        """
+        explicit_messages = spec.get("messages")
+        raw_prompt = spec["prompt"]
+        raw_completion = bool(spec.get("raw_completion", False))
+        has_chat_template = Capability.CHAT_TEMPLATE in backend.instance_capabilities
+
+        # Branch 1: explicit messages_template — always go through apply_template.
+        if explicit_messages:
+            rendered = backend.apply_template(explicit_messages)
+            if not rendered:
+                raise ChatTemplateRenderError(
+                    source_id=source_id,
+                    backend=type(backend).name,
+                    reason="apply_template returned empty string for explicit messages payload",
+                )
+            return rendered
+
+        # Branch 2: auto-wrap for chat-capable backends when raw mode
+        # was not opted into and there is something non-empty to wrap.
+        # ``Capability.CHAT_TEMPLATE`` declared → backend overrode
+        # ``apply_template`` (the SPI default would never be reached
+        # because backends without the cap fall through to branch 3).
+        if not raw_completion and has_chat_template and raw_prompt:
+            rendered = backend.apply_template([{"role": "user", "content": raw_prompt}])
+            if not rendered:
+                raise ChatTemplateRenderError(
+                    source_id=source_id,
+                    backend=type(backend).name,
+                    reason="apply_template returned empty string for auto-wrapped prompt",
+                )
+            return rendered
+
+        # Branch 3: raw completion.
+        return raw_prompt
 
     def _validate_at_startup(
         self,
@@ -697,6 +825,40 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                             f"{sorted(c.value for c in missing)}"
                         ),
                         "i18n_key": "parallelEnsemble.errors.capabilityMissing",
+                    }
+                )
+            # Chat-mode sources demand ``CHAT_TEMPLATE``. The SPI default
+            # ``apply_template`` (naive ``role: content`` join) would
+            # silently produce a scaffold that does not match any real
+            # model, which is exactly the failure mode this whole feature
+            # exists to fix. Reject loudly at startup so the user sees
+            # "this backend has no chat scaffold; pick a different
+            # backend or switch to prompt_template".
+            if (
+                ref.source_id not in capability_failed
+                and specs[ref.source_id].get("messages") is not None
+                and Capability.CHAT_TEMPLATE not in caps
+            ):
+                capability_failed.add(ref.source_id)
+                issues.append(
+                    {
+                        "severity": "error",
+                        "requirement": {
+                            "kind": "needs_chat_template",
+                            "value": True,
+                            "rationale": (
+                                f"source '{ref.source_id}' (alias={alias}, backend={spec.backend}) "
+                                f"was authored with messages_template (chat mode) but its backend "
+                                f"does not declare CHAT_TEMPLATE; the SPI default apply_template "
+                                f"would emit a non-model-specific scaffold"
+                            ),
+                        },
+                        "message": (
+                            f"Source '{ref.source_id}' uses messages_template (chat mode) but "
+                            f"backend '{spec.backend}' does not declare CHAT_TEMPLATE — switch "
+                            f"to prompt_template or pick a backend with chat-template support"
+                        ),
+                        "i18n_key": "parallelEnsemble.errors.chatTemplateUnsupported",
                     }
                 )
 
