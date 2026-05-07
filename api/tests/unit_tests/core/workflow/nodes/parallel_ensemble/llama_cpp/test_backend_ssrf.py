@@ -75,7 +75,9 @@ class _FakeResponse:
 
 def test_capability_declaration() -> None:
     """``LlamaCppBackend.capabilities`` returns exactly the set
-    BACKEND_CAPABILITIES.md §4 declares — and nothing more."""
+    BACKEND_CAPABILITIES.md §4 declares for stock endpoints, and only
+    adds ``LOGITS_RAW`` for specs that explicitly opt into the raw-logit
+    llama.cpp fork contract."""
     caps = LlamaCppBackend.capabilities(_spec())
     assert caps == frozenset(
         {
@@ -87,9 +89,11 @@ def test_capability_declaration() -> None:
         }
     )
     # Trap 1 from EXTENSIBILITY_SPEC §3.2: post-sampling probs are top-k
-    # re-normalised, NOT raw logits — a fork that flips this needs to
-    # subclass and override ``capabilities``.
+    # re-normalised, NOT raw logits.
     assert Capability.LOGITS_RAW not in caps
+
+    raw_caps = LlamaCppBackend.capabilities(_spec(expose_raw_logits=True))
+    assert raw_caps == caps | {Capability.LOGITS_RAW}
 
 
 # ── test_validate_requirements_default ────────────────────────────────
@@ -176,6 +180,48 @@ def test_step_token_uses_ssrf_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
     assert captured["headers"] == {"Content-Type": "application/json"}
     # 15000ms → 15.0s; the millisecond-to-second conversion is the
     # backend's responsibility (httpx wants seconds).
+    assert captured["timeout"] == pytest.approx(15.0)
+
+
+def test_step_token_raw_logits_uses_ssrf_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raw-logit specs keep the same SSRF boundary but flip
+    ``post_sampling_probs`` off and expose non-None candidate logits."""
+    captured: dict[str, Any] = {}
+
+    def _fake_post(url: str, **kwargs: Any) -> _FakeResponse:
+        captured.update({"url": url, **kwargs})
+        return _FakeResponse(
+            payload={
+                "completion_probabilities": [
+                    {
+                        "top_probs": [
+                            {"token": "yes", "logit": 2.0},
+                            {"token": "no", "logit": -1.0},
+                        ]
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(ssrf_module.ssrf_proxy, "post", _fake_post)
+    backend = LlamaCppBackend(
+        _spec(expose_raw_logits=True, request_timeout_ms=15000),
+        http=ssrf_module.ssrf_proxy,
+    )
+
+    candidates = backend.step_token("the answer is", TokenStepParams(top_k=5))
+    assert [c["token"] for c in candidates] == ["yes", "no"]
+    assert [c["logit"] for c in candidates] == [2.0, -1.0]
+    assert sum(c["prob"] for c in candidates) == pytest.approx(1.0)
+
+    assert captured["url"] == "http://internal.test:8080/completion"
+    assert captured["json"] == {
+        "prompt": "the answer is",
+        "max_tokens": 1,
+        "n_probs": 5,
+        "post_sampling_probs": False,
+    }
+    assert captured["headers"] == {"Content-Type": "application/json"}
     assert captured["timeout"] == pytest.approx(15.0)
 
 

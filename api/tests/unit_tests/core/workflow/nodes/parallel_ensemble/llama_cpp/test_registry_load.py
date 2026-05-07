@@ -130,11 +130,12 @@ def test_list_aliases_returns_backend_info(tmp_path: Path) -> None:
         [
             _entry(id="alpha", model_name="alpha-7b"),
             _entry(id="thinker", model_name="thinker-13b", type="think", stop_think="</think>"),
+            _entry(id="raw", model_name="raw-7b", expose_raw_logits=True),
         ],
     )
     registry = ModelRegistry.for_testing(str(path))
     aliases = registry.list_aliases()
-    assert {a["id"] for a in aliases} == {"alpha", "thinker"}
+    assert {a["id"] for a in aliases} == {"alpha", "thinker", "raw"}
     for info in aliases:
         assert set(info.keys()) == {"id", "backend", "model_name", "capabilities", "metadata"}
         # T2: secrets and URLs must never cross the API boundary.
@@ -147,10 +148,12 @@ def test_list_aliases_returns_backend_info(tmp_path: Path) -> None:
         # ``Capability`` enum.
         assert Capability.TOKEN_STEP.value in info["capabilities"]
         assert Capability.TOP_PROBS.value in info["capabilities"]
-        assert Capability.LOGITS_RAW.value not in info["capabilities"]
     # Backend-specific extras (``type`` / ``stop_think``) flow through
     # ``metadata`` so the dropdown can label "think"-mode models without
     # the TypedDict needing a llama.cpp-specific field.
     by_id = {a["id"]: a for a in aliases}
+    assert Capability.LOGITS_RAW.value not in by_id["alpha"]["capabilities"]
+    assert Capability.LOGITS_RAW.value not in by_id["thinker"]["capabilities"]
+    assert Capability.LOGITS_RAW.value in by_id["raw"]["capabilities"]
     assert by_id["alpha"]["metadata"] == {"type": "normal"}
     assert by_id["thinker"]["metadata"] == {"type": "think"}

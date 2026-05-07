@@ -104,6 +104,12 @@ class TestCapabilities:
         # EXTENSIBILITY_SPEC §3.2 trap 1: post_sampling_probs is not raw logits.
         assert Capability.LOGITS_RAW not in LlamaCppBackend.capabilities(_spec())
 
+    def test_logits_raw_declared_when_spec_opts_in(self) -> None:
+        caps = LlamaCppBackend.capabilities(_spec(expose_raw_logits=True))
+        assert Capability.LOGITS_RAW in caps
+        assert Capability.TOKEN_STEP in caps
+        assert Capability.TOP_PROBS in caps
+
     def test_function_calling_not_declared(self) -> None:
         assert Capability.FUNCTION_CALLING not in LlamaCppBackend.capabilities(_spec())
 
@@ -174,6 +180,35 @@ class TestParseTopProbs:
             eos="<|eos|>",
         )
         assert [c["token"] for c in out] == ["ok"]
+
+    def test_raw_logits_populate_logit_and_softmax_prob(self) -> None:
+        out = parse_top_probs(
+            {
+                "completion_probabilities": [
+                    {
+                        "top_probs": [
+                            {"token": "yes", "logit": 3.0},
+                            {"token": "no", "logit": 1.0},
+                            {"token": "<|eos|>", "raw_logit": 0.0},
+                        ]
+                    }
+                ]
+            },
+            eos="<|eos|>",
+            raw_logits=True,
+        )
+        assert [c["token"] for c in out] == ["yes", "no", "<end>"]
+        assert [c["logit"] for c in out] == [3.0, 1.0, 0.0]
+        assert sum(c["prob"] for c in out) == pytest.approx(1.0)
+        assert out[0]["prob"] > out[1]["prob"] > out[2]["prob"]
+
+    def test_raw_logits_require_explicit_logit_field(self) -> None:
+        out = parse_top_probs(
+            {"completion_probabilities": [{"top_probs": [{"token": "x", "prob": 1.0}]}]},
+            eos="<|eos|>",
+            raw_logits=True,
+        )
+        assert out == [{"token": "<end>", "prob": 0.01, "logit": None}]
 
 
 # ── parse_sse_chunks ──────────────────────────────────────────────────
@@ -277,6 +312,34 @@ class TestStepToken:
             "max_tokens": 1,
             "n_probs": 5,
             "post_sampling_probs": True,
+        }
+
+    def test_raw_logit_spec_requests_raw_mode_and_returns_logits(self) -> None:
+        http = _FakeHttp(
+            _FakeResponse(
+                payload={
+                    "completion_probabilities": [
+                        {
+                            "top_probs": [
+                                {"token": "yes", "logit": 2.0},
+                                {"token": "no", "logit": -1.0},
+                            ]
+                        }
+                    ]
+                }
+            )
+        )
+        backend = LlamaCppBackend(_spec(expose_raw_logits=True), http=http)
+        candidates = backend.step_token("the answer is", TokenStepParams(top_k=5))
+        assert candidates[0]["token"] == "yes"
+        assert candidates[0]["logit"] == 2.0
+        assert candidates[1]["logit"] == -1.0
+        assert sum(c["prob"] for c in candidates) == pytest.approx(1.0)
+        assert http.calls[0]["json"] == {
+            "prompt": "the answer is",
+            "max_tokens": 1,
+            "n_probs": 5,
+            "post_sampling_probs": False,
         }
 
     def test_eos_in_response_collapses_to_end(self) -> None:

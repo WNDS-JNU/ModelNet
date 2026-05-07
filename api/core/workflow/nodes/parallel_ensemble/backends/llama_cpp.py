@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
@@ -56,12 +57,13 @@ _LLAMA_CPP_CAPABILITIES: frozenset[Capability] = frozenset(
         Capability.CHAT_TEMPLATE,
     }
 )
-"""Capability set llama.cpp ships out of the box.
+"""Capability set stock llama.cpp ships out of the box.
 
 `LOGITS_RAW` is intentionally absent — `post_sampling_probs=true` is
 top-k re-normalised, not raw logits (see EXTENSIBILITY_SPEC §3.2 trap 1).
-A fork that exposes raw logits would subclass ``LlamaCppSpec`` /
-``LlamaCppBackend`` and override ``capabilities``."""
+Specs that opt into the raw-logit fork contract via
+``expose_raw_logits=true`` add ``LOGITS_RAW`` at runtime and make
+``step_token`` request raw mode."""
 
 _END_TOKEN_SENTINEL = "<end>"
 """PN.py's canonical end-of-stream marker; preserved as the public
@@ -96,7 +98,42 @@ class LlamaCppSpec(BaseSpec):
 # ── Pure parsing helpers (module-scope so tests / forks can re-use) ────
 
 
-def parse_top_probs(payload: dict[str, Any], eos: str) -> list[TokenCandidate]:
+def _fallback_end_candidate() -> list[TokenCandidate]:
+    return [TokenCandidate(token=_END_TOKEN_SENTINEL, prob=0.01, logit=None)]
+
+
+def _candidate_token(item: dict[str, Any], eos: str) -> str:
+    token = item.get("token", "")
+    if token in ("", eos):
+        token = _END_TOKEN_SENTINEL
+    return str(token)
+
+
+def _candidate_logit(item: dict[str, Any]) -> float | None:
+    for key in ("logit", "raw_logit"):
+        value = item.get(key)
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _softmax(values: list[float]) -> list[float]:
+    """Numerically stable softmax over the returned top-k raw logits."""
+    if not values:
+        return []
+    pivot = max(values)
+    exps = [math.exp(v - pivot) for v in values]
+    total = sum(exps)
+    if total <= 0.0 or not math.isfinite(total):
+        return [1.0 / len(values) for _ in values]
+    return [v / total for v in exps]
+
+
+def parse_top_probs(payload: dict[str, Any], eos: str, *, raw_logits: bool = False) -> list[TokenCandidate]:
     """Extract the top-k candidates llama.cpp returns for a single token step.
 
     R7 (TASKS.md): freeze the ``top_probs`` schema in one place.
@@ -119,31 +156,52 @@ def parse_top_probs(payload: dict[str, Any], eos: str) -> list[TokenCandidate]:
     downstream aggregator can compare across models with different EOS
     markers. We preserve that contract here — the runner / aggregator
     do not need to know which model produced which candidate.
+
+    ``raw_logits=True`` is the patched llama.cpp contract used by the
+    DuetNet reproduction path: each item must expose ``logit`` (or the
+    compatibility spelling ``raw_logit``). The adapter then fills
+    ``TokenCandidate.logit`` and synthesises a top-k probability
+    distribution with softmax so existing ``TOP_PROBS`` aggregators
+    still see a usable ``prob`` value.
     """
     completion_probabilities = payload.get("completion_probabilities") or []
     if not isinstance(completion_probabilities, list) or not completion_probabilities:
-        return [TokenCandidate(token=_END_TOKEN_SENTINEL, prob=0.01, logit=None)]
+        return _fallback_end_candidate()
     head = completion_probabilities[0]
     if not isinstance(head, dict):
-        return [TokenCandidate(token=_END_TOKEN_SENTINEL, prob=0.01, logit=None)]
+        return _fallback_end_candidate()
     raw_top = head.get("top_probs") or []
     if not isinstance(raw_top, list):
-        return [TokenCandidate(token=_END_TOKEN_SENTINEL, prob=0.01, logit=None)]
+        return _fallback_end_candidate()
+
+    if raw_logits:
+        raw_candidates: list[tuple[str, float]] = []
+        for item in raw_top:
+            if not isinstance(item, dict):
+                continue
+            logit = _candidate_logit(item)
+            if logit is None:
+                continue
+            raw_candidates.append((_candidate_token(item, eos), logit))
+        if not raw_candidates:
+            return _fallback_end_candidate()
+        probs = _softmax([logit for _, logit in raw_candidates])
+        return [
+            TokenCandidate(token=token, prob=prob, logit=logit)
+            for (token, logit), prob in zip(raw_candidates, probs)
+        ]
 
     out: list[TokenCandidate] = []
     for item in raw_top:
         if not isinstance(item, dict):
             continue
-        token = item.get("token", "")
         prob = item.get("prob", 0.0)
-        if token in ("", eos):
-            token = _END_TOKEN_SENTINEL
-        out.append(TokenCandidate(token=str(token), prob=float(prob), logit=None))
+        out.append(TokenCandidate(token=_candidate_token(item, eos), prob=float(prob), logit=None))
     if not out:
         # /completion without top_probs (e.g. content-only response) means
         # the model did not advance the generation — surface as <end> so
         # the aggregator terminates cleanly.
-        out.append(TokenCandidate(token=_END_TOKEN_SENTINEL, prob=0.01, logit=None))
+        out.extend(_fallback_end_candidate())
     return out
 
 
@@ -211,13 +269,16 @@ class LlamaCppBackend(ModelBackend):
 
     @classmethod
     def capabilities(cls, spec: BaseSpec) -> frozenset[Capability]:
-        """llama.cpp's stock capability set — same for every spec.
+        """Return capabilities for this llama.cpp spec.
 
-        ``spec`` is unused but kept in the signature so a fork that
-        gates a capability on ``model_arch`` / ``model_name`` can
-        override without re-typing the parent.
+        Stock endpoints expose post-sampling top-k probabilities only.
+        The ModelNet DuetNet path uses a patched llama.cpp endpoint and
+        opts in with ``expose_raw_logits=true``; only that spec advertises
+        ``LOGITS_RAW`` so strict logit aggregators fail fast on ordinary
+        endpoints.
         """
-        del spec  # intentionally unused; see docstring.
+        if isinstance(spec, LlamaCppSpec) and spec.expose_raw_logits:
+            return _LLAMA_CPP_CAPABILITIES | {Capability.LOGITS_RAW}
         return _LLAMA_CPP_CAPABILITIES
 
     @classmethod
@@ -346,7 +407,7 @@ class LlamaCppBackend(ModelBackend):
             "prompt": prompt,
             "max_tokens": params.max_tokens,
             "n_probs": params.top_k,
-            "post_sampling_probs": True,
+            "post_sampling_probs": not self._spec_as_llama().expose_raw_logits,
         }
         if params.temperature is not None:
             body["temperature"] = params.temperature
@@ -363,8 +424,9 @@ class LlamaCppBackend(ModelBackend):
             body.update(params.extra)
         payload = self._post_json("/completion", body)
         if not isinstance(payload, dict):
-            return [TokenCandidate(token=_END_TOKEN_SENTINEL, prob=0.01, logit=None)]
-        return parse_top_probs(payload, eos=self._spec_as_llama().EOS)
+            return _fallback_end_candidate()
+        spec = self._spec_as_llama()
+        return parse_top_probs(payload, eos=spec.EOS, raw_logits=spec.expose_raw_logits)
 
     def apply_template(self, messages: list[ChatMessage]) -> str:
         # Cast to ``Iterable`` so the json body is a plain list of

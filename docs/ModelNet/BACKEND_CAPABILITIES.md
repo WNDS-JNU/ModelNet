@@ -13,7 +13,7 @@
 | `TOKEN_STEP` | ✅ `max_tokens=1, n_probs=k` | ✅ `max_tokens=1, logprobs=k` | ⚠️ `max_tokens=1, logprobs=true, top_logprobs=k` 仅 chat-completions | ❌ |
 | `TOP_PROBS` | ✅ `completion_probabilities[0].top_probs` | ✅ `choices[0].logprobs.top_logprobs` | ⚠️ 0–20 上限 | ❌ |
 | `POST_SAMPLING_PROBS` | ✅ `post_sampling_probs=true` | ⚠️ 默认是 logprobs (log-softmax)，需 adapter 内换算 | ✅ logprobs 即 post-sampling | — |
-| `LOGITS_RAW` | ❌（除非用我们改过的 fork） | ✅ `return_logits` extension | ❌ | ❌ |
+| `LOGITS_RAW` | ⚠️ 仅 `expose_raw_logits=true` + raw-logit fork | ✅ `return_logits` extension | ❌ | ❌ |
 | `CHAT_TEMPLATE` | ✅ `/apply-template` | ❌（隐式应用） | ❌（N/A） | ❌（N/A） |
 | `FUNCTION_CALLING` | ❌ | ⚠️（部分模型） | ✅ | ✅ |
 | `KV_CACHE_REUSE` | ⚠️（slot id 路径，v0.2 未实现） | ❌（vLLM 内部管） | ❌ | ❌ |
@@ -35,7 +35,7 @@ llama.cpp 的 `post_sampling_probs=true` 返回的是 **采样空间归一化后
 - 想做 **真正的 logit 加权平均** 的研究 runner（写论文用 `token_step_strict`）必须 require `LOGITS_RAW`，而不是 `POST_SAMPLING_PROBS`，否则结果对不上理论。
 - 两个语义算出的 ensemble 结果在大多数模型上会偏移，对 ablation 不是噪声。
 
-**v0.2 的做法**：`token_step` runner 仅 require `TOKEN_STEP + TOP_PROBS`，把 `POST_SAMPLING_PROBS` 列在 `optional_capabilities`。`token_step_strict`（v0.3+）才 require `LOGITS_RAW`。
+**当前做法**：`token_step` runner 仅 require `TOKEN_STEP + TOP_PROBS`，把 `POST_SAMPLING_PROBS` 列在 `optional_capabilities`。`duet_net` 作为 token 聚合器会自行要求每个 source 声明 `LOGITS_RAW`。llama.cpp 默认不声明 `LOGITS_RAW`；只有 `model_net.yaml` 里的 spec 显式设置 `expose_raw_logits: true`，并且背后服务是 raw-logit fork 时，adapter 才会声明 `LOGITS_RAW`、请求 `post_sampling_probs=false`，并从响应里的 `logit` / `raw_logit` 字段填充 `TokenCandidate.logit`。
 
 ### 2.2 OpenAI `top_logprobs ≤ 20`
 
@@ -102,9 +102,9 @@ post_sampling = {tok: p / total for tok, p in unnormalised.items()} if total > 0
    - 若 backend 只声明 `TOP_PROBS` 不声明 `POST_SAMPLING_PROBS`，必须能用 `LOGITS_RAW` 数据复现 PN.py 同一份 prompt 的 top-k 顺序（兜底 P4.4 的跨 backend fixture）。
 4. **override `validate_requirements` 必要时**：默认实现对 capability 子集兜底，但任何细粒度上限（`top_k ≤ N`、模型黑名单、版本号）必须 override，参考 §2.2 OpenAI 示例。
 
-## 4. 当前 v0.2 的实际声明
+## 4. 当前实际声明
 
-**v0.2 只落地 llama_cpp**（`api/core/workflow/nodes/parallel_ensemble/backends/llama_cpp.py`）：
+当前只落地 llama_cpp（`api/core/workflow/nodes/parallel_ensemble/backends/llama_cpp.py`）。默认 spec 声明：
 
 ```python
 _LLAMA_CPP_CAPABILITIES = frozenset({
@@ -116,7 +116,7 @@ _LLAMA_CPP_CAPABILITIES = frozenset({
 })
 ```
 
-`LOGITS_RAW` 不声明 —— 见 §2.1。`FUNCTION_CALLING` / `KV_CACHE_REUSE` 不声明 —— 自托管 llama.cpp 不暴露 OpenAI 风格 tool calling，KV cache 复用见 PN.py `clear_slot_kv_cache` 但当前 framework 不利用。
+`LOGITS_RAW` 默认不声明 —— 见 §2.1。若 `LlamaCppSpec.expose_raw_logits=true`，`capabilities(spec)` 返回上述集合加 `Capability.LOGITS_RAW`。`FUNCTION_CALLING` / `KV_CACHE_REUSE` 不声明 —— 自托管 llama.cpp 不暴露 OpenAI 风格 tool calling，KV cache 复用见 PN.py `clear_slot_kv_cache` 但当前 framework 不利用。
 
 `validate_requirements` 默认对 `needs_function_calling=true` 拒（capability 不存在），其它 requirement 走默认 capability-bottom 兜底。
 
