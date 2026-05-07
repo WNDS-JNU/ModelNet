@@ -131,7 +131,7 @@ class ResponseAggregatorNodeData(BaseNodeData):
     type: NodeType = RESPONSE_AGGREGATOR_NODE_TYPE
 
     inputs: list[AggregationInputRef] = Field(..., min_length=2)
-    strategy_name: Literal["concat"] = "concat"
+    strategy_name: Literal["concat", "majority_vote"] = "concat"
     strategy_config: dict[str, object] = Field(default_factory=dict)
 
     @model_validator(mode="after")

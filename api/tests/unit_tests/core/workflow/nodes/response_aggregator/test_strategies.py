@@ -158,9 +158,12 @@ class TestSourceAggregationContextIsolation:
 
 
 class TestRegistry:
-    def test_concat_is_only_registered_strategy(self):
+    def test_registered_strategies(self):
         names = {entry["name"] for entry in list_strategies()}
-        assert names == {"concat"}
+        # ``concat`` is the legacy default; ``majority_vote`` lands with
+        # the AI-ModelNet S2P paradigm reproduction (see
+        # ``docs/ModelNet/PAPER_REPRODUCTION_PLAN.md`` §4.1).
+        assert names == {"concat", "majority_vote"}
 
     def test_list_strategies_carries_ui_schema(self):
         # ConcatStrategy publishes ui_schema entries; the panel

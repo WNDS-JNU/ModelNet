@@ -23,13 +23,14 @@ Pre-flight:
    read ``model_net.yaml``. Aliases ``5`` / ``27`` / ``6`` must be
    present (they already are at HEAD).
 
-Phase fidelity gap (until ``majority_vote`` lands per
-``PAPER_REPRODUCTION_PLAN.md`` §4.1): the S2P paths fall back to the
-``concat`` response-aggregator strategy because ``majority_vote`` is
-not yet registered. The S2P DSLs continue to import and run, but the
-final aggregated text is a *concatenation* of the two parallel
-answers, not a vote — accuracy will undercount the paper. Regenerate
-this directory after Phase 3 lands.
+S2P paths use the ``majority_vote`` response-aggregator strategy with
+a permissive default regex covering the 3 paper datasets (MCQ letters,
+booleans, integers, ``\\boxed{...}``). The regex's first match in each
+input wins, so chain-of-thought replies that put the answer at the
+top will vote correctly; replies that *only* state the answer at the
+very end of a long preamble may pick the wrong intermediate token —
+edit the DSL via Studio to anchor the regex (e.g. ``answer is\\s*(.*)$``)
+when reproducing a specific dataset.
 
 Run::
 
@@ -469,15 +470,20 @@ def build_pi(models: list[PaperModel]) -> dict:
     )
 
 
-def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> dict:
-    """S2P: serial → [parallel] → response-aggregator(concat fallback).
+_S2P_DEFAULT_VOTE_REGEX = (
+    # Matches the first answer-shaped token in a reply. No capture groups —
+    # the strategy returns the full match. Covers the 3 paper datasets:
+    #   * HendrycksMATH ``\boxed{...}`` (one level of brace nesting)
+    #   * C-Eval / MMLU MCQ ``(A)``..``(D)``
+    #   * BoolQ ``true`` / ``false``
+    #   * GSM8K integer answers
+    # Re-tune via Studio if your prompt template forces a different format.
+    r"\\boxed\{[^{}]*\}|\([A-D]\)|\btrue\b|\bfalse\b|-?\d+"
+)
 
-    The paper specifies majority_vote at the aggregator. Until the
-    ``majority_vote`` strategy lands (Phase 3 of
-    ``PAPER_REPRODUCTION_PLAN.md`` §4.1), the DSL falls back to ``concat``,
-    so the output is a concatenation of the two parallel answers, not a
-    vote. Re-import after Phase 3 to recover paper fidelity.
-    """
+
+def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> dict:
+    """S2P: serial → [parallel] → response-aggregator(majority_vote)."""
     nodes: list[dict] = [_start_node()]
     edges: list[dict] = []
 
@@ -518,18 +524,26 @@ def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> 
         edges.append(_edge(src=serial_id, dst=node_id, src_type="llm", dst_type="llm"))
         parallel_ids.append(node_id)
 
-    # Aggregator (Phase 2 placeholder — concat instead of majority_vote)
+    # Aggregator — paper-faithful majority vote across the parallel branches.
     nodes.append(
         _response_aggregator_node(
             node_id="aggregator",
             title="Response Aggregator (S2P)",
             desc=(
-                "Phase 2 placeholder: concat (paper specifies majority_vote; "
-                "swap once Phase 3 lands per PAPER_REPRODUCTION_PLAN.md §4.1)."
+                "Stage-2 majority vote across the parallel branches' final "
+                "answers (paper Fig. 5a). The default regex covers MCQ "
+                "letters, booleans, integers, and ``\\boxed{...}`` fragments "
+                "— tune via Studio if your prompt template forces a "
+                "different answer format."
             ),
             inputs=[(m.letter, [pid, "text"]) for m, pid in zip(parallel, parallel_ids)],
-            strategy_name="concat",
-            strategy_config={"include_source_label": True, "separator": "\n\n---\n\n"},
+            strategy_name="majority_vote",
+            strategy_config={
+                "answer_extract_regex": _S2P_DEFAULT_VOTE_REGEX,
+                "case_sensitive": False,
+                "weighted": True,
+                "tie_break": "first",
+            },
             x=942,
         )
     )
@@ -552,10 +566,9 @@ def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> 
             f"AI-ModelNet paper S2P path {serial.letter} → "
             f"[{', '.join(m.letter for m in parallel)}]. Stage 1 = "
             f"{serial.description}; Stage 2 (parallel) = "
-            f"{', '.join(m.description for m in parallel)}.\n\n"
-            "⚠ Phase 2 fidelity gap: response-aggregator falls back to concat "
-            "(paper specifies majority_vote at this junction). Regenerate "
-            "after Phase 3 lands — see PAPER_REPRODUCTION_PLAN.md §4.1."
+            f"{', '.join(m.description for m in parallel)}; Stage-2 outputs "
+            "feed a response-aggregator running the ``majority_vote`` "
+            "strategy (paper Fig. 5a)."
         ),
         nodes=nodes,
         edges=edges,

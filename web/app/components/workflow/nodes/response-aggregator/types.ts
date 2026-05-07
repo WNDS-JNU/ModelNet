@@ -3,10 +3,11 @@ import type { CommonNodeType, ValueSelector } from '@/app/components/workflow/ty
 
 export const RESPONSE_AGGREGATOR_NODE_TYPE = 'response-aggregator' as const
 
-export type ResponseStrategyName = 'concat'
+export type ResponseStrategyName = 'concat' | 'majority_vote'
 
 export const RESPONSE_STRATEGY_NAMES: ResponseStrategyName[] = [
   'concat',
+  'majority_vote',
 ]
 
 // Mirrors backend ``concat._ConcatConfig`` (api/core/workflow/nodes/
@@ -17,6 +18,17 @@ export type ConcatConfig = {
   separator?: string
   include_source_label?: boolean
   order_by_weight?: boolean
+}
+
+// Mirrors backend ``majority_vote._MajorityVoteConfig`` (api/core/
+// workflow/nodes/response_aggregator/strategies/majority_vote.py).
+// Used by the AI-ModelNet S2P paradigm (PAPER_REPRODUCTION_PLAN.md
+// §4.1).
+export type MajorityVoteConfig = {
+  answer_extract_regex?: string
+  case_sensitive?: boolean
+  weighted?: boolean
+  tie_break?: 'first' | 'longest'
 }
 
 export const DEFAULT_CONCAT_SEPARATOR = '\n\n---\n\n'
@@ -53,6 +65,16 @@ export const RESPONSE_STRATEGY_META: Record<
       separator: { control: 'text_input' },
       include_source_label: { control: 'switch' },
       order_by_weight: { control: 'switch' },
+    },
+  },
+  majority_vote: {
+    name: 'majority_vote',
+    i18n_key_prefix: 'nodes.responseAggregator.majorityVote',
+    ui_schema: {
+      answer_extract_regex: { control: 'text_input' },
+      case_sensitive: { control: 'switch' },
+      weighted: { control: 'switch' },
+      tie_break: { control: 'select' },
     },
   },
 }

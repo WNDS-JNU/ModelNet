@@ -231,10 +231,18 @@ class TestResponseAggregatorNodeData:
                 strategy_name="unknown_strategy",  # type: ignore[arg-type]
             )
 
-    def test_majority_vote_strategy_rejected(self):
-        # Voting strategies were removed; the literal must not accept them.
-        with pytest.raises(ValidationError):
-            ResponseAggregatorNodeData(
-                inputs=self._valid_inputs(),
-                strategy_name="majority_vote",  # type: ignore[arg-type]
-            )
+    def test_majority_vote_strategy_accepted(self):
+        # majority_vote was added to support the AI-ModelNet S2P paradigm
+        # (PAPER_REPRODUCTION_PLAN.md §4.1). The literal therefore now
+        # accepts ``concat`` and ``majority_vote``; an unknown name still
+        # fails (covered by ``test_unknown_strategy_name_rejected``).
+        data = ResponseAggregatorNodeData(
+            inputs=self._valid_inputs(),
+            strategy_name="majority_vote",
+            strategy_config={"answer_extract_regex": r"\(([A-D])\)"},
+        )
+        assert data.strategy_name == "majority_vote"
+        assert (
+            data.strategy_config["answer_extract_regex"]
+            == r"\(([A-D])\)"
+        )

@@ -1,11 +1,8 @@
 app:
-  description: 'AI-ModelNet paper S2P path Q → [D, Y]. Stage 1 = Qwen2.5-7B-Instruct;
-    Stage 2 (parallel) = DeepSeek-R1-Distill-Qwen-7B, GLM-4-9B-Chat.
-
-
-    ⚠ Phase 2 fidelity gap: response-aggregator falls back to concat (paper specifies
-    majority_vote at this junction). Regenerate after Phase 3 lands — see PAPER_REPRODUCTION_PLAN.md
-    §4.1.'
+  description: AI-ModelNet paper S2P path Q → [D, Y]. Stage 1 = Qwen2.5-7B-Instruct;
+    Stage 2 (parallel) = DeepSeek-R1-Distill-Qwen-7B, GLM-4-9B-Chat; Stage-2 outputs
+    feed a response-aggregator running the ``majority_vote`` strategy (paper Fig.
+    5a).
   icon: 🎼
   icon_background: '#DCE5FF'
   mode: workflow
@@ -295,8 +292,10 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: 'Phase 2 placeholder: concat (paper specifies majority_vote; swap once
-          Phase 3 lands per PAPER_REPRODUCTION_PLAN.md §4.1).'
+        desc: Stage-2 majority vote across the parallel branches' final answers (paper
+          Fig. 5a). The default regex covers MCQ letters, booleans, integers, and
+          ``\boxed{...}`` fragments — tune via Studio if your prompt template forces
+          a different answer format.
         inputs:
         - source_id: D
           variable_selector:
@@ -308,15 +307,11 @@ workflow:
           - text
         selected: false
         strategy_config:
-          include_source_label: true
-          separator: '
-
-
-            ---
-
-
-            '
-        strategy_name: concat
+          answer_extract_regex: \\boxed\{[^{}]*\}|\([A-D]\)|\btrue\b|\bfalse\b|-?\d+
+          case_sensitive: false
+          tie_break: first
+          weighted: true
+        strategy_name: majority_vote
         title: Response Aggregator (S2P)
         type: response-aggregator
       height: 150

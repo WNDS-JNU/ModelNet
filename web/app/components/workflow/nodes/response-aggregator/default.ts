@@ -21,7 +21,10 @@ const metaData = genNodeMetaData({
 // only fails at run time inside ``StrategyConfigError``.
 const ALLOWED_KEYS_BY_STRATEGY: Record<ResponseStrategyName, readonly string[]> = {
   concat: ['separator', 'include_source_label', 'order_by_weight'],
+  majority_vote: ['answer_extract_regex', 'case_sensitive', 'weighted', 'tie_break'],
 }
+
+const MAJORITY_VOTE_TIE_BREAKS = new Set(['first', 'longest'])
 
 const isFiniteNumber = (v: unknown): v is number =>
   // Reject ``bool`` explicitly: ``true``/``false`` are ``number``-coercible
@@ -178,6 +181,51 @@ const nodeDefault: NodeDefault<ResponseAggregatorNodeType> = {
         && typeof cfg.order_by_weight !== 'boolean'
       ) {
         errorMessages = t(`${i18nPrefix}.errorMsg.orderByWeightMustBeBoolean`, {
+          ns: 'workflow',
+        })
+      }
+    }
+
+    if (!errorMessages && strategy_name === 'majority_vote') {
+      const cfg = (strategy_config ?? {}) as {
+        answer_extract_regex?: unknown
+        case_sensitive?: unknown
+        weighted?: unknown
+        tie_break?: unknown
+      }
+      if (
+        cfg.answer_extract_regex !== undefined
+        && typeof cfg.answer_extract_regex !== 'string'
+      ) {
+        errorMessages = t(`${i18nPrefix}.errorMsg.answerExtractRegexMustBeString`, {
+          ns: 'workflow',
+        })
+      }
+      if (
+        !errorMessages
+        && cfg.case_sensitive !== undefined
+        && typeof cfg.case_sensitive !== 'boolean'
+      ) {
+        errorMessages = t(`${i18nPrefix}.errorMsg.caseSensitiveMustBeBoolean`, {
+          ns: 'workflow',
+        })
+      }
+      if (
+        !errorMessages
+        && cfg.weighted !== undefined
+        && typeof cfg.weighted !== 'boolean'
+      ) {
+        errorMessages = t(`${i18nPrefix}.errorMsg.weightedMustBeBoolean`, {
+          ns: 'workflow',
+        })
+      }
+      if (
+        !errorMessages
+        && cfg.tie_break !== undefined
+        && (typeof cfg.tie_break !== 'string'
+          || !MAJORITY_VOTE_TIE_BREAKS.has(cfg.tie_break))
+      ) {
+        errorMessages = t(`${i18nPrefix}.errorMsg.tieBreakInvalid`, {
           ns: 'workflow',
         })
       }
