@@ -1,0 +1,74 @@
+# Sample config for the AI-ModelNet paper reproduction (Tables 4 / 6-7).
+# See docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md §6 (direction D) and
+# docs/ModelNet/PAPER_REPRODUCTION_PLAN.md for the design.
+#
+# Copy to eval.paper.yaml (gitignored), import the paper_*.yml DSLs into
+# Dify Studio, paste each app's API key below, then:
+#
+#   uv run --project api python dev/modelnet/duet_net_eval.py \
+#       --config dev/modelnet/eval.paper.yaml
+#
+# Smoke a small subset before the 3900-call full run:
+#
+#   uv run --project api python dev/modelnet/duet_net_eval.py \
+#       --config dev/modelnet/eval.paper.yaml \
+#       --datasets gsm8k --n 5
+
+base_url: http://localhost:5001/v1
+user: paper-reproduction
+response_mode: blocking
+request_timeout_s: 600
+
+# ── workflow keys ─────────────────────────────────────────────────────
+# 3 paper models  Q = Qwen2.5-7B (alias 5)
+#                D = DeepSeek-R1-Distill-Qwen-7B (alias 27)
+#                Y = glm-4-9b-chat (alias 6, replacing the unavailable Yi-1.5-9B)
+#
+# 13 paths total: SI 6 (3! permutations) + PI 1 + S2P 3 + P2S 3.
+#
+# Stage A — MVP (paper Table 4): start by enabling just these 4 keys
+# while you bring up the platform end-to-end.
+workflow_keys:
+  paper_si_QDY:    app-PASTE_KEY_HERE   # Q → D → Y                 (Stage A)
+  paper_pi_QDY:    app-PASTE_KEY_HERE   # [Q, D, Y]                  (Stage A)
+  paper_s2p_Q_DY:  app-PASTE_KEY_HERE   # Q → [D, Y]                 (Stage A)
+  paper_p2s_QD_Y:  app-PASTE_KEY_HERE   # [Q, D] → Y                 (Stage A)
+
+  # Stage B — full path matrix (paper Tables 6-7). Add the remaining 9
+  # workflows to extend Stage A to the 13-path reproduction.
+  # paper_si_QYD:    app-PASTE_KEY_HERE   # Q → Y → D
+  # paper_si_DQY:    app-PASTE_KEY_HERE   # D → Q → Y
+  # paper_si_DYQ:    app-PASTE_KEY_HERE   # D → Y → Q
+  # paper_si_YQD:    app-PASTE_KEY_HERE   # Y → Q → D
+  # paper_si_YDQ:    app-PASTE_KEY_HERE   # Y → D → Q
+  # paper_s2p_D_QY:  app-PASTE_KEY_HERE   # D → [Q, Y]
+  # paper_s2p_Y_QD:  app-PASTE_KEY_HERE   # Y → [Q, D]
+  # paper_p2s_QY_D:  app-PASTE_KEY_HERE   # [Q, Y] → D
+  # paper_p2s_DY_Q:  app-PASTE_KEY_HERE   # [D, Y] → Q
+
+# ── datasets ──────────────────────────────────────────────────────────
+# Paper §4.1 randomly samples 100 questions from each dataset.
+datasets:
+  gsm8k:
+    n: 100
+    seed: 42
+  c_eval:
+    n: 100
+    seed: 42
+    # The paper does not name the C-Eval subjects it samples; expand
+    # this list to track whichever slice you reproduce. The single
+    # ``computer_network`` subject reproduces DuetNet's slice; add
+    # broader subjects for AI-ModelNet's 100-question random sample.
+    subjects:
+      - computer_network
+      # - high_school_mathematics
+      # - high_school_physics
+      # - high_school_chemistry
+      # - chinese_language_and_literature
+      # - accountant
+  math:
+    n: 100
+    seed: 42
+
+checkpoint_path: dev/modelnet/checkpoints/paper.json
+report_path:     dev/modelnet/reports/paper.json

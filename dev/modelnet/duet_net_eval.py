@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""DuetNet paper reproduction harness — Wang et al. 2025.
+"""Multi-model collaborative inference eval harness.
 
-Runs the DuetNet aggregator + the sum_score (≈ GaC) baseline against the
-four datasets the paper benchmarks (SimpleMath, C-Eval, BoolQ, MMLU) by
-hitting Dify's workflow run API with a deterministic prompt template per
-dataset, then computes accuracy / per-question token count / per-token
-latency in the form of paper Tables 4–5 / Fig. 7 / Fig. 11.
+Drives two paper reproductions through Dify's workflow run API:
+
+* **DuetNet** (Wang et al., 2025) — token-level parallel ensemble on
+  ``SimpleMath``, ``C-Eval``, ``BoolQ``, ``MMLU``. Output matches paper
+  Tables 4–5 / Fig. 7 / Fig. 11.
+* **AI-ModelNet** (Li et al., 2025) — 4 paradigms × 13 paths on
+  ``GSM8K``, ``C-Eval`` (multi-subject), ``HendrycksMATH``. Output
+  matches paper Tables 4 / 6-7. See
+  ``docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md`` §6 and
+  ``docs/ModelNet/PAPER_REPRODUCTION_PLAN.md``.
 
 Single-model baselines and any other comparison method (Unite, GaC, DK,
 DP) are configured the same way: register a workflow app per method in
@@ -17,6 +22,9 @@ Usage::
 
     python dev/modelnet/duet_net_eval.py --config dev/modelnet/eval.yaml
     python dev/modelnet/duet_net_eval.py --config dev/modelnet/eval.yaml --resume
+    # Smoke a single dataset / small n without editing the config:
+    python dev/modelnet/duet_net_eval.py --config eval.yaml \\
+        --datasets simple_math --n 10
 
 Config (YAML)::
 
@@ -35,9 +43,11 @@ Config (YAML)::
 
     datasets:
       simple_math: { n: 50, seed: 42 }
-      c_eval:      { n: 50 }
-      bool_q:      { n: 50 }
-      mmlu:        { n: 50 }
+      c_eval:      { n: 50, seed: 0, subjects: [computer_network] }
+      bool_q:      { n: 50, seed: 0 }
+      mmlu:        { n: 50, seed: 0 }
+      gsm8k:       { n: 100, seed: 42 }
+      math:        { n: 100, seed: 42 }
 
     checkpoint_path: dev/modelnet/eval_checkpoint.json
     report_path:     dev/modelnet/eval_report.json
@@ -48,7 +58,9 @@ where the last run stopped.
 
 Datasets are pulled once from HuggingFace via the ``datasets`` library
 (SimpleMath is synthesised in-process). Set ``HF_HOME`` to control where
-the cache lands.
+the cache lands. ``math`` (HendrycksMATH) optionally uses ``sympy`` +
+``antlr4-python3-runtime`` for symbolic equivalence — without them the
+comparison falls back to normalised string match.
 """
 
 from __future__ import annotations
@@ -108,34 +120,52 @@ def _simple_math(n: int, seed: int) -> Iterator[EvalItem]:
         )
 
 
-def _c_eval(n: int) -> Iterator[EvalItem]:
-    """C-Eval (4-choice MCQ, Chinese)."""
+_C_EVAL_DEFAULT_SUBJECTS: tuple[str, ...] = ("computer_network",)
+
+
+def _c_eval(
+    n: int,
+    seed: int = 0,
+    subjects: list[str] | None = None,
+) -> Iterator[EvalItem]:
+    """C-Eval (4-choice MCQ, Chinese).
+
+    ``subjects`` defaults to ``computer_network`` (DuetNet's benchmark
+    slice). Pass an explicit list to span multiple subjects when
+    reproducing the AI-ModelNet paper, which samples across a broader
+    subject pool. ``seed`` shuffles the merged pool before truncating
+    to ``n`` so re-runs and ``--resume`` see a stable ordering.
+    """
     from datasets import load_dataset
 
-    ds = load_dataset("ceval/ceval-exam", "computer_network", split="val")
-    rng = random.Random(0)
-    indices = rng.sample(range(len(ds)), min(n, len(ds)))
-    for i in indices:
-        row = ds[i]
+    chosen = subjects or list(_C_EVAL_DEFAULT_SUBJECTS)
+    rng = random.Random(seed)
+    pool: list[tuple[str, dict]] = []
+    for subject in chosen:
+        ds = load_dataset("ceval/ceval-exam", subject, split="val")
+        for idx in range(len(ds)):
+            pool.append((f"{subject}_{idx:04d}", ds[idx]))
+    rng.shuffle(pool)
+    for tag, row in pool[:n]:
         opts = "\n".join(f"{k}. {row[k]}" for k in ("A", "B", "C", "D"))
         question = (
             f"{row['question']}\n{opts}\n"
             "你必须在回答的最后重申你的答案（只写一个字母 A/B/C/D）。"
         )
         yield EvalItem(
-            item_id=f"c_eval_cn_{i:04d}",
+            item_id=f"c_eval_{tag}",
             question=question,
             answer=row["answer"].strip().upper(),
             extractor="last_abcd",
         )
 
 
-def _bool_q(n: int) -> Iterator[EvalItem]:
+def _bool_q(n: int, seed: int = 0) -> Iterator[EvalItem]:
     """BoolQ true/false."""
     from datasets import load_dataset
 
     ds = load_dataset("google/boolq", split="validation")
-    rng = random.Random(0)
+    rng = random.Random(seed)
     indices = rng.sample(range(len(ds)), min(n, len(ds)))
     for i in indices:
         row = ds[i]
@@ -154,12 +184,12 @@ def _bool_q(n: int) -> Iterator[EvalItem]:
         )
 
 
-def _mmlu(n: int) -> Iterator[EvalItem]:
+def _mmlu(n: int, seed: int = 0) -> Iterator[EvalItem]:
     """MMLU (4-choice MCQ, broad domain)."""
     from datasets import load_dataset
 
     ds = load_dataset("cais/mmlu", "all", split="test")
-    rng = random.Random(0)
+    rng = random.Random(seed)
     indices = rng.sample(range(len(ds)), min(n, len(ds)))
     letters = ["A", "B", "C", "D"]
     for i in indices:
@@ -179,11 +209,73 @@ def _mmlu(n: int) -> Iterator[EvalItem]:
         )
 
 
+def _gsm8k(n: int, seed: int = 0) -> Iterator[EvalItem]:
+    """GSM8K — grade-school math word problems (AI-ModelNet paper §4.1).
+
+    Gold answer lives in the ``#### N`` suffix of the ``answer`` column.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset("gsm8k", "main", split="test")
+    rng = random.Random(seed)
+    indices = rng.sample(range(len(ds)), min(n, len(ds)))
+    gold_re = re.compile(r"####\s*(-?\d[\d,]*)")
+    for i in indices:
+        row = ds[i]
+        m = gold_re.search(row["answer"])
+        if not m:
+            continue
+        question = (
+            f"{row['question']}\n"
+            "Reason step by step, and put the final integer answer at the "
+            "end of your reply."
+        )
+        yield EvalItem(
+            item_id=f"gsm8k_{i:05d}",
+            question=question,
+            answer=m.group(1).replace(",", ""),
+            extractor="gsm8k_last_int",
+        )
+
+
+def _math(n: int, seed: int = 0) -> Iterator[EvalItem]:
+    """HendrycksMATH — the AI-ModelNet paper labels this ``Mathematics``.
+
+    Gold lives inside the last ``\\boxed{...}`` of the ``solution`` column.
+    """
+    from datasets import load_dataset
+
+    ds = load_dataset(
+        "hendrycks/competition_math",
+        split="test",
+        trust_remote_code=True,
+    )
+    rng = random.Random(seed)
+    indices = rng.sample(range(len(ds)), min(n, len(ds)))
+    for i in indices:
+        row = ds[i]
+        gold = _extract_math_boxed(row["solution"])
+        if not gold:
+            continue
+        question = (
+            f"{row['problem']}\n"
+            "Reason step by step. Put the final answer in \\boxed{}."
+        )
+        yield EvalItem(
+            item_id=f"math_{i:05d}",
+            question=question,
+            answer=gold,
+            extractor="math_boxed",
+        )
+
+
 DATASET_LOADERS: dict[str, Any] = {
     "simple_math": _simple_math,
     "c_eval": _c_eval,
     "bool_q": _bool_q,
     "mmlu": _mmlu,
+    "gsm8k": _gsm8k,
+    "math": _math,
 }
 
 # ── Answer extractors ────────────────────────────────────────────────────
@@ -192,6 +284,10 @@ _INT_RE = re.compile(r"-?\d+")
 _ABCD_RE = re.compile(r"[A-D]")
 _PAREN_ABCD_RE = re.compile(r"\(\s*([A-D])\s*\)")
 _BOOL_RE = re.compile(r"\b(true|false)\b", re.IGNORECASE)
+# One level of brace nesting covers most HendrycksMATH ``\boxed{...}``
+# answers (e.g. ``\boxed{\frac{1}{2}}``); deeper nesting would need a
+# real parser, which is intentionally out of scope here.
+_BOXED_RE = re.compile(r"\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}")
 
 
 def _extract_last_integer(text: str) -> str:
@@ -217,11 +313,32 @@ def _extract_last_bool(text: str) -> str:
     return matches[-1].lower() if matches else ""
 
 
+def _extract_gsm8k_last_int(text: str) -> str:
+    """Strip thousands separators, then take the last integer in the reply."""
+    cleaned = text.replace(",", "")
+    matches = _INT_RE.findall(cleaned)
+    return matches[-1] if matches else ""
+
+
+def _extract_math_boxed(text: str) -> str:
+    """Prefer the last ``\\boxed{...}``; else fall back to the last non-empty line."""
+    boxed = _BOXED_RE.findall(text)
+    if boxed:
+        return boxed[-1].strip()
+    for line in reversed(text.splitlines()):
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
 EXTRACTORS: dict[str, Any] = {
     "last_integer": _extract_last_integer,
     "last_abcd": _extract_last_abcd,
     "paren_abcd": _extract_paren_abcd,
     "last_bool": _extract_last_bool,
+    "gsm8k_last_int": _extract_gsm8k_last_int,
+    "math_boxed": _extract_math_boxed,
 }
 
 # ── Dify workflow client ─────────────────────────────────────────────────
@@ -368,10 +485,17 @@ def _items_for_dataset(name: str, dcfg: dict[str, Any]) -> Iterator[EvalItem]:
     loader = DATASET_LOADERS.get(name)
     if loader is None:
         raise KeyError(f"unknown dataset {name!r}; known: {sorted(DATASET_LOADERS)}")
+    n = int(dcfg.get("n", 50))
     if name == "simple_math":
-        yield from loader(n=int(dcfg.get("n", 50)), seed=int(dcfg.get("seed", 42)))
-    else:
-        yield from loader(n=int(dcfg.get("n", 50)))
+        yield from loader(n=n, seed=int(dcfg.get("seed", 42)))
+        return
+    seed = int(dcfg.get("seed", 0))
+    if name == "c_eval":
+        subjects_raw = dcfg.get("subjects")
+        subjects = list(subjects_raw) if subjects_raw else None
+        yield from loader(n=n, seed=seed, subjects=subjects)
+        return
+    yield from loader(n=n, seed=seed)
 
 
 def evaluate(cfg: EvalConfig, *, resume: bool, every: int = 10) -> list[ItemRecord]:
@@ -441,11 +565,49 @@ def _matches(predicted: str, expected: str, extractor: str) -> bool:
             return int(predicted) == int(expected)
         except ValueError:
             return False
+    if extractor == "gsm8k_last_int":
+        try:
+            return int(predicted.replace(",", "")) == int(expected.replace(",", ""))
+        except ValueError:
+            return False
+    if extractor == "math_boxed":
+        return _math_boxed_equal(predicted, expected)
     if extractor in {"last_abcd", "paren_abcd"}:
         return predicted.upper() == expected.upper()
     if extractor == "last_bool":
         return predicted.lower() == expected.lower()
     return predicted == expected
+
+
+def _normalize_math(s: str) -> str:
+    """Strip whitespace, redundant LaTeX wrappers, trailing punctuation."""
+    s = s.strip().replace(" ", "")
+    s = s.removeprefix("$").removesuffix("$")
+    s = s.removeprefix("\\(").removesuffix("\\)")
+    return s.rstrip(".")
+
+
+def _math_boxed_equal(predicted: str, expected: str) -> bool:
+    """Match HendrycksMATH gold to a model reply.
+
+    Try a normalised string match first (covers most clean-formatted
+    answers). On miss, fall back to ``sympy`` symbolic equivalence via
+    ``parse_latex`` if the optional ``sympy`` + ``antlr4`` deps are
+    installed; without them the comparison degrades to "not equal" —
+    matching what the paper does without a CAS.
+    """
+    if _normalize_math(predicted) == _normalize_math(expected):
+        return True
+    try:
+        from sympy import simplify  # noqa: PLC0415
+        from sympy.parsing.latex import parse_latex  # noqa: PLC0415
+    except ImportError:
+        return False
+    try:
+        diff = simplify(parse_latex(predicted) - parse_latex(expected))
+        return diff == 0
+    except Exception:  # noqa: BLE001 — best-effort sympy fallback
+        return False
 
 
 # ── Reporting ────────────────────────────────────────────────────────────
@@ -513,6 +675,24 @@ def main() -> int:
         default=10,
         help="flush checkpoint every N items (default: 10)",
     )
+    parser.add_argument(
+        "--datasets",
+        type=str,
+        default=None,
+        help=(
+            "comma-separated subset of dataset names from the config to run "
+            "(default: all). Useful for smoke tests."
+        ),
+    )
+    parser.add_argument(
+        "--n",
+        type=int,
+        default=None,
+        help=(
+            "override every dataset's ``n`` (sample count) — handy for "
+            "smoke runs without editing the config."
+        ),
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
@@ -521,6 +701,18 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     cfg = EvalConfig.load(args.config)
+    if args.datasets:
+        keep = {ds.strip() for ds in args.datasets.split(",") if ds.strip()}
+        unknown = keep - cfg.datasets.keys()
+        if unknown:
+            parser.error(
+                f"--datasets references unknown name(s): {sorted(unknown)}; "
+                f"config defines: {sorted(cfg.datasets)}"
+            )
+        cfg.datasets = {k: cfg.datasets[k] for k in cfg.datasets if k in keep}
+    if args.n is not None:
+        for dcfg in cfg.datasets.values():
+            dcfg["n"] = args.n
     records = evaluate(cfg, resume=args.resume, every=args.checkpoint_every)
     summary = _summarise(records)
 
