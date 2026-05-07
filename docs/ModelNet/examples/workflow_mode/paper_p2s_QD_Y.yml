@@ -1,0 +1,345 @@
+app:
+  description: AI-ModelNet paper P2S path [Q, D] → Y. Stage 1 (parallel) = Qwen2.5-7B-Instruct,
+    DeepSeek-R1-Distill-Qwen-7B; Stage 2 = GLM-4-9B-Chat synthesizes.
+  icon: 🎼
+  icon_background: '#DCE5FF'
+  mode: workflow
+  name: paper_p2s_QD_Y (workflow)
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: start_node-to-llm_Q_par
+      source: start_node
+      sourceHandle: source
+      target: llm_Q_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: start_node-to-llm_D_par
+      source: start_node
+      sourceHandle: source
+      target: llm_D_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: response-aggregator
+      id: llm_Q_par-to-aggregator
+      source: llm_Q_par
+      sourceHandle: source
+      target: aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: response-aggregator
+      id: llm_D_par-to-aggregator
+      source: llm_D_par
+      sourceHandle: source
+      target: aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: response-aggregator
+        targetType: llm
+      id: aggregator-to-llm_Y_serial
+      source: aggregator
+      sourceHandle: source
+      target: llm_Y_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: llm_Y_serial-to-end_node
+      source: llm_Y_serial
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: User question routed to the paradigm topology.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - label: question
+          max_length: 4096
+          options: []
+          required: true
+          type: paragraph
+          variable: question
+      height: 90
+      id: start_node
+      position:
+        x: 30
+        y: 252
+      positionAbsolute:
+        x: 30
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: P2S stage 1 — Qwen2.5-7B-Instruct answers in parallel.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: qwen25-7b-instruct-q5km
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 6eacbe67-792c-5942-ad7c-bfc1b1b66435
+          role: system
+          text: You are a careful problem-solver. Read the question, reason step by
+            step, and provide your final answer at the end of the reply.
+        - id: b1792d2b-68e5-5f78-b4a0-110f6b5d4eff
+          role: user
+          text: '{{#start_node.question#}}'
+        selected: false
+        title: Q (parallel)
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: llm_Q_par
+      position:
+        x: 334
+        y: 176
+      positionAbsolute:
+        x: 334
+        y: 176
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: P2S stage 1 — DeepSeek-R1-Distill-Qwen-7B answers in parallel.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: deepseek-r1-distill-qwen-7b-q4
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 0c45dab3-1ac5-5c71-866a-848daf99bf94
+          role: system
+          text: You are a careful problem-solver. Read the question, reason step by
+            step, and provide your final answer at the end of the reply.
+        - id: 96b17cf1-70b3-52d2-a65a-a658b3b267bd
+          role: user
+          text: '{{#start_node.question#}}'
+        selected: false
+        title: D (parallel)
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: llm_D_par
+      position:
+        x: 334
+        y: 328
+      positionAbsolute:
+        x: 334
+        y: 328
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Concatenate stage-1 parallel answers; pipe to stage-2 model for synthesis.
+        inputs:
+        - source_id: Q
+          variable_selector:
+          - llm_Q_par
+          - text
+        - source_id: D
+          variable_selector:
+          - llm_D_par
+          - text
+        selected: false
+        strategy_config:
+          include_source_label: true
+          separator: '
+
+
+            ---
+
+
+            '
+        strategy_name: concat
+        title: Response Aggregator (P2S)
+        type: response-aggregator
+      height: 150
+      id: aggregator
+      position:
+        x: 638
+        y: 252
+      positionAbsolute:
+        x: 638
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: P2S stage 2 — GLM-4-9B-Chat synthesizes peer answers.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: glm-4-9b-chat-q4k
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: c78dcb7e-e548-5d82-a195-ab1580189738
+          role: system
+          text: You are a careful problem-solver. Read the question and the candidate
+            answers from peer models, then provide a unified final answer that you
+            have validated.
+        - id: d3d2c2c7-75b9-55ca-a678-1fc08c4c022b
+          role: user
+          text: 'Question:
+
+            {{#start_node.question#}}
+
+
+            Candidate answers from peer models:
+
+            {{#aggregator.text#}}
+
+
+            Provide your unified final answer:'
+        selected: false
+        title: Y (synthesizer)
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: llm_Y_serial
+      position:
+        x: 942
+        y: 252
+      positionAbsolute:
+        x: 942
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit the paradigm's final answer.
+        outputs:
+        - value_selector:
+          - llm_Y_serial
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: End
+        type: end
+      height: 90
+      id: end_node
+      position:
+        x: 1246
+        y: 252
+      positionAbsolute:
+        x: 1246
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7

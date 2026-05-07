@@ -22,6 +22,7 @@ research scratch space.
 | File | What it does |
 |---|---|
 | `generate_duet_net_dsls.py` | Emits 8 DuetNet workflow-mode DSLs (6 dual + 1 triple + 1 quad) under `docs/ModelNet/examples/workflow_mode/duet_net_*.yml` from a single template. Idempotent. |
+| `generate_paper_dsls.py` | Emits 13 AI-ModelNet paper DSLs (`paper_*.yml`) covering 4 paradigms × 3 paper models {Q=5, D=27, Y=6}. Idempotent. SI/S2P/P2S use the standard `llm` node; PI uses `parallel-ensemble`. S2P falls back to the `concat` strategy until `majority_vote` lands (Phase 3). |
 | `duet_net_eval.py` | Calls Dify's `/v1/workflows/run` API for each (workflow × dataset × item) and records accuracy / token count / latency. Drives both reproductions; the script does not care what is inside each workflow — it only sees the API contract. |
 | `eval.example.yaml` | Sample config for the DuetNet 8-DSL reproduction. |
 | `eval.paper.example.yaml` | Sample config for the AI-ModelNet paper reproduction (13 paths × paper datasets). |
@@ -75,11 +76,13 @@ research scratch space.
    - **Y** → alias `6`: GLM-4-9B-Chat (`glm-4-9b-chat-q4k`, replacing the unavailable Yi-1.5-9B per `PAPER_REPRODUCTION_PLAN.md` §2)
 
    The PI paradigm reads aliases directly from `model_net.yaml`. SI / S2P / P2S use Dify's standard `llm` node, which does **not** read `model_net.yaml`. Pre-configure those 3 endpoints once: Dify Web → Settings → Model Provider → install OpenAI-Compatible API plugin → add 3 entries pointing at the same llama.cpp URLs.
-2. **Generate the paper DSLs** _(Phase 2 — `generate_paper_dsls.py` not yet landed; until it does, hand-craft DSLs from the `duet_net_*.yml` templates and the paper §3 topology diagrams)_:
+2. **Generate the paper DSLs**:
    ```sh
    uv run --project api python dev/modelnet/generate_paper_dsls.py
    ```
-   Outputs will land under `docs/ModelNet/examples/workflow_mode/paper_*.yml`.
+   Outputs the 13 paths under `docs/ModelNet/examples/workflow_mode/paper_*.yml` (SI×6, PI×1, S2P×3, P2S×3). Idempotent.
+
+   ⚠ S2P paths fall back to the response-aggregator's `concat` strategy until Phase 3 (`majority_vote`, see `PAPER_REPRODUCTION_PLAN.md` §4.1) lands. Re-run the generator after Phase 3 to recover paper fidelity.
 3. **Import each DSL into Dify** and grab API keys.
 4. **Configure & smoke-test before the full run**:
    ```sh
