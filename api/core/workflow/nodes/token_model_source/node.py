@@ -87,6 +87,14 @@ class TokenModelSourceNode(Node[TokenModelSourceNodeData]):
             "extra": dict(node_data.extra),
             "messages": rendered_messages,
             "raw_completion": node_data.raw_completion,
+            # ``inline_spec`` rides through to the parallel-ensemble
+            # consumer untouched. ``None`` (the registry-backed path)
+            # is left in the dict on purpose so the wire shape stays
+            # stable across both modes — the consumer treats absent
+            # and ``None`` identically.
+            "inline_spec": (
+                dict(node_data.inline_spec) if node_data.inline_spec is not None else None
+            ),
         }
         # Surface ``model_alias`` as a top-level output too: downstream
         # nodes that only need the alias to fan out (panels / debug

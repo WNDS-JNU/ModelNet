@@ -1,11 +1,12 @@
-import type { TokenModelSourceNodeType } from '../types'
+import type { InlineModelSpec, TokenModelSourceNodeType } from '../types'
+import type { SourceMode } from '../use-config'
 import type { NodePanelProps } from '@/app/components/workflow/types'
 import { fireEvent, render, screen } from '@testing-library/react'
 import * as React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BlockEnum } from '@/app/components/workflow/types'
 import Panel from '../panel'
-import { DEFAULT_SAMPLING_PARAMS } from '../types'
+import { DEFAULT_INLINE_SPEC, DEFAULT_SAMPLING_PARAMS } from '../types'
 
 // ── Hoisted mocks ───────────────────────────────────────────────────
 //
@@ -73,6 +74,46 @@ vi.mock('@/app/components/workflow/nodes/_base/components/output-vars', () => ({
   ),
   VarItem: ({ name, type }: { name: string, type: string }) => (
     <div data-testid={`var-item-${name}`}>{`${name}:${type}`}</div>
+  ),
+}))
+
+// The mode-tabs and inline-spec form are tiny pass-throughs in the
+// panel; stub them so the test focuses on which one the panel renders
+// and what props it threads through, not the children's internals
+// (covered separately by their own suites).
+type SourceModeTabsMockProps = {
+  value: SourceMode
+  readonly: boolean
+  onChange: (mode: SourceMode) => void
+}
+vi.mock('../components/source-mode-tabs', () => ({
+  __esModule: true,
+  default: ({ value, readonly, onChange }: SourceModeTabsMockProps) => (
+    <div data-testid="source-mode-tabs">
+      <span data-testid="source-mode-value">{value}</span>
+      <span data-testid="source-mode-readonly">{String(Boolean(readonly))}</span>
+      <button type="button" onClick={() => onChange('inline')}>switch-inline</button>
+      <button type="button" onClick={() => onChange('registered')}>switch-registered</button>
+    </div>
+  ),
+}))
+
+type InlineSpecMockProps = {
+  value: InlineModelSpec
+  readonly: boolean
+  onChange: (patch: Partial<InlineModelSpec>) => void
+}
+vi.mock('../components/inline-spec-form', () => ({
+  __esModule: true,
+  default: ({ value, readonly, onChange }: InlineSpecMockProps) => (
+    <div data-testid="inline-spec-form">
+      <span data-testid="inline-backend">{value.backend}</span>
+      <span data-testid="inline-model-name">{value.model_name}</span>
+      <span data-testid="inline-readonly">{String(Boolean(readonly))}</span>
+      <button type="button" onClick={() => onChange({ model_name: 'patched-m' })}>
+        change-inline
+      </button>
+    </div>
   ),
 }))
 
@@ -154,7 +195,10 @@ const buildConfig = (overrides: Partial<{
   models: ReturnType<typeof buildModels>
   isLoadingModels: boolean
   readOnly: boolean
+  sourceMode: SourceMode
   handleModelAliasChange: ReturnType<typeof vi.fn>
+  handleSourceModeChange: ReturnType<typeof vi.fn>
+  handleInlineSpecChange: ReturnType<typeof vi.fn>
   handlePromptTemplateChange: ReturnType<typeof vi.fn>
   handleSamplingParamsChange: ReturnType<typeof vi.fn>
   handleExtraChange: ReturnType<typeof vi.fn>
@@ -163,7 +207,12 @@ const buildConfig = (overrides: Partial<{
   inputs: overrides.inputs ?? buildPayload(),
   models: overrides.models ?? buildModels(),
   isLoadingModels: overrides.isLoadingModels ?? false,
+  // Default ``sourceMode`` is "registered" so the prior assertions
+  // (alias dropdown rendered, no inline form) keep their semantics.
+  sourceMode: overrides.sourceMode ?? ('registered' as SourceMode),
   handleModelAliasChange: overrides.handleModelAliasChange ?? vi.fn(),
+  handleSourceModeChange: overrides.handleSourceModeChange ?? vi.fn(),
+  handleInlineSpecChange: overrides.handleInlineSpecChange ?? vi.fn(),
   handlePromptTemplateChange: overrides.handlePromptTemplateChange ?? vi.fn(),
   handleSamplingParamsChange: overrides.handleSamplingParamsChange ?? vi.fn(),
   handleExtraChange: overrides.handleExtraChange ?? vi.fn(),
@@ -295,6 +344,71 @@ describe('token-model-source/panel', () => {
       mockUseConfig.mockReturnValue(buildConfig({ models: [] }))
       renderPanel()
       expect(screen.getByTestId('alias-count').textContent).toBe('0')
+    })
+  })
+
+  describe('Source mode — inline vs registered', () => {
+    it('renders the alias dropdown in registered mode (default)', () => {
+      mockUseConfig.mockReturnValue(buildConfig({ sourceMode: 'registered' }))
+      renderPanel()
+      expect(screen.getByTestId('model-alias-select')).toBeInTheDocument()
+      expect(screen.queryByTestId('inline-spec-form')).not.toBeInTheDocument()
+    })
+
+    it('renders the inline spec form when sourceMode is "inline"', () => {
+      mockUseConfig.mockReturnValue(
+        buildConfig({
+          sourceMode: 'inline',
+          inputs: buildPayload({
+            inline_spec: { ...DEFAULT_INLINE_SPEC, model_name: 'llama-3.1-8b' },
+          }),
+        }),
+      )
+      renderPanel()
+      expect(screen.queryByTestId('model-alias-select')).not.toBeInTheDocument()
+      expect(screen.getByTestId('inline-spec-form')).toBeInTheDocument()
+      // The inline-spec form must receive the saved inline_spec; the
+      // panel falls back to DEFAULT_INLINE_SPEC only when the input
+      // is null (verified below).
+      expect(screen.getByTestId('inline-model-name').textContent).toBe('llama-3.1-8b')
+    })
+
+    it('falls back to DEFAULT_INLINE_SPEC when inline_spec is null in inline mode', () => {
+      // Defensive — the panel computes sourceMode from inline_spec but
+      // a race or test stub may set sourceMode='inline' with null
+      // inline_spec. The fallback keeps the child from blowing up on
+      // an undefined ``value`` prop.
+      mockUseConfig.mockReturnValue(
+        buildConfig({
+          sourceMode: 'inline',
+          inputs: buildPayload({ inline_spec: null }),
+        }),
+      )
+      renderPanel()
+      expect(screen.getByTestId('inline-backend').textContent).toBe(
+        DEFAULT_INLINE_SPEC.backend,
+      )
+    })
+
+    it('invokes handleSourceModeChange when the tabs emit a new mode', () => {
+      const handleSourceModeChange = vi.fn()
+      mockUseConfig.mockReturnValue(buildConfig({ handleSourceModeChange }))
+      renderPanel()
+      fireEvent.click(screen.getByText('switch-inline'))
+      expect(handleSourceModeChange).toHaveBeenCalledWith('inline')
+    })
+
+    it('invokes handleInlineSpecChange when the inline form emits a patch', () => {
+      const handleInlineSpecChange = vi.fn()
+      mockUseConfig.mockReturnValue(
+        buildConfig({
+          sourceMode: 'inline',
+          handleInlineSpecChange,
+        }),
+      )
+      renderPanel()
+      fireEvent.click(screen.getByText('change-inline'))
+      expect(handleInlineSpecChange).toHaveBeenCalledWith({ model_name: 'patched-m' })
     })
   })
 })

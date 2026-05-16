@@ -231,4 +231,213 @@ describe('token-model-source/default.checkValid', () => {
       expect(result.errorMessage).toContain('extraMustBeObject')
     })
   })
+
+  describe('inline_spec guards', () => {
+    // Mirrors backend ``_inline_spec_shape`` (entities.py) — the panel
+    // red-lines every error pydantic would 422 on after save.
+    const goodLlamaInline = {
+      backend: 'llama_cpp',
+      model_name: 'llama-3.1-8b-instruct',
+      model_url: 'http://127.0.0.1:8080',
+      EOS: '<|eot_id|>',
+      type: 'normal' as const,
+    }
+
+    it('accepts a fully populated llama_cpp inline spec', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ inline_spec: goodLlamaInline }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('treats null inline_spec as registered-alias mode (no inline check)', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ inline_spec: null }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('rejects inline_spec replaced by an array (DSL smuggle)', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: ['x'] as unknown as typeof goodLlamaInline,
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecMustBeObject')
+    })
+
+    it.each([
+      ['missing', undefined],
+      ['empty', ''],
+      ['blank', '   '],
+    ])('rejects %s backend', (_, backend) => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: {
+            ...goodLlamaInline,
+            backend: backend as unknown as string,
+          },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecBackendRequired')
+    })
+
+    it.each([
+      ['missing', undefined],
+      ['empty', ''],
+      ['blank', '   '],
+    ])('rejects %s model_name', (_, model_name) => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: {
+            ...goodLlamaInline,
+            model_name: model_name as unknown as string,
+          },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecModelNameRequired')
+    })
+
+    it('rejects llama_cpp inline spec missing model_url', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: { ...goodLlamaInline, model_url: '' },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecModelUrlRequired')
+    })
+
+    it('rejects llama_cpp inline spec missing EOS', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: { ...goodLlamaInline, EOS: '' },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecEosRequired')
+    })
+
+    it('rejects invalid type value on llama_cpp inline spec', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: {
+            ...goodLlamaInline,
+            type: 'reasoning' as unknown as 'normal' | 'think',
+          },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecTypeInvalid')
+    })
+
+    it('rejects an "id" field smuggled into the inline spec', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: {
+            ...goodLlamaInline,
+            id: 'smuggled-id',
+          } as typeof goodLlamaInline,
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecIdForbidden')
+    })
+
+    describe('model_url URL shape (llama_cpp)', () => {
+      // Mirrors ``LlamaCppSpec.model_url: AnyUrl`` — must be parseable
+      // by ``new URL`` with a scheme + host. Bare hostnames and
+      // relative paths are rejected.
+      it.each([
+        ['bare hostname', '127.0.0.1:8080'],
+        ['relative path', '/api/completion'],
+        ['no scheme', 'host.example.com'],
+        ['scheme only', 'http:'],
+      ])('rejects %s', (_, model_url) => {
+        const result = nodeDefault.checkValid(
+          buildPayload({
+            inline_spec: { ...goodLlamaInline, model_url },
+          }),
+          t,
+        )
+        expect(result.errorMessage).toContain('inlineSpecModelUrlInvalid')
+      })
+
+      it.each([
+        ['http://127.0.0.1:8080'],
+        ['https://llama.example.com'],
+        ['http://localhost:8080/'],
+      ])('accepts %s', (model_url) => {
+        const result = nodeDefault.checkValid(
+          buildPayload({
+            inline_spec: { ...goodLlamaInline, model_url },
+          }),
+          t,
+        )
+        expect(result.isValid).toBe(true)
+      })
+    })
+
+    describe('request_timeout_ms guard', () => {
+      // ``BaseSpec.request_timeout_ms`` is ``int`` with ``gt=0``;
+      // mirror server-side invariants so pydantic never sees a
+      // payload it would 422 on.
+      it('accepts undefined (backend default applies)', () => {
+        const result = nodeDefault.checkValid(
+          buildPayload({
+            inline_spec: { ...goodLlamaInline, request_timeout_ms: undefined },
+          }),
+          t,
+        )
+        expect(result.isValid).toBe(true)
+      })
+
+      it.each([
+        ['zero', 0],
+        ['negative', -1],
+        ['fractional', 1500.5],
+        ['NaN', Number.NaN],
+        ['Infinity', Number.POSITIVE_INFINITY],
+      ])('rejects %s request_timeout_ms', (_, request_timeout_ms) => {
+        const result = nodeDefault.checkValid(
+          buildPayload({
+            inline_spec: {
+              ...goodLlamaInline,
+              request_timeout_ms: request_timeout_ms as unknown as number,
+            },
+          }),
+          t,
+        )
+        expect(result.errorMessage).toContain('inlineSpecRequestTimeoutPositive')
+      })
+
+      it('rejects non-numeric request_timeout_ms (DSL smuggle)', () => {
+        const result = nodeDefault.checkValid(
+          buildPayload({
+            inline_spec: {
+              ...goodLlamaInline,
+              request_timeout_ms: '30000' as unknown as number,
+            },
+          }),
+          t,
+        )
+        expect(result.errorMessage).toContain('inlineSpecRequestTimeoutPositive')
+      })
+
+      it('accepts a positive integer', () => {
+        const result = nodeDefault.checkValid(
+          buildPayload({
+            inline_spec: { ...goodLlamaInline, request_timeout_ms: 60000 },
+          }),
+          t,
+        )
+        expect(result.isValid).toBe(true)
+      })
+    })
+  })
 })

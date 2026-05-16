@@ -553,6 +553,12 @@ class _FakeBackendRegistry:
     def get(self, name: str) -> type[ModelBackend]:
         return self._backends[name]
 
+    def get_spec_class(self, name: str) -> type[BaseSpec]:
+        # Exposed so ``_resolve_base_specs`` can validate the inline
+        # spec dict against the backend's pydantic spec class — same
+        # surface ``BackendRegistry.get_spec_class`` provides in prod.
+        return self._backends[name].spec_class
+
 
 # ── Node factory helper ──────────────────────────────────────────────────
 
@@ -564,6 +570,7 @@ def _make_spec_dict(
     sampling_params: dict[str, Any] | None = None,
     extra: dict[str, Any] | None = None,
     messages: list[dict[str, str]] | None = None,
+    inline_spec: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a ``ModelInvocationSpec``-shaped dict for the variable pool.
 
@@ -587,6 +594,8 @@ def _make_spec_dict(
     }
     if messages is not None:
         spec["messages"] = [dict(m) for m in messages]
+    if inline_spec is not None:
+        spec["inline_spec"] = dict(inline_spec)
     return spec
 
 
@@ -1251,6 +1260,138 @@ class TestSpecResolution:
             list(node._run())
         assert exc.value.source_id == "s1"
         assert "expected dict" in exc.value.reason
+
+
+# ── Inline-spec resolution ──────────────────────────────────────────────
+
+
+class TestInlineSpecResolution:
+    """``ModelInvocationSpec.inline_spec`` bypasses the alias registry.
+
+    ``_resolve_base_specs`` validates the inline dict against the
+    backend's pydantic spec class instead of looking up
+    ``model_alias`` in ``model_net.yaml``. Three invariants pin here:
+
+    * the synthetic ``id`` is always the source's ``model_alias`` —
+      callers cannot smuggle an ``id`` through the wire (the source-
+      side validator rejects it; here we test the consumer rejects a
+      malformed inline_spec attribution-correctly);
+    * a typo'd backend on the inline dict surfaces as
+      :class:`InvalidSpecError` with the source_id, not a generic
+      ``UnknownBackendError`` the panel cannot trace back;
+    * an inline-spec source produces ``inputs.models == [model_alias]``
+      so the run-history view stays consistent with registered-alias
+      sources.
+    """
+
+    def test_inline_spec_bypasses_registry(self):
+        # No alias in the registry → registered-alias path would
+        # raise UnknownModelAliasError. With inline_spec set, the
+        # consumer must construct the spec from the inline dict.
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="ad_hoc",
+                inline_spec={"backend": "synthetic", "model_name": "ad-hoc-m"},
+            ),
+        )
+        pool.add(
+            ["src_1", "spec"],
+            _make_spec_dict(
+                model_alias="ad_hoc_2",
+                inline_spec={"backend": "synthetic", "model_name": "ad-hoc-m2"},
+            ),
+        )
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            # Empty registry — proves the inline path doesn't touch it.
+            specs={},
+        )
+
+        events = list(node._run())
+        completed = [e for e in events if isinstance(e, StreamCompletedEvent)]
+        assert len(completed) == 1
+        nrr = completed[0].node_run_result
+        assert nrr.status == WorkflowNodeExecutionStatus.SUCCEEDED
+        # ``inputs.models`` echoes the model_alias for both paths so a
+        # mixed config (one registered + one inline) still produces a
+        # uniform run-history row.
+        assert nrr.inputs["models"] == ["ad_hoc", "ad_hoc_2"]
+
+    def test_inline_spec_unknown_backend_raises_invalid_spec(self):
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                inline_spec={"backend": "no-such-backend", "model_name": "x"},
+            ),
+        )
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2"))
+        node = _make_node(pool=pool, selectors=[["src_0", "spec"], ["src_1", "spec"]])
+
+        with pytest.raises(InvalidSpecError) as exc:
+            list(node._run())
+        assert exc.value.source_id == "s0"
+        assert "no-such-backend" in exc.value.reason
+
+    def test_inline_spec_invalid_payload_attributed_to_source(self):
+        # The synthetic spec class allows extras but ``model_name`` is
+        # required (BaseSpec). Passing an empty model_name through
+        # ``inline_spec`` should surface as InvalidSpecError on the
+        # right source — pydantic's bare ValidationError carries no
+        # source attribution.
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1"))
+        pool.add(
+            ["src_1", "spec"],
+            _make_spec_dict(
+                model_alias="m2",
+                inline_spec={"backend": "synthetic", "model_name": ""},
+            ),
+        )
+        node = _make_node(pool=pool, selectors=[["src_0", "spec"], ["src_1", "spec"]])
+
+        with pytest.raises(InvalidSpecError) as exc:
+            list(node._run())
+        assert exc.value.source_id == "s1"
+        # ``synthetic`` (the backend tag) is in the reason so the
+        # panel can show "which backend rejected the inline payload".
+        assert "synthetic" in exc.value.reason
+
+    def test_inline_spec_id_derived_from_model_alias(self):
+        # The synthetic ``id`` must be the source's ``model_alias`` so
+        # downstream debug views key on the same handle across both
+        # paths. Drive this through ``inputs.models``: registry-backed
+        # specs put the alias there, inline-backed must do the same.
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="my-inline-id",
+                inline_spec={"backend": "synthetic", "model_name": "any-name"},
+            ),
+        )
+        pool.add(
+            ["src_1", "spec"],
+            _make_spec_dict(
+                model_alias="my-inline-id-2",
+                inline_spec={"backend": "synthetic", "model_name": "any-name-2"},
+            ),
+        )
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            specs={},
+        )
+
+        completed = next(e for e in node._run() if isinstance(e, StreamCompletedEvent))
+        assert completed.node_run_result.inputs["models"] == [
+            "my-inline-id",
+            "my-inline-id-2",
+        ]
 
 
 # ── Chat-mode integration ────────────────────────────────────────────────

@@ -50,6 +50,7 @@ def _payload(
     sampling_params: dict | None = None,
     extra: dict | None = None,
     messages_template: list[dict] | None = None,
+    inline_spec: dict | None = None,
 ) -> dict:
     payload: dict = {
         "title": "src",
@@ -65,6 +66,8 @@ def _payload(
         payload["sampling_params"] = sampling_params
     if extra is not None:
         payload["extra"] = extra
+    if inline_spec is not None:
+        payload["inline_spec"] = inline_spec
     return payload
 
 
@@ -309,6 +312,76 @@ class TestRenderPromptSegmentText:
         )
         spec = list(node._run())[0].node_run_result.outputs["spec"]
         assert spec["prompt"] == "Value: <>"
+
+
+class TestInlineSpecPassthrough:
+    """``inline_spec`` rides through ``_run`` to ``outputs.spec.inline_spec``
+    so the parallel-ensemble consumer can validate it against the
+    backend's pydantic class instead of resolving an alias against
+    ``model_net.yaml``. The node never validates per-backend fields
+    here — that's the consumer's job — but the wire shape must round
+    trip byte-for-byte and stay decoupled from the node-data dict.
+    """
+
+    def test_inline_spec_round_trips_into_outputs(self):
+        pool = VariablePool()
+        pool.add(["start", "q"], "x")
+        node = _make_node(
+            pool,
+            _payload(
+                inline_spec={
+                    "backend": "llama_cpp",
+                    "model_name": "llama-3.1-8b-instruct",
+                    "model_url": "http://127.0.0.1:8080",
+                    "EOS": "<|eot_id|>",
+                    "type": "normal",
+                    "expose_raw_logits": False,
+                },
+            ),
+        )
+
+        spec = list(node._run())[0].node_run_result.outputs["spec"]
+        assert spec["inline_spec"] == {
+            "backend": "llama_cpp",
+            "model_name": "llama-3.1-8b-instruct",
+            "model_url": "http://127.0.0.1:8080",
+            "EOS": "<|eot_id|>",
+            "type": "normal",
+            "expose_raw_logits": False,
+        }
+
+    def test_inline_spec_default_none(self):
+        # Registered-alias mode (no inline_spec) emits ``inline_spec: None``
+        # so the wire shape stays stable; the consumer treats absent
+        # and None identically.
+        pool = VariablePool()
+        pool.add(["start", "q"], "x")
+        node = _make_node(pool, _payload())
+
+        spec = list(node._run())[0].node_run_result.outputs["spec"]
+        assert spec["inline_spec"] is None
+
+    def test_inline_spec_decoupled_from_node_data(self):
+        # Same defensive-copy contract as ``extra``: downstream mutation
+        # of ``spec.inline_spec`` must not bleed back into the parsed
+        # node_data.
+        pool = VariablePool()
+        pool.add(["start", "q"], "x")
+        node = _make_node(
+            pool,
+            _payload(
+                inline_spec={
+                    "backend": "llama_cpp",
+                    "model_name": "m",
+                    "model_url": "http://127.0.0.1:8080",
+                    "EOS": "<|eot_id|>",
+                },
+            ),
+        )
+
+        spec = list(node._run())[0].node_run_result.outputs["spec"]
+        spec["inline_spec"]["mutated"] = True
+        assert "mutated" not in (node._node_data.inline_spec or {})
 
 
 class TestRunFailurePaths:

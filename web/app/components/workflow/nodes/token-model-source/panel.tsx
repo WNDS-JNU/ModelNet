@@ -4,14 +4,18 @@ import type { NodePanelProps, Var } from '@/app/components/workflow/types'
 import * as React from 'react'
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import Input from '@/app/components/base/input'
 import Field from '@/app/components/workflow/nodes/_base/components/field'
 import OutputVars, { VarItem } from '@/app/components/workflow/nodes/_base/components/output-vars'
 import PromptEditor from '@/app/components/workflow/nodes/_base/components/prompt/editor'
 import Split from '@/app/components/workflow/nodes/_base/components/split'
 import useAvailableVarList from '@/app/components/workflow/nodes/_base/hooks/use-available-var-list'
 import { VarType } from '@/app/components/workflow/types'
+import InlineSpecForm from './components/inline-spec-form'
 import ModelAliasSelect from './components/model-alias-select'
 import SamplingParamsForm from './components/sampling-params-form'
+import SourceModeTabs from './components/source-mode-tabs'
+import { DEFAULT_INLINE_SPEC } from './types'
 import useConfig from './use-config'
 
 const i18nPrefix = 'nodes.tokenModelSource'
@@ -55,7 +59,10 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
     inputs,
     models,
     isLoadingModels,
+    sourceMode,
     handleModelAliasChange,
+    handleSourceModeChange,
+    handleInlineSpecChange,
     handlePromptTemplateChange,
     handleSamplingParamsChange,
   } = useConfig(id, data)
@@ -68,20 +75,69 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
   return (
     <div className="pt-2">
       <div className="space-y-4 px-4 pb-2">
-        {/* Section 1 — Model alias */}
+        {/*
+         * Section 1 — Source mode + model identity.
+         *
+         * The tabs flip between two backend paths described in
+         * ``api/core/workflow/nodes/parallel_ensemble/node.py``'s
+         * ``_resolve_base_specs``: "registered" picks an alias the
+         * deployment already registered in ``model_net.yaml``;
+         * "inline" lets the user type the backend fields directly
+         * (model_url / EOS / type / …) so the source bypasses the
+         * yaml registry. ``model_alias`` stays required in both
+         * modes — for registered it's the registry key, for inline
+         * it's the synthetic ``id`` the server constructs from the
+         * spec block.
+         */}
+        <SourceModeTabs
+          readonly={readOnly}
+          value={sourceMode}
+          onChange={handleSourceModeChange}
+        />
+
         <Field
           title={t(`${i18nPrefix}.modelAlias`, { ns: 'workflow' })}
-          tooltip={t(`${i18nPrefix}.modelAliasTooltip`, { ns: 'workflow' })}
+          tooltip={
+            sourceMode === 'registered'
+              ? t(`${i18nPrefix}.modelAliasTooltip`, { ns: 'workflow' })
+              : t(`${i18nPrefix}.modelAliasInlineTooltip`, {
+                  ns: 'workflow',
+                  defaultValue:
+                    'A logical name for this source. Used as the synthetic id of the custom spec on the server side; must be non-empty.',
+                })
+          }
           required
         >
-          <ModelAliasSelect
-            readonly={readOnly}
-            isLoading={isLoadingModels}
-            models={models}
-            selected={inputs.model_alias}
-            onChange={handleModelAliasChange}
-          />
+          {sourceMode === 'registered'
+            ? (
+                <ModelAliasSelect
+                  readonly={readOnly}
+                  isLoading={isLoadingModels}
+                  models={models}
+                  selected={inputs.model_alias}
+                  onChange={handleModelAliasChange}
+                />
+              )
+            : (
+                <Input
+                  value={inputs.model_alias}
+                  onChange={e => handleModelAliasChange(e.target.value)}
+                  disabled={readOnly}
+                  placeholder={t(`${i18nPrefix}.modelAliasInlinePlaceholder`, {
+                    ns: 'workflow',
+                    defaultValue: 'e.g. my-llama-8b',
+                  })}
+                />
+              )}
         </Field>
+
+        {sourceMode === 'inline' && (
+          <InlineSpecForm
+            readonly={readOnly}
+            value={inputs.inline_spec ?? DEFAULT_INLINE_SPEC}
+            onChange={handleInlineSpecChange}
+          />
+        )}
 
         {/* Section 2 — Prompt template.
          *

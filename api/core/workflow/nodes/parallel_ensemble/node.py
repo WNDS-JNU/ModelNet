@@ -238,6 +238,15 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         # backend is instantiated.
         specs = self._collect_specs(cfg.token_sources)
 
+        # Resolve each source's ``BaseSpec`` exactly once. ``inline_spec``
+        # in the upstream payload bypasses the registry; otherwise the
+        # alias is looked up against ``model_net.yaml``. Computing the
+        # map here means capability / requirements / instantiation all
+        # key off the same parsed spec — no double work, and a typo in
+        # an inline-spec field surfaces before the §9 validation pipeline
+        # walks it five times.
+        base_specs = self._resolve_base_specs(cfg.token_sources, specs)
+
         # Per-source ``TokenStepParams`` carry whatever sampling the
         # upstream source produced (temperature / top_p / stop / seed /
         # max_tokens) plus the ``top_k_override`` this node injects.
@@ -260,10 +269,11 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
             runner_config=runner_config,
             cfg=cfg,
             specs=specs,
+            base_specs=base_specs,
             effective_params=effective_params,
         )
 
-        backends = self._instantiate_backends(cfg.token_sources, specs)
+        backends = self._instantiate_backends(cfg.token_sources, specs, base_specs)
         weights = self._resolve_weights(cfg.token_sources)
         sources = self._build_source_inputs(cfg.token_sources, specs, effective_params, weights, backends)
 
@@ -483,6 +493,73 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                         )
             specs[ref.source_id] = value
         return specs
+
+    def _resolve_base_specs(
+        self,
+        refs: list[TokenSourceRef],
+        specs: dict[str, dict[str, Any]],
+    ) -> dict[str, BaseSpec]:
+        """Per-source ``BaseSpec`` — inline payload if present, else registry alias.
+
+        Inline path: the upstream ``token-model-source`` node carried
+        an ``inline_spec`` dict (the panel's "custom model" mode). We
+        validate it against the backend's own pydantic spec class
+        (``BackendRegistry.get_spec_class(...)``) so every per-backend
+        invariant — llama.cpp's ``EOS`` required, ``model_url``
+        URL-shaped, ``type`` ∈ {normal, think}, ``extra='forbid'``
+        against typos — is enforced exactly the same way a yaml
+        registry entry would be. The synthetic ``id`` is the
+        source's ``model_alias``: the panel uses that as the source's
+        logical name and the registry's ``id`` uniqueness invariant
+        rides on parallel-ensemble's own ``source_id`` uniqueness
+        check, so collisions surface earlier.
+
+        Registry path: unchanged behaviour — alias resolves through
+        ``self._model_registry.get`` and raises ``UnknownModelAliasError``
+        if the alias is not present in ``model_net.yaml``.
+        """
+        out: dict[str, BaseSpec] = {}
+        for ref in refs:
+            spec_dict = specs[ref.source_id]
+            inline = spec_dict.get("inline_spec")
+            alias = spec_dict["model_alias"]
+            if not inline:
+                out[ref.source_id] = self._model_registry.get(alias)
+                continue
+            if not isinstance(inline, dict):
+                raise InvalidSpecError(
+                    source_id=ref.source_id,
+                    reason=(
+                        f"inline_spec must be a dict when set, "
+                        f"got {type(inline).__name__}"
+                    ),
+                )
+            backend_name = inline.get("backend")
+            if not isinstance(backend_name, str) or not backend_name.strip():
+                raise InvalidSpecError(
+                    source_id=ref.source_id,
+                    reason="inline_spec.backend must be a non-empty string",
+                )
+            try:
+                spec_class = self._backend_registry.get_spec_class(backend_name)
+            except Exception as exc:
+                raise InvalidSpecError(
+                    source_id=ref.source_id,
+                    reason=f"inline_spec.backend '{backend_name}' is not a registered backend: {exc}",
+                ) from exc
+            # ``id`` is *always* derived from the source's model_alias so
+            # the user never has to spell the same name twice; rejecting a
+            # caller-supplied ``id`` in the source-side validator keeps
+            # this contract one-directional.
+            payload = {**inline, "id": alias}
+            try:
+                out[ref.source_id] = spec_class.model_validate(payload)
+            except ValidationError as exc:
+                raise InvalidSpecError(
+                    source_id=ref.source_id,
+                    reason=f"inline_spec failed {backend_name} validation: {exc}",
+                ) from exc
+        return out
 
     def _build_effective_params(
         self,
@@ -746,6 +823,7 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         runner_config: Any,
         cfg: ParallelEnsembleConfig,
         specs: dict[str, dict[str, Any]],
+        base_specs: dict[str, BaseSpec],
         effective_params: dict[str, TokenStepParams],
     ) -> None:
         """EXTENSIBILITY_SPEC §9 startup validation pipeline.
@@ -800,7 +878,7 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         # ``TokenStepParams``, which can differ across sources.
         for ref in cfg.token_sources:
             alias = specs[ref.source_id]["model_alias"]
-            spec = self._model_registry.get(alias)
+            spec = base_specs[ref.source_id]
             backend_cls = self._backend_registry.get(spec.backend)
             caps = backend_cls.capabilities(spec)
             missing = runner_cls.required_capabilities - caps
@@ -874,7 +952,7 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                 if ref.source_id in capability_failed:
                     continue
                 alias = specs[ref.source_id]["model_alias"]
-                spec = self._model_registry.get(alias)
+                spec = base_specs[ref.source_id]
                 backend_cls = self._backend_registry.get(spec.backend)
                 source_top_k = effective_params[ref.source_id].top_k
                 per_source_reqs: list[Requirement] = []
@@ -899,18 +977,22 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         self,
         refs: list[TokenSourceRef],
         specs: dict[str, dict[str, Any]],
+        base_specs: dict[str, BaseSpec],
     ) -> dict[str, ModelBackend]:
         """``source_id`` → fresh-per-run backend mapping.
 
         Keyed by ``source_id`` (not ``model_alias``) so the same alias
         contributing two sources lands as two distinct backend
         instances — required for the "same model, different sampling"
-        self-consistency configuration that motivates ADR-v3-6.
+        self-consistency configuration that motivates ADR-v3-6. The
+        per-source ``BaseSpec`` is whatever ``_resolve_base_specs``
+        produced: registry-backed when the upstream source carried a
+        plain ``model_alias``, inline-validated when the panel was
+        configured with custom backend fields.
         """
         backends: dict[str, ModelBackend] = {}
         for ref in refs:
-            alias = specs[ref.source_id]["model_alias"]
-            spec: BaseSpec = self._model_registry.get(alias)
+            spec: BaseSpec = base_specs[ref.source_id]
             backend_cls = self._backend_registry.get(spec.backend)
             backends[ref.source_id] = backend_cls(spec, http=self._http_client)
         return backends

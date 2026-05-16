@@ -184,6 +184,79 @@ class TestTokenModelSourceNodeData:
             )
 
 
+class TestInlineSpecField:
+    """``inline_spec`` is the optional escape hatch that lets the panel
+    bypass ``model_net.yaml``. The DSL layer keeps the per-backend
+    schema unconstrained — the parallel-ensemble consumer validates
+    the payload against ``BackendRegistry.get_spec_class(...)`` — but
+    enforces three invariants here: ``backend`` and ``model_name``
+    must be non-blank strings, and the user cannot smuggle an ``id``
+    (the consumer derives it from ``model_alias``).
+    """
+
+    def test_default_is_none(self):
+        nd = TokenModelSourceNodeData(
+            title="src", model_alias="ad-hoc", prompt_template="hi"
+        )
+        assert nd.inline_spec is None
+
+    def test_minimal_inline_spec_accepted(self):
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="ad-hoc",
+            prompt_template="hi",
+            inline_spec={
+                "backend": "llama_cpp",
+                "model_name": "llama-3.1-8b-instruct",
+                "model_url": "http://127.0.0.1:8080",
+                "EOS": "<|eot_id|>",
+            },
+        )
+        assert nd.inline_spec is not None
+        assert nd.inline_spec["backend"] == "llama_cpp"
+        assert nd.inline_spec["model_name"] == "llama-3.1-8b-instruct"
+
+    def test_missing_backend_rejected(self):
+        with pytest.raises(ValidationError):
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="ad-hoc",
+                prompt_template="hi",
+                inline_spec={"model_name": "x"},
+            )
+
+    def test_blank_backend_rejected(self):
+        with pytest.raises(ValidationError):
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="ad-hoc",
+                prompt_template="hi",
+                inline_spec={"backend": "  ", "model_name": "x"},
+            )
+
+    def test_missing_model_name_rejected(self):
+        with pytest.raises(ValidationError):
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="ad-hoc",
+                prompt_template="hi",
+                inline_spec={"backend": "llama_cpp"},
+            )
+
+    def test_id_smuggling_rejected(self):
+        with pytest.raises(ValidationError):
+            TokenModelSourceNodeData(
+                title="src",
+                model_alias="ad-hoc",
+                prompt_template="hi",
+                inline_spec={
+                    "backend": "llama_cpp",
+                    "model_name": "x",
+                    "id": "smuggled-id",
+                },
+            )
+
+
 class TestChatMessageTemplate:
     """``ChatMessageTemplate`` is the per-row pydantic shape behind
     ``messages_template`` (chat mode). The DSL surface must reject

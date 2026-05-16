@@ -116,6 +116,20 @@ class ModelInvocationSpec(TypedDict):
     sampling_params: dict[str, Any]
     extra: dict[str, Any]
     messages: NotRequired[list[ChatMessageDict] | None]
+    inline_spec: NotRequired[dict[str, Any] | None]
+    """Optional inline backend spec for sources that bypass
+    ``model_net.yaml``. When set, the parallel-ensemble consumer
+    validates this dict against ``BackendRegistry.get_spec_class(
+    inline_spec['backend'])`` (using ``model_alias`` as the synthetic
+    ``id``) and constructs the backend from it instead of resolving
+    ``model_alias`` against the registry. The shape is intentionally
+    open (``dict[str, Any]``) so a third-party backend's spec can
+    ride through without forking ``ModelInvocationSpec``; the
+    per-backend pydantic class is the authoritative validator on the
+    consumer side. URL / api_key / api_key_env appear here when the
+    user fills them in the panel — same SSRF / credential surface a
+    yaml entry would carry, with the same boundary (ssrf_proxy + the
+    backend's pydantic ``extra='forbid'`` seat-belt)."""
     """Explicit chat-mode payload. Set when the source node was
     configured with ``messages_template``; the parallel-ensemble node
     detects this and routes through each backend's ``apply_template``
@@ -157,6 +171,19 @@ class TokenModelSourceNodeData(BaseNodeData):
     type: NodeType = TOKEN_MODEL_SOURCE_NODE_TYPE
 
     model_alias: str = Field(..., min_length=1)
+    inline_spec: dict[str, Any] | None = None
+    """Optional inline backend spec. When ``None`` the consumer looks
+    ``model_alias`` up in ``model_net.yaml`` (the original P3.B.1
+    behaviour). When set, ``model_alias`` is treated as the source's
+    logical name (also used as the synthetic ``id`` for the inline
+    spec) and ``inline_spec`` carries the backend-specific fields the
+    user would otherwise hand-edit into the yaml registry (backend
+    name, model_name, model_url, EOS, type, expose_raw_logits, …).
+    The dict is validated against
+    ``BackendRegistry.get_spec_class(inline_spec['backend'])`` on the
+    parallel-ensemble side — keeping the per-backend schema there
+    means a third-party backend that brings its own ``BaseSpec``
+    subclass needs no edit to this node."""
     prompt_template: str = ""
     messages_template: list[ChatMessageTemplate] | None = None
     """Explicit chat-mode template — list of ``{role, content}`` rows,
@@ -195,6 +222,35 @@ class TokenModelSourceNodeData(BaseNodeData):
         if not stripped:
             raise ValueError("model_alias must not be blank")
         return stripped
+
+    @field_validator("inline_spec")
+    @classmethod
+    def _inline_spec_shape(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        # Surface-level checks only — every per-backend schema lives
+        # on the parallel-ensemble side. We catch the two errors that
+        # would otherwise surface as a confusing pydantic message at
+        # run time: missing ``backend`` (cannot route to a spec_class)
+        # and missing / blank ``model_name`` (no backend accepts an
+        # empty name and the panel always asks for one).
+        if v is None:
+            return None
+        backend = v.get("backend")
+        if not isinstance(backend, str) or not backend.strip():
+            raise ValueError("inline_spec.backend must be a non-empty string")
+        model_name = v.get("model_name")
+        if not isinstance(model_name, str) or not model_name.strip():
+            raise ValueError("inline_spec.model_name must be a non-empty string")
+        # Reject ``id`` smuggling — the consumer derives ``id`` from
+        # ``model_alias`` so it stays the single user-facing handle
+        # (matches the yaml registry's ``id`` per-entry uniqueness
+        # invariant by piggy-backing on ``source_id`` uniqueness in
+        # the parallel-ensemble config).
+        if "id" in v:
+            raise ValueError(
+                "inline_spec must not carry an 'id' field; the source's model_alias "
+                "is used as the synthetic id for the inline spec"
+            )
+        return v
 
     @model_validator(mode="after")
     def _check_chat_vs_raw_mutex(self) -> TokenModelSourceNodeData:
