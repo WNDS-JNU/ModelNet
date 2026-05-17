@@ -1,6 +1,7 @@
 import agentDefault from '@/app/components/workflow/nodes/agent/default'
 import assignerDefault from '@/app/components/workflow/nodes/assigner/default'
 import codeDefault from '@/app/components/workflow/nodes/code/default'
+import dataLoaderDefault from '@/app/components/workflow/nodes/data-loader/default'
 
 import documentExtractorDefault from '@/app/components/workflow/nodes/document-extractor/default'
 import httpRequestDefault from '@/app/components/workflow/nodes/http/default'
@@ -42,6 +43,7 @@ export const WORKFLOW_COMMON_NODES = [
   responseAggregatorDefault,
   parallelEnsembleDefault,
   tokenModelSourceDefault,
+  dataLoaderDefault,
   documentExtractorDefault,
   assignerDefault,
   parameterExtractorDefault,

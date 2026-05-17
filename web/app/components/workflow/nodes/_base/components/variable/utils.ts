@@ -670,6 +670,25 @@ const formatItem = (
       break
     }
 
+    case BlockEnum.DataLoader: {
+      // Mirrors backend ``DataLoaderNode._build_outputs``. ``items`` keeps
+      // full normalized rows; ``questions`` / ``answers`` are convenience
+      // arrays for benchmark-style prompts and evaluators.
+      res.vars = [
+        { variable: 'dataset', type: VarType.string },
+        { variable: 'split', type: VarType.string },
+        { variable: 'items', type: VarType.arrayObject },
+        { variable: 'count', type: VarType.number },
+        { variable: 'total', type: VarType.number },
+        { variable: 'has_more', type: VarType.boolean },
+        { variable: 'next_offset', type: VarType.number },
+        { variable: 'questions', type: VarType.arrayString },
+        { variable: 'answers', type: VarType.arrayString },
+        { variable: 'metadata', type: VarType.object },
+      ]
+      break
+    }
+
     case BlockEnum.ParallelEnsemble: {
       // Mirrors backend ``ParallelEnsembleNode._finalize_outputs``
       // (api/core/workflow/nodes/parallel_ensemble/node.py:494).
@@ -2269,6 +2288,23 @@ export const getNodeOutputVars = (
       // the spec dict.
       res.push([id, 'spec'])
       res.push([id, 'model_alias'])
+      break
+    }
+
+    case BlockEnum.DataLoader: {
+      const vars = [
+        'dataset',
+        'split',
+        'items',
+        'count',
+        'total',
+        'has_more',
+        'next_offset',
+        'questions',
+        'answers',
+        'metadata',
+      ]
+      vars.forEach(key => res.push([id, key]))
       break
     }
 

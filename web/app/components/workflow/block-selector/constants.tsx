@@ -139,6 +139,11 @@ export const BLOCKS = [
   },
   {
     classification: BlockClassificationEnum.Transform,
+    type: BlockEnum.DataLoader,
+    title: 'Data Loader',
+  },
+  {
+    classification: BlockClassificationEnum.Transform,
     type: BlockEnum.DocExtractor,
     title: 'Doc Extractor',
   },

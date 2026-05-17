@@ -74,6 +74,7 @@ const singleRunFormParamsHooks: Record<BlockEnum, any> = {
   [BlockEnum.ResponseAggregator]: undefined,
   [BlockEnum.ParallelEnsemble]: undefined,
   [BlockEnum.TokenModelSource]: undefined,
+  [BlockEnum.DataLoader]: undefined,
 }
 
 const useSingleRunFormParamsHooks = (nodeType: BlockEnum) => {
@@ -116,6 +117,7 @@ const getDataForCheckMoreHooks: Record<BlockEnum, any> = {
   [BlockEnum.ResponseAggregator]: undefined,
   [BlockEnum.ParallelEnsemble]: undefined,
   [BlockEnum.TokenModelSource]: undefined,
+  [BlockEnum.DataLoader]: undefined,
 }
 
 const useGetDataForCheckMoreHooks = <T>(nodeType: BlockEnum) => {

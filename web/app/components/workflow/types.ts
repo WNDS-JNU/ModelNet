@@ -59,6 +59,7 @@ export enum BlockEnum {
   ResponseAggregator = 'response-aggregator',
   ParallelEnsemble = 'parallel-ensemble',
   TokenModelSource = 'token-model-source',
+  DataLoader = 'data-loader',
 }
 
 export enum ControlMode {

@@ -8,6 +8,8 @@ import AssignerNode from './assigner/node'
 import AssignerPanel from './assigner/panel'
 import CodeNode from './code/node'
 import CodePanel from './code/panel'
+import DataLoaderNode from './data-loader/node'
+import DataLoaderPanel from './data-loader/panel'
 import DataSourceNode from './data-source/node'
 import DataSourcePanel from './data-source/panel'
 import DocExtractorNode from './document-extractor/node'
@@ -75,6 +77,7 @@ export const NodeComponentMap: Record<string, ComponentType<any>> = {
   [BlockEnum.ResponseAggregator]: ResponseAggregatorNode,
   [BlockEnum.ParallelEnsemble]: ParallelEnsembleNode,
   [BlockEnum.TokenModelSource]: TokenModelSourceNode,
+  [BlockEnum.DataLoader]: DataLoaderNode,
   [BlockEnum.ParameterExtractor]: ParameterExtractorNode,
   [BlockEnum.Iteration]: IterationNode,
   [BlockEnum.Loop]: LoopNode,
@@ -106,6 +109,7 @@ export const PanelComponentMap: Record<string, ComponentType<any>> = {
   [BlockEnum.ResponseAggregator]: ResponseAggregatorPanel,
   [BlockEnum.ParallelEnsemble]: ParallelEnsemblePanel,
   [BlockEnum.TokenModelSource]: TokenModelSourcePanel,
+  [BlockEnum.DataLoader]: DataLoaderPanel,
   [BlockEnum.Assigner]: AssignerPanel,
   [BlockEnum.ParameterExtractor]: ParameterExtractorPanel,
   [BlockEnum.Iteration]: IterationPanel,
