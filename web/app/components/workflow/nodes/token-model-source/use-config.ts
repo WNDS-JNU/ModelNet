@@ -72,6 +72,13 @@ const useConfig = (id: string, payload: TokenModelSourceNodeType) => {
       const next = produce(inputs, (draft) => {
         const current: InlineModelSpec
           = (draft.inline_spec ?? DEFAULT_INLINE_SPEC) as InlineModelSpec
+        if (typeof patch.model_name === 'string') {
+          const nextModelName = patch.model_name.trim()
+          const currentModelName = current.model_name.trim()
+          const currentAlias = draft.model_alias.trim()
+          if (nextModelName && (currentAlias.length === 0 || currentAlias === currentModelName))
+            draft.model_alias = nextModelName
+        }
         draft.inline_spec = {
           ...current,
           ...patch,

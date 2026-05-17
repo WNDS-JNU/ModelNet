@@ -66,9 +66,14 @@ describe('token-model-source/model-alias-select', () => {
       ).toBeInTheDocument()
     })
 
-    it('renders the selected alias when one is bound', () => {
+    it('renders the selected alias with its model name when one is bound', () => {
       renderSelect({ selected: 'llama3-local' })
-      expect(screen.getByText('llama3-local')).toBeInTheDocument()
+      expect(screen.getByText('llama3-local · llama3-8b')).toBeInTheDocument()
+    })
+
+    it('falls back to the raw selected alias when local model metadata is unavailable', () => {
+      renderSelect({ selected: 'missing-alias' })
+      expect(screen.getByText('missing-alias')).toBeInTheDocument()
     })
 
     it('renders "Loading…" while the local-models query is in flight', () => {

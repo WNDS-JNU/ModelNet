@@ -59,6 +59,10 @@ const ModelAliasSelect: FC<Props> = ({
       })),
     [models],
   )
+  const selectedInfo = useMemo(
+    () => models.find(m => m.id === selected),
+    [models, selected],
+  )
 
   const handlePick = useCallback(
     (alias: string, compatible: boolean) => {
@@ -87,6 +91,8 @@ const ModelAliasSelect: FC<Props> = ({
         defaultValue: 'Pick a model alias',
       })
     }
+    if (selectedInfo)
+      return `${selectedInfo.id} · ${selectedInfo.model_name}`
     return selected
   }
 
