@@ -152,6 +152,11 @@ def parse_top_probs(payload: dict[str, Any], eos: str, *, raw_logits: bool = Fal
           ...
         }
 
+    In raw-logit mode llama.cpp returns ``top_logprobs`` when
+    ``post_sampling_probs=false``. Some patched deployments kept the older
+    ``top_probs`` spelling while adding ``logit`` / ``raw_logit`` fields, so
+    the parser accepts both shapes.
+
     PN.py rewrites the EOS / empty-string token to ``"<end>"`` so a
     downstream aggregator can compare across models with different EOS
     markers. We preserve that contract here — the runner / aggregator
@@ -170,7 +175,13 @@ def parse_top_probs(payload: dict[str, Any], eos: str, *, raw_logits: bool = Fal
     head = completion_probabilities[0]
     if not isinstance(head, dict):
         return _fallback_end_candidate()
-    raw_top = head.get("top_probs") or []
+    if raw_logits:
+        raw_top = head.get("top_logprobs")
+        if raw_top is None:
+            raw_top = head.get("top_probs")
+    else:
+        raw_top = head.get("top_probs")
+    raw_top = raw_top or []
     if not isinstance(raw_top, list):
         return _fallback_end_candidate()
 

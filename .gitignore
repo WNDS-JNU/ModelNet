@@ -149,6 +149,9 @@ pyrightconfig.json
 api/.idea
 
 api/.env
+api/.env.bak.codex-*
+docker/middleware.env.bak.codex-*
+web/.env.local.bak.codex-*
 api/storage/*
 
 docker-legacy/volumes/app/storage/*
@@ -255,3 +258,4 @@ scripts/stress-test/reports/
 # enter git; use api/configs/model_net.yaml.example as a template.
 api/configs/model_net.yaml
 docs/ModelNet/Token-Level Collaborative Reasoning for Parallel Multi-Models.pdf
+.codex-run/

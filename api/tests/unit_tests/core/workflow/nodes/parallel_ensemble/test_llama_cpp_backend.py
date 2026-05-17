@@ -202,6 +202,26 @@ class TestParseTopProbs:
         assert sum(c["prob"] for c in out) == pytest.approx(1.0)
         assert out[0]["prob"] > out[1]["prob"] > out[2]["prob"]
 
+    def test_raw_logits_accept_llama_cpp_top_logprobs_shape(self) -> None:
+        out = parse_top_probs(
+            {
+                "completion_probabilities": [
+                    {
+                        "top_logprobs": [
+                            {"token": "Li", "logit": 20.0},
+                            {"token": "In", "logit": 17.0},
+                            {"token": "<|eos|>", "logit": 10.0},
+                        ]
+                    }
+                ]
+            },
+            eos="<|eos|>",
+            raw_logits=True,
+        )
+        assert [c["token"] for c in out] == ["Li", "In", "<end>"]
+        assert [c["logit"] for c in out] == [20.0, 17.0, 10.0]
+        assert sum(c["prob"] for c in out) == pytest.approx(1.0)
+
     def test_raw_logits_require_explicit_logit_field(self) -> None:
         out = parse_top_probs(
             {"completion_probabilities": [{"top_probs": [{"token": "x", "prob": 1.0}]}]},
