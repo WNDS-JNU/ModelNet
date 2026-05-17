@@ -35,6 +35,55 @@ const KNOWN_BACKENDS: ReadonlyArray<{ id: string, labelKey: string }> = [
   { id: 'llama_cpp', labelKey: `${i18nPrefix}.backends.llamaCpp` },
 ]
 
+// Match a ``scheme://host`` prefix without any port / path / query /
+// fragment trailing it. Constrained to the chars URL schemes and
+// hostnames actually use so the regex stays linear-time (no ``.*``
+// tail to backtrack into a sibling quantifier).
+const SCHEME_HOST_PREFIX = /^[a-z][a-z\d+\-.]*:\/\/[^/:?#]+/i
+
+// Split a stored ``model_url`` (single string round-tripped to the
+// backend's ``AnyUrl``) into the two edit boxes the panel surfaces.
+// The port is whatever digits follow ``scheme://host:`` before any
+// path / query / fragment; everything else stays in ``base`` so a
+// user-typed path / query string survives the round-trip.
+const parseModelUrl = (full: string): { base: string, port: string } => {
+  const m = full.match(SCHEME_HOST_PREFIX)
+  if (!m || !m[0])
+    return { base: full, port: '' }
+  const schemeHost = m[0]
+  const rest = full.slice(schemeHost.length)
+  if (!rest.startsWith(':'))
+    return { base: full, port: '' }
+  // Walk digits manually after the colon — avoids the ``\d+`` /
+  // ``.*`` backtracking pair that ``regexp/no-super-linear-backtracking``
+  // flags, and stops cleanly at the first non-digit (path / EOL).
+  let i = 1
+  while (i < rest.length) {
+    const ch = rest.charCodeAt(i)
+    if (ch < 48 || ch > 57)
+      break
+    i++
+  }
+  const port = rest.slice(1, i)
+  if (!port)
+    return { base: full, port: '' }
+  return { base: schemeHost + rest.slice(i), port }
+}
+
+// Re-insert ``port`` between scheme://host and any path / query /
+// fragment the user typed into ``base``. Empty port returns ``base``
+// verbatim so the saved URL stays minimal when the user hasn't
+// pinned one.
+const joinModelUrl = (base: string, port: string): string => {
+  if (!port)
+    return base
+  const m = base.match(SCHEME_HOST_PREFIX)
+  if (!m || !m[0])
+    return `${base}:${port}`
+  const schemeHost = m[0]
+  return `${schemeHost}:${port}${base.slice(schemeHost.length)}`
+}
+
 type Props = {
   readonly: boolean
   value: InlineModelSpec
@@ -186,15 +235,50 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
         tooltip={t(`${i18nPrefix}.modelUrl.tooltip`, { ns: 'workflow' })}
         required
       >
-        <Input
-          value={value.model_url ?? ''}
-          onChange={handleText('model_url')}
-          disabled={readonly}
-          placeholder={t(`${i18nPrefix}.modelUrl.placeholder`, {
-            ns: 'workflow',
-            defaultValue: 'http://127.0.0.1:8080',
-          })}
-        />
+        {/* URL + port split into two inputs. The wire still carries one
+            ``model_url`` string so ``LlamaCppSpec.model_url: AnyUrl`` stays
+            the canonical schema; the split is purely a UX upgrade over a
+            single text box. Round-tripping via parse/joinModelUrl
+            preserves a user-typed path / query string when present. */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input
+              value={parseModelUrl(value.model_url ?? '').base}
+              onChange={(e) => {
+                const { port } = parseModelUrl(value.model_url ?? '')
+                onChange({ model_url: joinModelUrl(e.target.value, port) })
+              }}
+              disabled={readonly}
+              placeholder={t(`${i18nPrefix}.modelUrl.placeholder`, {
+                ns: 'workflow',
+                defaultValue: 'http://219.222.20.79',
+              })}
+            />
+          </div>
+          <div className="w-24">
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              value={parseModelUrl(value.model_url ?? '').port}
+              onChange={(e) => {
+                const { base } = parseModelUrl(value.model_url ?? '')
+                const raw = e.target.value
+                // Reject fractional input so the port box mirrors the
+                // server-side integer contract; allow empty so the user
+                // can clear it.
+                if (raw !== '' && (!Number.isFinite(Number(raw)) || !Number.isInteger(Number(raw))))
+                  return
+                onChange({ model_url: joinModelUrl(base, raw) })
+              }}
+              disabled={readonly}
+              placeholder={t(`${i18nPrefix}.modelPort.placeholder`, {
+                ns: 'workflow',
+                defaultValue: '8080',
+              })}
+            />
+          </div>
+        </div>
       </Field>
 
       <Field

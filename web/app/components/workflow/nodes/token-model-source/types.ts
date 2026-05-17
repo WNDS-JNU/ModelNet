@@ -91,11 +91,13 @@ export const DEFAULT_SAMPLING_PARAMS: SamplingParams = {
 // dropdown still lets the user pick a different one if more backends
 // register. ``EOS`` is required by ``LlamaCppSpec`` server-side and
 // has no canonical default — leaving it empty surfaces the panel
-// red-line before save.
+// red-line before save. ``model_url`` is pre-seeded with the lab's
+// in-house llama.cpp host so a fresh node renders something usable
+// and the user only needs to type the port.
 export const DEFAULT_INLINE_SPEC: InlineModelSpec = {
   backend: 'llama_cpp',
   model_name: '',
-  model_url: '',
+  model_url: 'http://219.222.20.79',
   EOS: '',
   type: 'normal',
   stop_think: null,

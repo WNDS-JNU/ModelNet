@@ -51,13 +51,15 @@ describe('token-model-source/inline-spec-form', () => {
           EOS: '<|eot_id|>',
         }),
       })
-      // model_name + model_url + EOS + model_arch + request_timeout —
-      // five distinct placeholders the i18n stub renders into the
-      // ``placeholder`` attribute. Asserting *which* placeholders
-      // exist beats counting raw inputs (other primitives like the
-      // dify-ui Switch can render their own internal input nodes).
+      // model_name + model_url + model_port + EOS + model_arch +
+      // request_timeout — six distinct placeholders the i18n stub
+      // renders into the ``placeholder`` attribute. Asserting *which*
+      // placeholders exist beats counting raw inputs (other primitives
+      // like the dify-ui Switch can render their own internal input
+      // nodes).
       expect(screen.getByPlaceholderText(/modelName\.placeholder/)).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/modelUrl\.placeholder/)).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/modelPort\.placeholder/)).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/eos\.placeholder/)).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/modelArch\.placeholder/)).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/requestTimeout\.placeholder/)).toBeInTheDocument()
@@ -105,12 +107,27 @@ describe('token-model-source/inline-spec-form', () => {
       expect(onChange).toHaveBeenLastCalledWith({ model_name: 'llama-3.1-8b' })
     })
 
-    it('patches model_url on text change', () => {
-      const { onChange } = renderForm()
+    it('patches the URL host (model_url base) without a port pinned', () => {
+      // Empty starting URL → port is also empty → composed URL is
+      // the typed host verbatim, no synthetic ``:`` slipped in.
+      const { onChange } = renderForm({ value: buildValue({ model_url: '' }) })
       fireEvent.change(inputByPlaceholder(/modelUrl\.placeholder/), {
-        target: { value: 'http://localhost:9000' },
+        target: { value: 'http://localhost' },
       })
-      expect(onChange).toHaveBeenLastCalledWith({ model_url: 'http://localhost:9000' })
+      expect(onChange).toHaveBeenLastCalledWith({ model_url: 'http://localhost' })
+    })
+
+    it('preserves the existing port when only the URL host is edited', () => {
+      // Round-trip case: user already pinned :8080 and is changing
+      // the host. The composer must reinsert the same port — without
+      // it the saved URL would silently lose the port.
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:8080' }),
+      })
+      fireEvent.change(inputByPlaceholder(/modelUrl\.placeholder/), {
+        target: { value: 'http://otherhost' },
+      })
+      expect(onChange).toHaveBeenLastCalledWith({ model_url: 'http://otherhost:8080' })
     })
 
     it('patches EOS verbatim — including angle-bracket markers', () => {
@@ -142,6 +159,71 @@ describe('token-model-source/inline-spec-form', () => {
         target: { value: '' },
       })
       expect(onChange).toHaveBeenLastCalledWith({ stop_think: null })
+    })
+  })
+
+  describe('Port input — composed with the URL host', () => {
+    // The panel surfaces URL + port as two separate boxes but writes
+    // a single ``model_url`` string to the wire (LlamaCppSpec.model_url
+    // is ``AnyUrl`` server-side). Pin the composition rules here so a
+    // future edit can't silently drop a colon, lose the port, or
+    // generate a URL pydantic would 422 on.
+    const portInput = () => inputByPlaceholder(/modelPort\.placeholder/)
+
+    it('renders the parsed port from a stored URL with one', () => {
+      renderForm({ value: buildValue({ model_url: 'http://219.222.20.79:8080' }) })
+      expect((portInput() as HTMLInputElement).value).toBe('8080')
+    })
+
+    it('renders empty port for a URL without one', () => {
+      renderForm({ value: buildValue({ model_url: 'http://219.222.20.79' }) })
+      expect((portInput() as HTMLInputElement).value).toBe('')
+    })
+
+    it('appends a port to a URL that did not have one', () => {
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79' }),
+      })
+      fireEvent.change(portInput(), { target: { value: '9000' } })
+      expect(onChange).toHaveBeenLastCalledWith({ model_url: 'http://219.222.20.79:9000' })
+    })
+
+    it('replaces an existing port when the port box changes', () => {
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:8080' }),
+      })
+      fireEvent.change(portInput(), { target: { value: '9000' } })
+      expect(onChange).toHaveBeenLastCalledWith({ model_url: 'http://219.222.20.79:9000' })
+    })
+
+    it('clearing the port drops it from the composed URL', () => {
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:8080' }),
+      })
+      fireEvent.change(portInput(), { target: { value: '' } })
+      expect(onChange).toHaveBeenLastCalledWith({ model_url: 'http://219.222.20.79' })
+    })
+
+    it('does not emit for fractional port input (integer-only)', () => {
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:8080' }),
+      })
+      fireEvent.change(portInput(), { target: { value: '80.5' } })
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('preserves a user-typed path when composing port', () => {
+      // Edge case: user added a path to the URL box. The composer
+      // must reinsert the port between scheme://host and the path,
+      // not append it after the path (which would produce invalid
+      // URLs).
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79/v1' }),
+      })
+      fireEvent.change(portInput(), { target: { value: '8080' } })
+      expect(onChange).toHaveBeenLastCalledWith({
+        model_url: 'http://219.222.20.79:8080/v1',
+      })
     })
   })
 
