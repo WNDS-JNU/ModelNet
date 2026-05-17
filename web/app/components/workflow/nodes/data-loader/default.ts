@@ -21,8 +21,8 @@ const isNonNegativeInt = (value: unknown): value is number =>
 
 const metaData = genNodeMetaData({
   author: 'xianghe',
-  classification: BlockClassificationEnum.Transform,
-  sort: 7,
+  classification: BlockClassificationEnum.Data,
+  sort: 1,
   type: BlockEnum.DataLoader,
 })
 

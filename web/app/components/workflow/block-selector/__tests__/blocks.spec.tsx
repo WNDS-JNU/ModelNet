@@ -17,7 +17,11 @@ vi.mock('reactflow', () => ({
   }),
 }))
 
-const createBlock = (type: BlockEnum, title: string, classification = BlockClassificationEnum.Default): NodeDefault => ({
+const createBlock = (
+  type: BlockEnum,
+  title: string,
+  classification: BlockClassificationEnum = BlockClassificationEnum.Default,
+): NodeDefault => ({
   metaData: {
     classification,
     sort: 0,
@@ -75,5 +79,33 @@ describe('Blocks', () => {
     )
 
     expect(screen.getByText('workflow.tabs.noResult')).toBeInTheDocument()
+  })
+
+  it('renders model collaboration and data groups', () => {
+    render(
+      <Blocks
+        searchText=""
+        onSelect={vi.fn()}
+        availableBlocksTypes={[
+          BlockEnum.ResponseAggregator,
+          BlockEnum.ParallelEnsemble,
+          BlockEnum.TokenModelSource,
+          BlockEnum.DataLoader,
+        ]}
+        blocks={[
+          createBlock(BlockEnum.ResponseAggregator, 'Response Aggregator', BlockClassificationEnum.ModelCollaboration),
+          createBlock(BlockEnum.ParallelEnsemble, 'Parallel Ensemble', BlockClassificationEnum.ModelCollaboration),
+          createBlock(BlockEnum.TokenModelSource, 'Token Model Source', BlockClassificationEnum.ModelCollaboration),
+          createBlock(BlockEnum.DataLoader, 'Data Loader', BlockClassificationEnum.Data),
+        ]}
+      />,
+    )
+
+    expect(screen.getByText('workflow.tabs.model-collaboration')).toBeInTheDocument()
+    expect(screen.getByText('Response Aggregator')).toBeInTheDocument()
+    expect(screen.getByText('Parallel Ensemble')).toBeInTheDocument()
+    expect(screen.getByText('Token Model Source')).toBeInTheDocument()
+    expect(screen.getByText('workflow.tabs.data')).toBeInTheDocument()
+    expect(screen.getByText('Data Loader')).toBeInTheDocument()
   })
 })

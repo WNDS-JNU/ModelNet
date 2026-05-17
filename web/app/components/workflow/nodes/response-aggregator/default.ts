@@ -9,8 +9,8 @@ const i18nPrefix = 'nodes.responseAggregator'
 
 const metaData = genNodeMetaData({
   author: 'xianghe',
-  classification: BlockClassificationEnum.Transform,
-  sort: 4,
+  classification: BlockClassificationEnum.ModelCollaboration,
+  sort: 1,
   type: BlockEnum.ResponseAggregator,
 })
 

@@ -18,11 +18,10 @@ const i18nPrefix = 'nodes.parallelEnsemble'
 
 const metaData = genNodeMetaData({
   author: 'xianghe',
-  classification: BlockClassificationEnum.Transform,
+  classification: BlockClassificationEnum.ModelCollaboration,
   // Sit immediately after the response-level sibling ResponseAggregator
-  // (sort 4) — the two share the picker section "Transform" and users
-  // pick between them based on whether they need token-level voting.
-  sort: 5,
+  // so users pick between full-response and token-level collaboration.
+  sort: 2,
   type: BlockEnum.ParallelEnsemble,
 })
 

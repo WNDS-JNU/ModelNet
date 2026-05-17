@@ -26,15 +26,12 @@ const isWellFormedUrl = (raw: string): boolean => {
 
 const metaData = genNodeMetaData({
   author: 'xianghe',
-  // ``Transform`` keeps the node grouped with parallel-ensemble — they
-  // are typically dropped in pairs (multiple sources → one ensemble),
-  // and the picker reads top-to-bottom in the same Transform section.
-  classification: BlockClassificationEnum.Transform,
-  // Sort 6 places it directly after parallel-ensemble (sort 5). The
+  classification: BlockClassificationEnum.ModelCollaboration,
+  // Place it directly after parallel-ensemble. The
   // canvas picker reads top-to-bottom, so the order matches the typical
   // build flow: drop a parallel-ensemble first, then add 2+ token
   // sources to feed it.
-  sort: 6,
+  sort: 3,
   type: BlockEnum.TokenModelSource,
 })
 

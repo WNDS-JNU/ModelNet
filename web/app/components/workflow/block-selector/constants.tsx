@@ -4,6 +4,8 @@ import { BlockClassificationEnum } from './types'
 
 export const BLOCK_CLASSIFICATIONS = [
   BlockClassificationEnum.Default,
+  BlockClassificationEnum.ModelCollaboration,
+  BlockClassificationEnum.Data,
   BlockClassificationEnum.QuestionUnderstand,
   BlockClassificationEnum.Logic,
   BlockClassificationEnum.Transform,
@@ -123,22 +125,22 @@ export const BLOCKS = [
     title: 'Variable Aggregator',
   },
   {
-    classification: BlockClassificationEnum.Transform,
+    classification: BlockClassificationEnum.ModelCollaboration,
     type: BlockEnum.ResponseAggregator,
     title: 'Response Aggregator',
   },
   {
-    classification: BlockClassificationEnum.Transform,
+    classification: BlockClassificationEnum.ModelCollaboration,
     type: BlockEnum.ParallelEnsemble,
     title: 'Parallel Ensemble',
   },
   {
-    classification: BlockClassificationEnum.Transform,
+    classification: BlockClassificationEnum.ModelCollaboration,
     type: BlockEnum.TokenModelSource,
     title: 'Token Model Source',
   },
   {
-    classification: BlockClassificationEnum.Transform,
+    classification: BlockClassificationEnum.Data,
     type: BlockEnum.DataLoader,
     title: 'Data Loader',
   },

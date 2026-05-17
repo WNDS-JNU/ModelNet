@@ -98,11 +98,12 @@ export const useTabs = ({
 
     return fallbackTab
   }, [defaultActiveTab, noBlocks, noSources, noTools, noStart, tabs, getValidTabKey])
-  const [activeTab, setActiveTab] = useState(initialTab)
+  const [activeTab, setActiveTab] = useState<TabsEnum>(initialTab)
 
   useEffect(() => {
     const currentTab = tabs.find(tab => tab.key === activeTab)
     if (!currentTab || currentTab.disabled)
+      // eslint-disable-next-line react/set-state-in-effect -- Tab availability changes with node context; reset immediately to keep the returned active tab valid.
       setActiveTab(initialTab)
   }, [tabs, activeTab, initialTab])
 
@@ -115,7 +116,7 @@ export const useTabs = ({
 
 export const useToolTabs = (isHideMCPTools?: boolean) => {
   const { t } = useTranslation()
-  const tabs = [
+  const tabs: Array<{ key: ToolTypeEnum, name: string }> = [
     {
       key: ToolTypeEnum.All,
       name: t('tabs.allTool', { ns: 'workflow' }),

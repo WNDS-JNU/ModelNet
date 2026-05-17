@@ -2,28 +2,33 @@ import type { ParametersSchema, PluginMeta, PluginTriggerSubscriptionConstructor
 import type { Collection, Event } from '../../tools/types'
 import type { TypeWithI18N } from '@/app/components/header/account-setting/model-provider-page/declarations'
 
-export enum TabsEnum {
-  Start = 'start',
-  Blocks = 'blocks',
-  Tools = 'tools',
-  Sources = 'sources',
-}
+export const TabsEnum = {
+  Start: 'start',
+  Blocks: 'blocks',
+  Tools: 'tools',
+  Sources: 'sources',
+} as const
+export type TabsEnum = typeof TabsEnum[keyof typeof TabsEnum]
 
-export enum ToolTypeEnum {
-  All = 'all',
-  BuiltIn = 'built-in',
-  Custom = 'custom',
-  Workflow = 'workflow',
-  MCP = 'mcp',
-}
+export const ToolTypeEnum = {
+  All: 'all',
+  BuiltIn: 'built-in',
+  Custom: 'custom',
+  Workflow: 'workflow',
+  MCP: 'mcp',
+} as const
+export type ToolTypeEnum = typeof ToolTypeEnum[keyof typeof ToolTypeEnum]
 
-export enum BlockClassificationEnum {
-  Default = '-',
-  QuestionUnderstand = 'question-understand',
-  Logic = 'logic',
-  Transform = 'transform',
-  Utilities = 'utilities',
-}
+export const BlockClassificationEnum = {
+  Default: '-',
+  ModelCollaboration: 'model-collaboration',
+  Data: 'data',
+  QuestionUnderstand: 'question-understand',
+  Logic: 'logic',
+  Transform: 'transform',
+  Utilities: 'utilities',
+} as const
+export type BlockClassificationEnum = typeof BlockClassificationEnum[keyof typeof BlockClassificationEnum]
 
 type PluginCommonDefaultValue = {
   provider_id: string
@@ -173,11 +178,12 @@ export type TriggerWithProvider = Collection & {
 
 // Trigger subscription instance types
 
-export enum TriggerCredentialTypeEnum {
-  ApiKey = 'api-key',
-  Oauth2 = 'oauth2',
-  Unauthorized = 'unauthorized',
-}
+export const TriggerCredentialTypeEnum = {
+  ApiKey: 'api-key',
+  Oauth2: 'oauth2',
+  Unauthorized: 'unauthorized',
+} as const
+export type TriggerCredentialTypeEnum = typeof TriggerCredentialTypeEnum[keyof typeof TriggerCredentialTypeEnum]
 
 type TriggerSubscriptionStructure = {
   id: string
