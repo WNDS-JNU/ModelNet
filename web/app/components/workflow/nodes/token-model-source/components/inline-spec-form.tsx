@@ -24,6 +24,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Input from '@/app/components/base/input'
 import Field from '@/app/components/workflow/nodes/_base/components/field'
+import { post } from '@/service/base'
 
 const i18nPrefix = 'nodes.tokenModelSource.inlineSpec'
 
@@ -85,6 +86,32 @@ const joinModelUrl = (base: string, port: string): string => {
   return `${schemeHost}:${port}${base.slice(schemeHost.length)}`
 }
 
+const buildModelsProbeUrl = (raw: string): string | null => {
+  if (!raw)
+    return null
+  try {
+    const u = new URL(raw)
+    if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.host)
+      return null
+
+    const pathPrefix = u.pathname.replace(/\/+$/, '')
+    let probePath = '/v1/models'
+    if (pathPrefix) {
+      if (pathPrefix.endsWith('/v1/models'))
+        probePath = pathPrefix
+      else if (pathPrefix.endsWith('/v1'))
+        probePath = `${pathPrefix}/models`
+      else
+        probePath = `${pathPrefix}/v1/models`
+    }
+
+    return `${u.protocol}//${u.host}${probePath}`
+  }
+  catch {
+    return null
+  }
+}
+
 type Props = {
   readonly: boolean
   value: InlineModelSpec
@@ -100,27 +127,14 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
   const [probeOk, setProbeOk] = useState(false)
 
   // Probe target is only well-formed when the URL has both a scheme +
-  // host and (for llama.cpp) a port. We don't replicate ``isWellFormedUrl``
+  // host. We don't replicate ``isWellFormedUrl``
   // from default.ts because that lives in a sibling module; the
   // server-side validator catches malformed URLs in any case. Here we
-  // just gate the button on the two minimum pieces the user has to
-  // type to make the probe meaningful.
+  // just gate the button on the minimum pieces the user has to type
+  // to make the probe meaningful.
   const probeUrl = useMemo(() => {
     const raw = value.model_url?.trim() ?? ''
-    if (!raw)
-      return null
-    try {
-      const u = new URL(raw)
-      if (!u.protocol.startsWith('http') || !u.host)
-        return null
-      // Drop any user-typed path: ``/v1/models`` is the well-known
-      // llama.cpp openai-compat endpoint and replacing the path is
-      // simpler than concatenating two arbitrary path fragments.
-      return `${u.protocol}//${u.host}/v1/models`
-    }
-    catch {
-      return null
-    }
+    return buildModelsProbeUrl(raw)
   }, [value.model_url])
 
   const handleProbeModelInfo = useCallback(async () => {
@@ -130,36 +144,54 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
     setProbeError(null)
     setProbeOk(false)
     try {
-      const resp = await fetch(probeUrl)
-      if (!resp.ok)
-        throw new Error(`HTTP ${resp.status}`)
-      const json = await resp.json()
-      // ``data[0].id`` is the openai-compat shape llama.cpp's
-      // ``/v1/models`` always emits; ``models[0].name`` is the same
-      // model under llama.cpp's native field name. Prefer ``id`` so
-      // the saved spec matches what the runtime backend will identify
-      // the model as.
-      const firstId
-        = (Array.isArray(json?.data) && typeof json.data[0]?.id === 'string')
-          ? json.data[0].id
-          : (Array.isArray(json?.models) && typeof json.models[0]?.name === 'string')
-              ? json.models[0].name
-              : null
-      if (!firstId)
+      // Server-side proxy: the original implementation called
+      // ``fetch(probeUrl)`` from the browser, which only works for
+      // llama.cpp because it enables CORS by default. vLLM / TGI /
+      // SGLang / hosted routers do not, so the request was blocked
+      // before it left the browser. The console endpoint reissues
+      // the GET through ``ssrf_proxy`` so the same egress / SSRF
+      // guards apply and CORS is no longer a barrier — the OpenAI-
+      // compat response shape (``data[].id``) is parsed server-side.
+      // ``silent: true`` suppresses the global error toast so the
+      // panel can show the diagnostic inline like before.
+      const resp = await post<{ model_name: string }>(
+        '/workflow/probe-model-info',
+        { body: { url: value.model_url ?? '' } },
+        { silent: true },
+      )
+      if (!resp?.model_name)
         throw new Error('no model in response')
-      onChange({ model_name: firstId })
+      onChange({ model_name: resp.model_name })
       setProbeOk(true)
     }
     catch (e) {
-      // Keep the error narrow — the message is shown in the panel so
-      // the user can tell "server unreachable" from "malformed
-      // response". Stack traces are not useful here.
-      setProbeError(e instanceof Error ? e.message : 'fetch failed')
+      // Dify's ``post`` helper rejects with the raw ``Response`` on a
+      // non-2xx (the BaseHTTPException body carries ``code`` / ``message``);
+      // unwrap the upstream diagnostic so the user sees the same level
+      // of detail the old direct-fetch surfaced ("HTTP 503 from
+      // upstream", "no model in response", etc.).
+      let message = 'fetch failed'
+      if (e instanceof Response) {
+        try {
+          const parsed = await e.json() as { message?: string }
+          if (parsed?.message)
+            message = parsed.message
+          else
+            message = `HTTP ${e.status}`
+        }
+        catch {
+          message = `HTTP ${e.status}`
+        }
+      }
+      else if (e instanceof Error) {
+        message = e.message
+      }
+      setProbeError(message)
     }
     finally {
       setIsProbing(false)
     }
-  }, [probeUrl, onChange])
+  }, [probeUrl, value.model_url, onChange])
 
   const handleText = useCallback(
     (key: keyof InlineModelSpec) =>
@@ -302,8 +334,11 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
         required
       >
         {/* URL + port split into two inputs, plus a probe button that
-            hits ``${model_url}/v1/models`` and auto-fills ``model_name``
-            from the first entry. The wire still carries one
+            hits the URL's OpenAI-compatible ``/v1/models`` endpoint
+            and auto-fills ``model_name`` from the first entry. The
+            probe preserves any path prefix before ``/v1`` because
+            hosted routers can scope one model per URL path. The wire
+            still carries one
             ``model_url`` string so ``LlamaCppSpec.model_url: AnyUrl``
             stays the canonical schema; the split is purely a UX
             upgrade over a single text box. Round-tripping via

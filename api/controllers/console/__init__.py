@@ -44,6 +44,7 @@ from . import (
     setup,
     spec,
     version,
+    workflow_probe_model,
 )
 
 # Import app controllers
@@ -222,6 +223,7 @@ __all__ = [
     "workflow_app_log",
     "workflow_comment",
     "workflow_draft_variable",
+    "workflow_probe_model",
     "workflow_run",
     "workflow_statistic",
     "workflow_trigger",
