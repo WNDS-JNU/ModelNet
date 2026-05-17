@@ -13,11 +13,13 @@ const Node: FC<NodeProps<ResponseAggregatorNodeType>> = ({ data }) => {
   if (inputCount === 0)
     return null
 
+  const modelLabel = data.model?.name || t(`${i18nPrefix}.model`, { ns: 'workflow' })
+
   return (
     <div className="mb-1 px-3 py-1">
       <div className="flex items-center justify-between rounded-md bg-workflow-block-parma-bg px-2 py-1">
         <span className="truncate system-xs-medium text-text-secondary">
-          {t(`${i18nPrefix}.strategies.${data.strategy_name}.label`, { ns: 'workflow' })}
+          {modelLabel}
         </span>
         <span className="system-xs-regular text-text-tertiary">
           {t(`${i18nPrefix}.inputCount`, { ns: 'workflow', count: inputCount })}

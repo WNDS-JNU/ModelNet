@@ -6,6 +6,9 @@ from core.workflow.nodes.response_aggregator.entities import (
     AggregationInputRef,
     ResponseAggregatorNodeData,
 )
+from core.workflow.nodes.response_aggregator.strategies.synthesize import (
+    DEFAULT_SYNTHESIS_INSTRUCTION,
+)
 
 
 class TestAggregationInputRef:
@@ -172,6 +175,15 @@ class TestAggregationInputRef:
         assert ref.source_id == "gpt4"
 
 
+def _valid_model_payload() -> dict:
+    return {
+        "provider": "openai",
+        "name": "gpt-4o-mini",
+        "mode": "chat",
+        "completion_params": {"temperature": 0.2},
+    }
+
+
 class TestResponseAggregatorNodeData:
     @staticmethod
     def _valid_inputs():
@@ -181,15 +193,26 @@ class TestResponseAggregatorNodeData:
         ]
 
     def test_defaults_applied(self):
-        data = ResponseAggregatorNodeData(inputs=self._valid_inputs())
+        data = ResponseAggregatorNodeData(
+            inputs=self._valid_inputs(), model=_valid_model_payload()
+        )
         assert data.type == RESPONSE_AGGREGATOR_NODE_TYPE
-        assert data.strategy_name == "concat"
-        assert data.strategy_config == {}
+        assert data.instruction == DEFAULT_SYNTHESIS_INSTRUCTION
+        assert data.model.name == "gpt-4o-mini"
+
+    def test_instruction_override_accepted(self):
+        data = ResponseAggregatorNodeData(
+            inputs=self._valid_inputs(),
+            instruction="merge the answers",
+            model=_valid_model_payload(),
+        )
+        assert data.instruction == "merge the answers"
 
     def test_inputs_too_few_rejected(self):
         with pytest.raises(ValidationError):
             ResponseAggregatorNodeData(
-                inputs=[{"source_id": "gpt4", "variable_selector": ["node_a", "text"]}]
+                inputs=[{"source_id": "gpt4", "variable_selector": ["node_a", "text"]}],
+                model=_valid_model_payload(),
             )
 
     def test_duplicate_source_id_rejected(self):
@@ -198,7 +221,8 @@ class TestResponseAggregatorNodeData:
                 inputs=[
                     {"source_id": "gpt4", "variable_selector": ["node_a", "text"]},
                     {"source_id": "gpt4", "variable_selector": ["node_b", "text"]},
-                ]
+                ],
+                model=_valid_model_payload(),
             )
         assert "Duplicate source_id" in str(exc.value)
 
@@ -211,38 +235,67 @@ class TestResponseAggregatorNodeData:
                 inputs=[
                     {"source_id": "gpt4", "variable_selector": ["node_a", "text"]},
                     {"source_id": "gpt4 ", "variable_selector": ["node_b", "text"]},
-                ]
+                ],
+                model=_valid_model_payload(),
             )
         assert "Duplicate source_id" in str(exc.value)
 
-    def test_concat_strategy_accepted(self):
-        data = ResponseAggregatorNodeData(
-            inputs=self._valid_inputs(),
-            strategy_name="concat",
-            strategy_config={"separator": "\n\n"},
-        )
-        assert data.strategy_name == "concat"
-        assert data.strategy_config["separator"] == "\n\n"
-
-    def test_unknown_strategy_name_rejected(self):
+    def test_model_is_required(self):
         with pytest.raises(ValidationError):
+            ResponseAggregatorNodeData(inputs=self._valid_inputs())  # type: ignore[call-arg]
+
+    def test_blank_model_provider_rejected(self):
+        with pytest.raises(ValidationError) as exc:
             ResponseAggregatorNodeData(
                 inputs=self._valid_inputs(),
-                strategy_name="unknown_strategy",  # type: ignore[arg-type]
+                model={
+                    "provider": "  ",
+                    "name": "gpt-4o-mini",
+                    "mode": "chat",
+                    "completion_params": {},
+                },
             )
+        assert "model.provider" in str(exc.value)
 
-    def test_majority_vote_strategy_accepted(self):
-        # majority_vote was added to support the AI-ModelNet S2P paradigm
-        # (PAPER_REPRODUCTION_PLAN.md §4.1). The literal therefore now
-        # accepts ``concat`` and ``majority_vote``; an unknown name still
-        # fails (covered by ``test_unknown_strategy_name_rejected``).
+    def test_blank_instruction_falls_back_to_default(self):
+        # The i18n tooltip promises "leave empty to use the built-in
+        # synthesis instruction" — the backend must honour that promise.
         data = ResponseAggregatorNodeData(
             inputs=self._valid_inputs(),
-            strategy_name="majority_vote",
-            strategy_config={"answer_extract_regex": r"\(([A-D])\)"},
+            instruction="",
+            model=_valid_model_payload(),
         )
-        assert data.strategy_name == "majority_vote"
-        assert (
-            data.strategy_config["answer_extract_regex"]
-            == r"\(([A-D])\)"
+        assert data.instruction == DEFAULT_SYNTHESIS_INSTRUCTION
+
+    def test_whitespace_only_instruction_falls_back_to_default(self):
+        data = ResponseAggregatorNodeData(
+            inputs=self._valid_inputs(),
+            instruction="   \n\t  ",
+            model=_valid_model_payload(),
         )
+        assert data.instruction == DEFAULT_SYNTHESIS_INSTRUCTION
+
+    @pytest.mark.parametrize(
+        ("deprecated_field", "deprecated_value"),
+        [
+            ("strategy_name", "majority_vote"),
+            ("strategy_config", {"answer_extract_regex": r"\(([A-D])\)"}),
+        ],
+    )
+    def test_legacy_strategy_fields_rejected(
+        self, deprecated_field: str, deprecated_value: object
+    ):
+        # BaseNodeData uses extra='allow', so without an explicit check
+        # legacy DSL keys would silently land in model_extra. The
+        # node-level validator must surface them with a migration hint.
+        with pytest.raises(ValidationError) as exc:
+            ResponseAggregatorNodeData.model_validate(
+                {
+                    "inputs": self._valid_inputs(),
+                    "model": _valid_model_payload(),
+                    deprecated_field: deprecated_value,
+                }
+            )
+        message = str(exc.value)
+        assert deprecated_field in message
+        assert "synthesis-only" in message

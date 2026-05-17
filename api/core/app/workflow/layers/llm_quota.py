@@ -11,6 +11,7 @@ from core.app.entities.app_invoke_entities import DIFY_RUN_CONTEXT_KEY, DifyRunC
 from core.app.llm import deduct_llm_quota, ensure_llm_quota_available
 from core.errors.error import QuotaExceededError
 from core.model_manager import ModelInstance
+from core.workflow.nodes.response_aggregator import RESPONSE_AGGREGATOR_NODE_TYPE
 from graphon.enums import BuiltinNodeTypes
 from graphon.graph_engine.entities.commands import AbortCommand, CommandType
 from graphon.graph_engine.layers import GraphEngineLayer
@@ -18,6 +19,7 @@ from graphon.graph_events import GraphEngineEvent, GraphNodeEventBase, NodeRunSu
 from graphon.nodes.base.node import Node
 
 if TYPE_CHECKING:
+    from core.workflow.nodes.response_aggregator import ResponseAggregatorNode
     from graphon.nodes.llm.node import LLMNode
     from graphon.nodes.parameter_extractor.parameter_extractor_node import ParameterExtractorNode
     from graphon.nodes.question_classifier.question_classifier_node import QuestionClassifierNode
@@ -117,6 +119,8 @@ class LLMQuotaLayer(GraphEngineLayer):
                     model_instance = cast("ParameterExtractorNode", node).model_instance
                 case BuiltinNodeTypes.QUESTION_CLASSIFIER:
                     model_instance = cast("QuestionClassifierNode", node).model_instance
+                case _ if node.node_type == RESPONSE_AGGREGATOR_NODE_TYPE:
+                    model_instance = cast("ResponseAggregatorNode", node).model_instance
                 case _:
                     return None
         except AttributeError:

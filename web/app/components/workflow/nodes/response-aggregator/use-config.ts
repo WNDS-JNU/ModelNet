@@ -2,13 +2,20 @@ import type { ValueSelector, Var } from '../../types'
 import type {
   AggregationInputRef,
   ResponseAggregatorNodeType,
-  ResponseStrategyConfig,
-  ResponseStrategyName,
 } from './types'
+import type { FormValue } from '@/app/components/header/account-setting/model-provider-page/declarations'
 import { produce } from 'immer'
-import { useCallback } from 'react'
+import {
+  useCallback,
+  useEffect,
+} from 'react'
+import {
+  ModelTypeEnum,
+} from '@/app/components/header/account-setting/model-provider-page/declarations'
+import { useModelListAndDefaultModelAndCurrentProviderAndModel } from '@/app/components/header/account-setting/model-provider-page/hooks'
 import { useNodesReadOnly } from '@/app/components/workflow/hooks'
 import useNodeCrud from '@/app/components/workflow/nodes/_base/hooks/use-node-crud'
+import { AppModeEnum } from '@/types/app'
 import { VarType } from '../../types'
 
 // Upstream text comes through graphon's `segment.text`, which renders
@@ -36,9 +43,40 @@ const NUMERIC_VAR_TYPES: VarType[] = [
   VarType.any,
 ]
 
+const defaultAggregationModel = () => ({
+  provider: '',
+  name: '',
+  mode: AppModeEnum.CHAT,
+  completion_params: {
+    temperature: 0.2,
+  },
+})
+
 const useConfig = (id: string, payload: ResponseAggregatorNodeType) => {
   const { nodesReadOnly: readOnly } = useNodesReadOnly()
   const { inputs, setInputs } = useNodeCrud<ResponseAggregatorNodeType>(id, payload)
+  const {
+    currentProvider,
+    currentModel,
+  } = useModelListAndDefaultModelAndCurrentProviderAndModel(ModelTypeEnum.textGeneration)
+
+  useEffect(() => {
+    if (
+      !inputs.model?.provider
+      && currentProvider?.provider
+      && currentModel?.model
+    ) {
+      const next = produce(inputs, (draft) => {
+        draft.model = {
+          provider: currentProvider.provider,
+          name: currentModel.model,
+          mode: (currentModel.model_properties?.mode as string | undefined) || AppModeEnum.CHAT,
+          completion_params: draft.model?.completion_params ?? { temperature: 0.2 },
+        }
+      })
+      setInputs(next)
+    }
+  }, [currentModel, currentProvider, inputs, setInputs])
 
   const filterStringVar = useCallback((varPayload: Var) => {
     return TEXT_COMPATIBLE_VAR_TYPES.includes(varPayload.type)
@@ -47,11 +85,6 @@ const useConfig = (id: string, payload: ResponseAggregatorNodeType) => {
   const filterNumericVar = useCallback((varPayload: Var) => {
     return NUMERIC_VAR_TYPES.includes(varPayload.type)
   }, [])
-
-  // `VarReferencePicker` (used inside `InputList`) runs its own
-  // `useAvailableVarList` when rendered, so computing/returning the list
-  // here is a redundant walk of the graph. Keep only the filter helpers,
-  // which the picker needs via props.
 
   const nextDefaultSourceId = useCallback((refs: AggregationInputRef[]) => {
     // Stable alias naming: `model_1`, `model_2`, … — user is expected to
@@ -69,12 +102,7 @@ const useConfig = (id: string, payload: ResponseAggregatorNodeType) => {
       draft.inputs.push({
         source_id: nextDefaultSourceId(draft.inputs),
         variable_selector: [],
-        // ``1.0`` keeps the input neutral relative to existing peers —
-        // ``concat``'s ``order_by_weight`` flag treats unit weights as
-        // a tie and preserves declared input order.
         weight: 1,
-        // ``null`` = fail-fast on dynamic weight resolution failure
-        // (ADR-v3-15). Operators opt into graceful degrade explicitly.
         fallback_weight: null,
         extra: {},
       })
@@ -130,25 +158,42 @@ const useConfig = (id: string, payload: ResponseAggregatorNodeType) => {
     [inputs, setInputs],
   )
 
-  const handleStrategyChange = useCallback((name: ResponseStrategyName) => {
+  const handleInstructionChange = useCallback((value: string) => {
     const next = produce(inputs, (draft) => {
-      draft.strategy_name = name
-      // Reset config on strategy switch — the previous strategy's fields
-      // are rejected by the new strategy's `extra="forbid"` validator.
-      draft.strategy_config = {}
+      draft.instruction = value
     })
     setInputs(next)
   }, [inputs, setInputs])
 
-  const handleStrategyConfigChange = useCallback(
-    (patch: ResponseStrategyConfig) => {
-      // ``DynamicConfigForm`` already handles the "patch contains all
-      // current keys minus deletions" semantics for us: it emits the
-      // full ``ConfigBlob`` snapshot (with any ``undefined`` keys
-      // already stripped via that component's ``handlePatchKey``).
-      // Treat the patch as the new authoritative ``strategy_config``.
+  const handleCompletionParamsChange = useCallback((newParams: FormValue) => {
+    const next = produce(inputs, (draft) => {
+      const current = draft.model ?? defaultAggregationModel()
+      draft.model = {
+        ...current,
+        completion_params: newParams,
+      }
+    })
+    setInputs(next)
+  }, [inputs, setInputs])
+
+  const handleModelAndCompletionParamsChange = useCallback(
+    (
+      model: { provider: string, modelId: string, mode?: string },
+      completionParams: FormValue,
+    ) => {
+      // Single ``produce`` over the latest ``inputs`` closure — avoids the
+      // sequenced ``setInputs(params)`` then ``setInputs(model)`` pattern,
+      // where both updaters reuse the same stale snapshot and the second
+      // write clobbers the first.
       const next = produce(inputs, (draft) => {
-        draft.strategy_config = { ...patch }
+        const current = draft.model ?? defaultAggregationModel()
+        draft.model = {
+          ...current,
+          provider: model.provider,
+          name: model.modelId,
+          mode: model.mode || AppModeEnum.CHAT,
+          completion_params: completionParams,
+        }
       })
       setInputs(next)
     },
@@ -166,8 +211,9 @@ const useConfig = (id: string, payload: ResponseAggregatorNodeType) => {
     handleVariableSelectorChange,
     handleWeightChange,
     handleFallbackWeightChange,
-    handleStrategyChange,
-    handleStrategyConfigChange,
+    handleInstructionChange,
+    handleCompletionParamsChange,
+    handleModelAndCompletionParamsChange,
   }
 }
 

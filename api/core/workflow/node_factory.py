@@ -45,6 +45,8 @@ from core.workflow.nodes.parallel_ensemble.registry import (
     ModelRegistry,
     RunnerRegistry,
 )
+from core.workflow.nodes.response_aggregator import RESPONSE_AGGREGATOR_NODE_TYPE
+from core.workflow.nodes.response_aggregator.entities import ResponseAggregatorNodeData
 from core.workflow.system_variables import SystemVariableKey, get_system_text, system_variable_selector
 from core.workflow.template_rendering import CodeExecutorJinja2TemplateRenderer
 from extensions.ext_database import db
@@ -467,6 +469,10 @@ class DifyNodeFactory(NodeFactory):
                 "executor": self._get_parallel_ensemble_executor(),
                 "http_client": self._http_request_http_client,
             },
+            RESPONSE_AGGREGATOR_NODE_TYPE: lambda: self._build_response_aggregator_node_init_kwargs(
+                node_class=node_class,
+                node_data=resolved_node_data,
+            ),
         }
         node_init_kwargs = node_init_kwargs_factories.get(node_type, lambda: {})()
         return node_class(
@@ -532,6 +538,34 @@ class DifyNodeFactory(NodeFactory):
         if validated_node_data.type == BuiltinNodeTypes.LLM:
             node_init_kwargs["default_query_selector"] = system_variable_selector(SystemVariableKey.QUERY)
         return node_init_kwargs
+
+    def _build_response_aggregator_node_init_kwargs(
+        self,
+        *,
+        node_class: type[Node],
+        node_data: BaseNodeData,
+    ) -> dict[str, object]:
+        """Inject the aggregation model + LLM runtime dependencies.
+
+        The response-aggregator node is exclusively a full-response
+        synthesis path, so the model is always required and the
+        runtime dependencies are always injected.
+        """
+        validated_node_data = cast(
+            ResponseAggregatorNodeData,
+            self._validate_resolved_node_data(node_class=node_class, node_data=node_data),
+        )
+        model_instance, _ = fetch_model_config(
+            node_data_model=validated_node_data.model,
+            credentials_provider=self._llm_credentials_provider,
+            model_factory=self._llm_model_factory,
+        )
+        model_instance.model_type_instance = cast(LargeLanguageModel, model_instance.model_type_instance)
+        return {
+            "model_instance": DifyPreparedLLM(model_instance),
+            "prompt_message_serializer": self._prompt_message_serializer,
+            "llm_file_saver": self._llm_file_saver,
+        }
 
     def _build_model_instance_for_llm_node(self, node_data: LLMCompatibleNodeData) -> ModelInstance:
         node_data_model = node_data.model

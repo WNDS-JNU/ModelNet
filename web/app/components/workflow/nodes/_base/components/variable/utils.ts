@@ -647,12 +647,10 @@ const formatItem = (
     }
 
     case BlockEnum.ResponseAggregator: {
-      // Mirrors backend ``ResponseAggregatorNode._run`` outputs
-      // (api/core/workflow/nodes/response_aggregator/node.py:94-97).
-      // ``getNodeOutputVars`` lists the same selectors; this branch
-      // exists so VarReferencePicker (End/Answer/any downstream) can
-      // resolve their typed schema — without it, ``toNodeOutputVars``
-      // filters this node out as having ``vars.length === 0``.
+      // Mirrors backend ``ResponseAggregatorNode._run_synthesis`` outputs.
+      // Exists so VarReferencePicker (End/Answer/any downstream) can resolve
+      // typed schema — without it, ``toNodeOutputVars`` filters this node
+      // out as having ``vars.length === 0``.
       res.vars = [
         { variable: 'text', type: VarType.string },
         { variable: 'metadata', type: VarType.object },

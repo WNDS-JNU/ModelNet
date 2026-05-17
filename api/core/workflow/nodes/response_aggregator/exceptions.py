@@ -6,14 +6,6 @@ class ResponseAggregatorNodeError(Exception):
         super().__init__(self.message)
 
 
-class StrategyNotFoundError(ResponseAggregatorNodeError):
-    """Raised when the specified aggregation strategy is not registered."""
-
-    def __init__(self, strategy_name: str):
-        self.strategy_name = strategy_name
-        super().__init__(f"Aggregation strategy '{strategy_name}' is not registered")
-
-
 class MissingInputError(ResponseAggregatorNodeError):
     """Raised when a referenced upstream variable is not present in the variable pool."""
 
@@ -26,12 +18,8 @@ class MissingInputError(ResponseAggregatorNodeError):
         )
 
 
-class StrategyConfigError(ResponseAggregatorNodeError):
-    """Raised when strategy_config fails validation for a given strategy."""
-
-    def __init__(self, strategy_name: str, message: str):
-        self.strategy_name = strategy_name
-        super().__init__(f"Invalid config for strategy '{strategy_name}': {message}")
+class ModelSynthesisError(ResponseAggregatorNodeError):
+    """Raised when the LLM-backed synthesis path cannot produce a response."""
 
 
 class WeightResolutionError(ResponseAggregatorNodeError):
