@@ -10,6 +10,7 @@
 // loudly at run time even without a frontend edit.
 import type { ChangeEvent, FC } from 'react'
 import type { InlineModelSpec } from '../types'
+import { Button } from '@langgenius/dify-ui/button'
 import { cn } from '@langgenius/dify-ui/cn'
 import {
   DropdownMenu,
@@ -19,7 +20,7 @@ import {
 } from '@langgenius/dify-ui/dropdown-menu'
 import { Switch } from '@langgenius/dify-ui/switch'
 import * as React from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Input from '@/app/components/base/input'
 import Field from '@/app/components/workflow/nodes/_base/components/field'
@@ -94,6 +95,71 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
   const { t } = useTranslation()
   const [backendOpen, setBackendOpen] = useState(false)
   const [typeOpen, setTypeOpen] = useState(false)
+  const [isProbing, setIsProbing] = useState(false)
+  const [probeError, setProbeError] = useState<string | null>(null)
+  const [probeOk, setProbeOk] = useState(false)
+
+  // Probe target is only well-formed when the URL has both a scheme +
+  // host and (for llama.cpp) a port. We don't replicate ``isWellFormedUrl``
+  // from default.ts because that lives in a sibling module; the
+  // server-side validator catches malformed URLs in any case. Here we
+  // just gate the button on the two minimum pieces the user has to
+  // type to make the probe meaningful.
+  const probeUrl = useMemo(() => {
+    const raw = value.model_url?.trim() ?? ''
+    if (!raw)
+      return null
+    try {
+      const u = new URL(raw)
+      if (!u.protocol.startsWith('http') || !u.host)
+        return null
+      // Drop any user-typed path: ``/v1/models`` is the well-known
+      // llama.cpp openai-compat endpoint and replacing the path is
+      // simpler than concatenating two arbitrary path fragments.
+      return `${u.protocol}//${u.host}/v1/models`
+    }
+    catch {
+      return null
+    }
+  }, [value.model_url])
+
+  const handleProbeModelInfo = useCallback(async () => {
+    if (!probeUrl)
+      return
+    setIsProbing(true)
+    setProbeError(null)
+    setProbeOk(false)
+    try {
+      const resp = await fetch(probeUrl)
+      if (!resp.ok)
+        throw new Error(`HTTP ${resp.status}`)
+      const json = await resp.json()
+      // ``data[0].id`` is the openai-compat shape llama.cpp's
+      // ``/v1/models`` always emits; ``models[0].name`` is the same
+      // model under llama.cpp's native field name. Prefer ``id`` so
+      // the saved spec matches what the runtime backend will identify
+      // the model as.
+      const firstId
+        = (Array.isArray(json?.data) && typeof json.data[0]?.id === 'string')
+          ? json.data[0].id
+          : (Array.isArray(json?.models) && typeof json.models[0]?.name === 'string')
+              ? json.models[0].name
+              : null
+      if (!firstId)
+        throw new Error('no model in response')
+      onChange({ model_name: firstId })
+      setProbeOk(true)
+    }
+    catch (e) {
+      // Keep the error narrow — the message is shown in the panel so
+      // the user can tell "server unreachable" from "malformed
+      // response". Stack traces are not useful here.
+      setProbeError(e instanceof Error ? e.message : 'fetch failed')
+    }
+    finally {
+      setIsProbing(false)
+    }
+  }, [probeUrl, onChange])
 
   const handleText = useCallback(
     (key: keyof InlineModelSpec) =>
@@ -235,48 +301,101 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
         tooltip={t(`${i18nPrefix}.modelUrl.tooltip`, { ns: 'workflow' })}
         required
       >
-        {/* URL + port split into two inputs. The wire still carries one
-            ``model_url`` string so ``LlamaCppSpec.model_url: AnyUrl`` stays
-            the canonical schema; the split is purely a UX upgrade over a
-            single text box. Round-tripping via parse/joinModelUrl
-            preserves a user-typed path / query string when present. */}
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <Input
-              value={parseModelUrl(value.model_url ?? '').base}
-              onChange={(e) => {
-                const { port } = parseModelUrl(value.model_url ?? '')
-                onChange({ model_url: joinModelUrl(e.target.value, port) })
-              }}
-              disabled={readonly}
-              placeholder={t(`${i18nPrefix}.modelUrl.placeholder`, {
-                ns: 'workflow',
-                defaultValue: 'http://219.222.20.79',
-              })}
-            />
+        {/* URL + port split into two inputs, plus a probe button that
+            hits ``${model_url}/v1/models`` and auto-fills ``model_name``
+            from the first entry. The wire still carries one
+            ``model_url`` string so ``LlamaCppSpec.model_url: AnyUrl``
+            stays the canonical schema; the split is purely a UX
+            upgrade over a single text box. Round-tripping via
+            parse/joinModelUrl preserves a user-typed path / query
+            string when present. The probe runs in the browser so the
+            user's llama.cpp server must allow CORS — typical setups
+            do. ``Field`` accepts only one child, so wrap the row +
+            probe-button block in a single outer div. */}
+        <div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                value={parseModelUrl(value.model_url ?? '').base}
+                onChange={(e) => {
+                  const { port } = parseModelUrl(value.model_url ?? '')
+                  onChange({ model_url: joinModelUrl(e.target.value, port) })
+                }}
+                disabled={readonly}
+                placeholder={t(`${i18nPrefix}.modelUrl.placeholder`, {
+                  ns: 'workflow',
+                  defaultValue: 'http://219.222.20.79',
+                })}
+              />
+            </div>
+            <div className="w-24">
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={parseModelUrl(value.model_url ?? '').port}
+                onChange={(e) => {
+                  const { base } = parseModelUrl(value.model_url ?? '')
+                  const raw = e.target.value
+                  // Reject fractional input so the port box mirrors the
+                  // server-side integer contract; allow empty so the
+                  // user can clear it.
+                  if (raw !== '' && (!Number.isFinite(Number(raw)) || !Number.isInteger(Number(raw))))
+                    return
+                  onChange({ model_url: joinModelUrl(base, raw) })
+                }}
+                disabled={readonly}
+                placeholder={t(`${i18nPrefix}.modelPort.placeholder`, {
+                  ns: 'workflow',
+                  defaultValue: '8080',
+                })}
+              />
+            </div>
           </div>
-          <div className="w-24">
-            <Input
-              type="number"
-              min={1}
-              step={1}
-              value={parseModelUrl(value.model_url ?? '').port}
-              onChange={(e) => {
-                const { base } = parseModelUrl(value.model_url ?? '')
-                const raw = e.target.value
-                // Reject fractional input so the port box mirrors the
-                // server-side integer contract; allow empty so the user
-                // can clear it.
-                if (raw !== '' && (!Number.isFinite(Number(raw)) || !Number.isInteger(Number(raw))))
-                  return
-                onChange({ model_url: joinModelUrl(base, raw) })
-              }}
-              disabled={readonly}
-              placeholder={t(`${i18nPrefix}.modelPort.placeholder`, {
-                ns: 'workflow',
-                defaultValue: '8080',
-              })}
-            />
+          <div className="mt-2 flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="small"
+              type="button"
+              disabled={readonly || isProbing || !probeUrl}
+              onClick={handleProbeModelInfo}
+            >
+              {isProbing
+                ? t(`${i18nPrefix}.probeModel.loading`, {
+                    ns: 'workflow',
+                    defaultValue: 'Fetching…',
+                  })
+                : t(`${i18nPrefix}.probeModel.action`, {
+                    ns: 'workflow',
+                    defaultValue: 'Fetch model info',
+                  })}
+            </Button>
+            {probeError && (
+              <span
+                role="status"
+                className="system-xs-regular text-text-destructive"
+                data-testid="probe-error"
+              >
+                {t(`${i18nPrefix}.probeModel.errorPrefix`, {
+                  ns: 'workflow',
+                  defaultValue: 'Probe failed:',
+                })}
+                {' '}
+                {probeError}
+              </span>
+            )}
+            {probeOk && !probeError && !isProbing && (
+              <span
+                role="status"
+                className="system-xs-regular text-text-success"
+                data-testid="probe-ok"
+              >
+                {t(`${i18nPrefix}.probeModel.success`, {
+                  ns: 'workflow',
+                  defaultValue: 'Filled from server.',
+                })}
+              </span>
+            )}
           </div>
         </div>
       </Field>

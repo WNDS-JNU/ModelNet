@@ -1,7 +1,7 @@
 import type { InlineModelSpec } from '../../types'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import * as React from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_INLINE_SPEC } from '../../types'
 import InlineSpecForm from '../inline-spec-form'
 
@@ -354,6 +354,188 @@ describe('token-model-source/inline-spec-form', () => {
     it('does not render a weight input', () => {
       renderForm()
       expect(screen.queryByText(/inlineSpec\.weight/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Probe model info button', () => {
+    // The button hits ``${model_url}/v1/models`` and auto-fills
+    // ``model_name`` from the first entry of the response. Tests
+    // mock ``global.fetch`` so each case can pin a specific server
+    // shape (success / error / malformed) without a real network
+    // round-trip.
+
+    const probeButton = () =>
+      screen.getByRole('button', { name: /probeModel\.(action|loading)/ })
+
+    const okResponse = (body: unknown) =>
+      Promise.resolve(new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+
+    beforeEach(() => {
+      // ``vi.stubGlobal`` survives across the test; the afterEach
+      // unstubs so the next test starts clean. Default to a happy
+      // server that returns the user's example payload shape.
+      vi.stubGlobal('fetch', vi.fn(() => okResponse({
+        data: [
+          { id: 'Llama-3.1-8B-Instruct-Q8_0.gguf', object: 'model' },
+        ],
+        models: [
+          { name: 'Llama-3.1-8B-Instruct-Q8_0.gguf' },
+        ],
+      })))
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('is disabled when the URL is blank', () => {
+      renderForm({ value: buildValue({ model_url: '' }) })
+      expect((probeButton() as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('is disabled when the URL is not a well-formed http(s) URL', () => {
+      renderForm({ value: buildValue({ model_url: 'not-a-url' }) })
+      expect((probeButton() as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('is enabled when the URL has a scheme + host (no port)', () => {
+      // A bare ``http://host`` is still a valid URL — the user may
+      // be running llama.cpp on the default port 80 or behind a
+      // reverse proxy. The probe target ``${url}/v1/models`` is
+      // still well-formed, so the button stays enabled.
+      renderForm({ value: buildValue({ model_url: 'http://219.222.20.79' }) })
+      expect((probeButton() as HTMLButtonElement).disabled).toBe(false)
+    })
+
+    it('is disabled while readonly', () => {
+      renderForm({ readonly: true })
+      expect((probeButton() as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    it('GETs the v1/models path and dispatches model_name from data[0].id', async () => {
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834' }),
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      // ``vi.stubGlobal`` routes fetch through the mock on
+      // ``globalThis.fetch``; assert the URL the probe targeted lines
+      // up with the v1/models path on the host the user pinned.
+      const calls = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.[0]).toBe('http://219.222.20.79:30834/v1/models')
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith({
+          model_name: 'Llama-3.1-8B-Instruct-Q8_0.gguf',
+        })
+      })
+      // Success banner replaces the loading state once the promise
+      // resolves; pin so a future refactor can't silently drop the
+      // user feedback.
+      expect(screen.getByTestId('probe-ok')).toBeInTheDocument()
+    })
+
+    it('falls back to models[0].name when data[] is absent', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => okResponse({
+        models: [{ name: 'fallback-model.gguf' }],
+      })))
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834' }),
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith({ model_name: 'fallback-model.gguf' })
+      })
+    })
+
+    it('surfaces an error banner when the server returns non-2xx', async () => {
+      vi.stubGlobal('fetch', vi.fn(() =>
+        Promise.resolve(new Response('nope', { status: 503 })),
+      ))
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834' }),
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('probe-error')).toHaveTextContent(/HTTP 503/)
+      })
+      // No model_name update when the probe failed.
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('surfaces an error banner when the response has no models', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => okResponse({ data: [], models: [] })))
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834' }),
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('probe-error')).toHaveTextContent(/no model/i)
+      })
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('surfaces an error banner when fetch rejects (network unreachable)', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network down'))))
+      renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834' }),
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('probe-error')).toHaveTextContent(/network down/)
+      })
+    })
+
+    it('clears any prior error on a successful retry', async () => {
+      // First probe fails, second succeeds — the error banner must
+      // come down on the success, otherwise the user gets stale
+      // negative feedback after a correct retry.
+      const fetchMock = vi.fn()
+        .mockImplementationOnce(() => Promise.resolve(new Response('', { status: 500 })))
+        .mockImplementationOnce(() => okResponse({ data: [{ id: 'retry-model' }] }))
+      vi.stubGlobal('fetch', fetchMock)
+
+      renderForm({ value: buildValue({ model_url: 'http://219.222.20.79:30834' }) })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('probe-error')).toBeInTheDocument()
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      await waitFor(() => {
+        expect(screen.queryByTestId('probe-error')).not.toBeInTheDocument()
+        expect(screen.getByTestId('probe-ok')).toBeInTheDocument()
+      })
+    })
+
+    it('strips a user-typed path on model_url when building the probe target', async () => {
+      // ``/v1/models`` is the well-known endpoint; if the user typed
+      // ``http://host:port/foo`` we still want to hit
+      // ``http://host:port/v1/models`` rather than chain paths into
+      // ``http://host:port/foo/v1/models`` (which 404s on llama.cpp).
+      renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834/something-else' }),
+      })
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+      const calls = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
+      expect(calls[0]?.[0]).toBe('http://219.222.20.79:30834/v1/models')
     })
   })
 })
