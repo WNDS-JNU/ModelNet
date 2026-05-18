@@ -222,13 +222,45 @@ class TestParseTopProbs:
         assert [c["logit"] for c in out] == [20.0, 17.0, 10.0]
         assert sum(c["prob"] for c in out) == pytest.approx(1.0)
 
-    def test_raw_logits_require_explicit_logit_field(self) -> None:
+    def test_raw_logits_use_selected_token_logit_when_top_logprobs_empty(self) -> None:
+        out = parse_top_probs(
+            {"completion_probabilities": [{"token": "x", "logit": 2.5, "top_logprobs": []}]},
+            eos="<|eos|>",
+            raw_logits=True,
+        )
+        assert out == [{"token": "x", "prob": 1.0, "logit": 2.5}]
+
+    def test_raw_logits_missing_completion_probabilities_skips_vote(self) -> None:
+        out = parse_top_probs({"content": "hi"}, eos="<|eos|>", raw_logits=True)
+        assert out == []
+
+    def test_raw_logits_non_dict_head_skips_vote(self) -> None:
+        out = parse_top_probs({"completion_probabilities": ["bogus"]}, eos="<|eos|>", raw_logits=True)
+        assert out == []
+
+    def test_raw_logits_non_list_top_logprobs_skips_vote(self) -> None:
+        out = parse_top_probs(
+            {"completion_probabilities": [{"top_logprobs": {"token": "x", "logit": 1.0}}]},
+            eos="<|eos|>",
+            raw_logits=True,
+        )
+        assert out == []
+
+    def test_raw_logits_missing_logit_fields_skips_vote(self) -> None:
         out = parse_top_probs(
             {"completion_probabilities": [{"top_probs": [{"token": "x", "prob": 1.0}]}]},
             eos="<|eos|>",
             raw_logits=True,
         )
-        assert out == [{"token": "<end>", "prob": 0.01, "logit": None}]
+        assert out == []
+
+    def test_raw_logits_empty_top_logprobs_without_head_logit_skips_vote(self) -> None:
+        out = parse_top_probs(
+            {"completion_probabilities": [{"token": "x", "top_logprobs": []}]},
+            eos="<|eos|>",
+            raw_logits=True,
+        )
+        assert out == []
 
 
 # ── parse_sse_chunks ──────────────────────────────────────────────────

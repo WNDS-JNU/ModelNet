@@ -167,13 +167,19 @@ def parse_top_probs(payload: dict[str, Any], eos: str, *, raw_logits: bool = Fal
     compatibility spelling ``raw_logit``). The adapter then fills
     ``TokenCandidate.logit`` and synthesises a top-k probability
     distribution with softmax so existing ``TOP_PROBS`` aggregators
-    still see a usable ``prob`` value.
+    still see a usable ``prob`` value. Malformed raw-logit responses
+    return ``[]`` so the source skips this token step instead of voting
+    with a candidate that would violate DuetNet's raw-logit contract.
     """
     completion_probabilities = payload.get("completion_probabilities") or []
     if not isinstance(completion_probabilities, list) or not completion_probabilities:
+        if raw_logits:
+            return []
         return _fallback_end_candidate()
     head = completion_probabilities[0]
     if not isinstance(head, dict):
+        if raw_logits:
+            return []
         return _fallback_end_candidate()
     if raw_logits:
         raw_top = head.get("top_logprobs")
@@ -183,6 +189,8 @@ def parse_top_probs(payload: dict[str, Any], eos: str, *, raw_logits: bool = Fal
         raw_top = head.get("top_probs")
     raw_top = raw_top or []
     if not isinstance(raw_top, list):
+        if raw_logits:
+            return []
         return _fallback_end_candidate()
 
     if raw_logits:
@@ -195,7 +203,11 @@ def parse_top_probs(payload: dict[str, Any], eos: str, *, raw_logits: bool = Fal
                 continue
             raw_candidates.append((_candidate_token(item, eos), logit))
         if not raw_candidates:
-            return _fallback_end_candidate()
+            selected_logit = _candidate_logit(head)
+            if selected_logit is not None:
+                raw_candidates.append((_candidate_token(head, eos), selected_logit))
+        if not raw_candidates:
+            return []
         probs = _softmax([logit for _, logit in raw_candidates])
         return [
             TokenCandidate(token=token, prob=prob, logit=logit)
