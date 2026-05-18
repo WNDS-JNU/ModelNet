@@ -24,6 +24,7 @@ const buildPayload = (
   type: BlockEnum.TokenModelSource,
   model_alias: 'qwen3-4b',
   prompt_template: 'Answer: {{#start.q#}}',
+  raw_completion: false,
   sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
   extra: {},
   ...overrides,
@@ -229,6 +230,35 @@ describe('token-model-source/default.checkValid', () => {
         t,
       )
       expect(result.errorMessage).toContain('extraMustBeObject')
+    })
+  })
+
+  describe('raw_completion guard', () => {
+    it('accepts true for raw completion mode', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ raw_completion: true }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('accepts omitted raw_completion for legacy DSL payloads', () => {
+      const payload = buildPayload()
+      delete payload.raw_completion
+
+      const result = nodeDefault.checkValid(payload, t)
+
+      expect(result.isValid).toBe(true)
+    })
+
+    it('rejects non-boolean raw_completion', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          raw_completion: 'false' as unknown as boolean,
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('rawCompletionBoolean')
     })
   })
 

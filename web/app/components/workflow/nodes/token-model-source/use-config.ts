@@ -99,6 +99,16 @@ const useConfig = (id: string, payload: TokenModelSourceNodeType) => {
     [inputs, setInputs],
   )
 
+  const handleRawCompletionChange = useCallback(
+    (checked: boolean) => {
+      const next = produce(inputs, (draft) => {
+        draft.raw_completion = checked
+      })
+      setInputs(next)
+    },
+    [inputs, setInputs],
+  )
+
   const handleSamplingParamsChange = useCallback(
     (patch: Partial<SamplingParams>) => {
       const next = produce(inputs, (draft) => {
@@ -138,6 +148,7 @@ const useConfig = (id: string, payload: TokenModelSourceNodeType) => {
     handleSourceModeChange,
     handleInlineSpecChange,
     handlePromptTemplateChange,
+    handleRawCompletionChange,
     handleSamplingParamsChange,
     handleExtraChange,
   }

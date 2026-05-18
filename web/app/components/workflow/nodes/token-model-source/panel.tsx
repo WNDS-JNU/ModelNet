@@ -1,6 +1,7 @@
 import type { FC } from 'react'
 import type { TokenModelSourceNodeType } from './types'
 import type { NodePanelProps, Var } from '@/app/components/workflow/types'
+import { Switch } from '@langgenius/dify-ui/switch'
 import * as React from 'react'
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -64,6 +65,7 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
     handleSourceModeChange,
     handleInlineSpecChange,
     handlePromptTemplateChange,
+    handleRawCompletionChange,
     handleSamplingParamsChange,
   } = useConfig(id, data)
 
@@ -169,6 +171,20 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
             defaultValue: 'Answer: {{#start.q#}}',
           })}
         />
+
+        <Field
+          title={t(`${i18nPrefix}.rawCompletion`, { ns: 'workflow' })}
+          tooltip={t(`${i18nPrefix}.rawCompletionTooltip`, { ns: 'workflow' })}
+          inline
+          operations={(
+            <Switch
+              checked={Boolean(inputs.raw_completion)}
+              onCheckedChange={handleRawCompletionChange}
+              size="md"
+              disabled={readOnly}
+            />
+          )}
+        />
       </div>
 
       <Split />
@@ -197,6 +213,8 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
              * (api/core/workflow/nodes/token_model_source/node.py):
              * ``spec`` is the ``ModelInvocationSpec`` payload the
              * downstream parallel-ensemble consumes by selector;
+             * ``raw_completion`` rides inside that spec to choose raw
+             * completion vs chat-template auto-wrap;
              * ``model_alias`` is duplicated at the top level so panels
              * / debug views can show "which model" without unpacking
              * the spec dict.

@@ -29,6 +29,7 @@ const createPayload = (
   type: BlockEnum.TokenModelSource,
   model_alias: '',
   prompt_template: 'Answer: {{#start.q#}}',
+  raw_completion: false,
   sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
   extra: {},
   inline_spec: { ...DEFAULT_INLINE_SPEC },
@@ -87,6 +88,18 @@ describe('token-model-source/useConfig', () => {
         inline_spec: expect.objectContaining({
           model_name: 'new-model',
         }),
+      }))
+    })
+  })
+
+  describe('Raw completion option', () => {
+    it('should persist the raw completion switch value', () => {
+      const { result } = renderHook(() => useConfig('token-source', createPayload()))
+
+      result.current.handleRawCompletionChange(true)
+
+      expect(mockSetInputs).toHaveBeenCalledWith(expect.objectContaining({
+        raw_completion: true,
       }))
     })
   })

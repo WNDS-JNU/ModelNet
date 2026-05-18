@@ -180,6 +180,7 @@ const buildPayload = (
   type: BlockEnum.TokenModelSource,
   model_alias: 'llama3-local',
   prompt_template: 'Answer: {{#start.q#}}',
+  raw_completion: false,
   sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
   extra: {},
   ...overrides,
@@ -200,6 +201,7 @@ const buildConfig = (overrides: Partial<{
   handleSourceModeChange: ReturnType<typeof vi.fn>
   handleInlineSpecChange: ReturnType<typeof vi.fn>
   handlePromptTemplateChange: ReturnType<typeof vi.fn>
+  handleRawCompletionChange: ReturnType<typeof vi.fn>
   handleSamplingParamsChange: ReturnType<typeof vi.fn>
   handleExtraChange: ReturnType<typeof vi.fn>
 }> = {}) => ({
@@ -214,6 +216,7 @@ const buildConfig = (overrides: Partial<{
   handleSourceModeChange: overrides.handleSourceModeChange ?? vi.fn(),
   handleInlineSpecChange: overrides.handleInlineSpecChange ?? vi.fn(),
   handlePromptTemplateChange: overrides.handlePromptTemplateChange ?? vi.fn(),
+  handleRawCompletionChange: overrides.handleRawCompletionChange ?? vi.fn(),
   handleSamplingParamsChange: overrides.handleSamplingParamsChange ?? vi.fn(),
   handleExtraChange: overrides.handleExtraChange ?? vi.fn(),
 })
@@ -281,6 +284,22 @@ describe('token-model-source/panel', () => {
       // — pin that wiring so a future edit can't silently turn it back on.
       expect(screen.getByTestId('prompt-editor-show-context').textContent).toBe('false')
     })
+
+    it('renders raw completion as an off switch by default', () => {
+      mockUseConfig.mockReturnValue(buildConfig())
+      renderPanel()
+
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    })
+
+    it('renders raw completion as enabled when the payload opts into raw mode', () => {
+      mockUseConfig.mockReturnValue(buildConfig({
+        inputs: buildPayload({ raw_completion: true }),
+      }))
+      renderPanel()
+
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+    })
   })
 
   describe('Wiring — event → handler', () => {
@@ -313,6 +332,17 @@ describe('token-model-source/panel', () => {
       fireEvent.change(textarea, { target: { value: 'New prompt' } })
       expect(handlePromptTemplateChange).toHaveBeenCalledWith('New prompt')
     })
+
+    it('invokes handleRawCompletionChange when the raw completion switch changes', () => {
+      const handleRawCompletionChange = vi.fn()
+      mockUseConfig.mockReturnValue(buildConfig({ handleRawCompletionChange }))
+      renderPanel()
+
+      fireEvent.click(screen.getByRole('switch'))
+
+      expect(handleRawCompletionChange).toHaveBeenCalledTimes(1)
+      expect(handleRawCompletionChange).toHaveBeenCalledWith(true)
+    })
   })
 
   describe('Forwarded flags', () => {
@@ -335,6 +365,7 @@ describe('token-model-source/panel', () => {
       // panel could go read-only for the surrounding controls while
       // leaving the prompt freely editable.
       expect(screen.getByTestId('prompt-editor-readonly').textContent).toBe('true')
+      expect(screen.getByRole('switch')).toHaveAttribute('data-disabled', '')
     })
 
     it('forwards an empty models list to the alias selector', () => {

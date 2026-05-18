@@ -26,6 +26,7 @@ export type ModelInvocationSpec = {
   prompt: string
   sampling_params: SamplingParams
   extra: Record<string, unknown>
+  raw_completion?: boolean
   inline_spec?: InlineModelSpec | null
 }
 
@@ -65,6 +66,11 @@ export type InlineModelSpec = {
 export type TokenModelSourceNodeType = CommonNodeType & {
   model_alias: string
   prompt_template: string
+  // ``false`` is the backend default: chat-capable backends auto-wrap
+  // ``prompt_template`` as a single user message before token stepping.
+  // ``true`` preserves PN.py-style raw completion for research prompts
+  // that already include exact model-specific scaffolding.
+  raw_completion?: boolean
   sampling_params: SamplingParams
   extra: Record<string, unknown>
   // ``null`` (the canonical "use registered alias" state) is the

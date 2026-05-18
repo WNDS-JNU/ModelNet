@@ -40,6 +40,7 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
   defaultValue: {
     model_alias: '',
     prompt_template: '',
+    raw_completion: false,
     sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
     extra: {},
     // ``null`` is the canonical "registered alias mode" — keeps the
@@ -134,6 +135,21 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
           errorMessage = t(`${i18nPrefix}.errorMsg.stopList`, { ns: 'workflow' })
         }
       }
+    }
+
+    // ── raw_completion: boolean escape hatch ─────────────────────
+    // Backend default is ``False``. Let legacy / hand-authored DSL omit
+    // the field, but reject scalar smuggling so the panel does not save
+    // a payload pydantic would fail before graph execution.
+    const rawCompletion = payload?.raw_completion
+    if (
+      !errorMessage
+      && rawCompletion !== undefined
+      && typeof rawCompletion !== 'boolean'
+    ) {
+      errorMessage = t(`${i18nPrefix}.errorMsg.rawCompletionBoolean`, {
+        ns: 'workflow',
+      })
     }
 
     // ── extra: plain object only ─────────────────────────────────
