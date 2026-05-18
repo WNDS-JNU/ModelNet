@@ -38,7 +38,7 @@
 - 短品牌名：`ModelNet`
 - 英文名：`JNU ModelNet` 或 `ModelNet`
 - 官网：`https://www.aimodelnetwork.cn/`
-- 代码地址：暂时置空
+- 代码地址：`https://github.com/WNDS-JNU/ModelNet`
 - 技术支持邮箱：`15225743339@63.com`
 - 浅色背景 Logo
 - 深色背景 Logo
