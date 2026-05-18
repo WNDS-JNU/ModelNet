@@ -70,4 +70,57 @@ describe('useWorkflowNodeFinished', () => {
       expect(getNodeRuntimeState(result.current.nodes[0])._runningBranchId).toBe('branch-a')
     })
   })
+
+  it('hydrates parallel ensemble final trace from node finished data', () => {
+    const { result, store } = renderRunEventHook(() => useWorkflowNodeFinished(), {
+      nodes: [
+        createNode({
+          id: 'n1',
+          data: { _runningStatus: NodeRunningStatus.Running },
+        }),
+      ],
+      initialStoreState: {
+        workflowRunningData: baseRunningData({
+          tracing: [{ id: 'trace-1', node_id: 'n1', status: NodeRunningStatus.Running }],
+        }),
+      },
+    })
+
+    act(() => {
+      result.current.handleWorkflowNodeFinished(createNodeFinishedResponse({
+        data: {
+          id: 'trace-1',
+          node_id: 'n1',
+          node_type: BlockEnum.ParallelEnsemble,
+          status: NodeRunningStatus.Succeeded,
+          process_data: {
+            ensemble_trace: {
+              token_trace: [
+                {
+                  step: 0,
+                  selected_token: 'duet',
+                  selected_score: 0.8,
+                  elapsed_ms: 10,
+                  aggregator_reasoning: {
+                    per_token_logit: { duet: 2.1 },
+                    winner_per_model: { model_a: 2.1 },
+                    topT_candidates: ['duet'],
+                  },
+                },
+              ],
+            },
+          },
+        } as never,
+      }))
+    })
+
+    const steps = store.getState().parallelEnsembleTraceByNodeId.n1!
+    expect(steps).toHaveLength(1)
+    expect(steps[0]!.message_id).toBe('trace-1:trace:0')
+    expect(steps[0]!.aggregator_reasoning).toEqual({
+      per_token_logit: { duet: 2.1 },
+      winner_per_model: { model_a: 2.1 },
+      topT_candidates: ['duet'],
+    })
+  })
 })

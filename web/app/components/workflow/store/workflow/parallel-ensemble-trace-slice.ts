@@ -1,12 +1,19 @@
 import type { StateCreator } from 'zustand'
 import type {
+  NodeTracing,
   ParallelEnsembleTraceStep,
   ParallelEnsembleTraceStepResponse,
 } from '@/types/workflow'
+import { BlockEnum } from '@/app/components/workflow/types'
+
+type FinalParallelEnsembleTrace = {
+  token_trace?: ParallelEnsembleTraceStep[]
+}
 
 export type ParallelEnsembleTraceSliceShape = {
   parallelEnsembleTraceByNodeId: Record<string, ParallelEnsembleTraceStep[]>
   appendParallelEnsembleTraceStep: (response: ParallelEnsembleTraceStepResponse) => void
+  hydrateParallelEnsembleTraceFromNodeFinished: (data: NodeTracing) => void
   resetParallelEnsembleTrace: () => void
 }
 
@@ -41,6 +48,27 @@ export const createParallelEnsembleTraceSlice: StateCreator<ParallelEnsembleTrac
         },
       }
     })
+  },
+  hydrateParallelEnsembleTraceFromNodeFinished: (data) => {
+    if (data.node_type !== BlockEnum.ParallelEnsemble)
+      return
+
+    const trace = (
+      data.process_data?.ensemble_trace ?? data.outputs?.trace
+    ) as FinalParallelEnsembleTrace | undefined
+    const tokenTrace = trace?.token_trace
+    if (!Array.isArray(tokenTrace))
+      return
+
+    set(state => ({
+      parallelEnsembleTraceByNodeId: {
+        ...state.parallelEnsembleTraceByNodeId,
+        [data.node_id]: tokenTrace.map(step => ({
+          ...step,
+          message_id: `${data.id}:trace:${step.step}`,
+        })),
+      },
+    }))
   },
   resetParallelEnsembleTrace: () => set(() => ({ parallelEnsembleTraceByNodeId: {} })),
 })

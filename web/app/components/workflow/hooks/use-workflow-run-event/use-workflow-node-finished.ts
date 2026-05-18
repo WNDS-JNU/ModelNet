@@ -18,6 +18,7 @@ export const useWorkflowNodeFinished = () => {
     const {
       workflowRunningData,
       setWorkflowRunningData,
+      hydrateParallelEnsembleTraceFromNodeFinished,
     } = workflowStore.getState()
     const {
       getNodes,
@@ -26,6 +27,7 @@ export const useWorkflowNodeFinished = () => {
       setEdges,
     } = store.getState()
     const nodes = getNodes()
+    hydrateParallelEnsembleTraceFromNodeFinished(data)
     setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
       const currentIndex = draft.tracing!.findIndex(item => item.id === data.id)
       if (currentIndex > -1) {
