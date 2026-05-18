@@ -9,17 +9,17 @@
 
 - 发现 llama.cpp 模型服务端口：24 个
 - 发现开放但非 llama.cpp 模型服务/无模板接口端口：5 个
-- `model_net.yaml` 已配置端口：37 个
+- `model_net.yaml` 已配置端口：22 个
 - 模型服务开放但未配置端口：2 个：`30293, 30297`
-- 已配置但当前 `/props` 不通端口：15 个：`30459, 30498, 30586, 30587, 30689, 30782, 30784, 30786, 31136, 31323, 31464, 31926, 32310, 32520, 32767`
+- 已从 `model_net.yaml` 移除的不可达端口：15 个：`30459, 30498, 30586, 30587, 30689, 30782, 30784, 30786, 31136, 31323, 31464, 31926, 32310, 32520, 32767`
 
 ## DuetNet 当前 DSL alias 状态
 
-当前 `DuetNet 显式循环 + 数据加载` DSL 使用 `q1=29`、`q2=5`、`g4=6`、`L3=2`。
+当前 `DuetNet 显式循环 + 数据加载` DSL 使用 `q1=38`、`q2=5`、`g4=6`、`L3=2`。
 
 | logical | alias id | port | registry model_name | status | template family |
 |---|---:|---:|---|---|---|
-| q1 | 29 | 30586 | `qwen25-3b-q8` | DOWN or /props unavailable | - |
+| q1 | 38 | 30788 | `gpt-oss-20b-mxfp4` | alive | gpt-oss |
 | q2 | 5 | 32246 | `qwen25-7b-instruct-q5km` | alive | qwen/chatml |
 | g4 | 6 | 31021 | `glm-4-9b-chat-q4k` | alive | glm |
 | L3 | 2 | 30834 | `meta-llama-31-8b-instruct-q80` | alive | llama-3 |
@@ -30,48 +30,28 @@
 |---:|---|---|---|---|---|---|---|---|
 | 30293 | - | - | `Qwen3-Embedding-8B-f16.gguf` | qwen/chatml | `Content-only` | len=2427 sha=44d5f08f3f72b837 | ok len=123 sha=7a404a07af2cb071 | not in model_net.yaml |
 | 30297 | - | - | `embeddinggemma-300M-F32.gguf` | qwen/chatml | `Content-only` | len=208 sha=cc145ac597328b60 | ok len=123 sha=7a404a07af2cb071 | not in model_net.yaml |
-| 30403 | 23 | hunyuan-7b-instruct-q5km | `tencent_Hunyuan-7B-Instruct-Q5_K_M.gguf` | hunyuan | `Content-only` | len=4919 sha=7dfb19355e3c8779 | ok len=98 sha=b9cd8f391c23d070 | server template available; registry has no pinned template metadata |
-| 30465 | 18 | phi-4-mini-q8 | `Phi-4-mini-instruct.Q8_0.gguf` | phi | `Content-only` | len=398 sha=46bcd040271c497e | ok len=88 sha=cbb413705d324b61 | server template available; registry has no pinned template metadata |
-| 30468 | 15 | gemma-3-4b-it-q4 | `gemma-3-4b-it-Q4_K_M.gguf` | gemma | `Content-only` | len=1531 sha=8d9e3a3c114fb205 | ok len=100 sha=45d43bb6ff1ddd31 | server template available; registry has no pinned template metadata |
-| 30524 | 24 | ministral-3b-q8kxl | `Ministral-3-3B-Instruct-2512-UD-Q8_K_XL.gguf` | mistral/ministral | `Content-only` | len=7503 sha=a81fa42ad89f88c7 | ok len=87 sha=c8d8b5b82a9a3b6e | server template available; registry has no pinned template metadata |
-| 30525 | 16 | granite-h-micro-3b-q8kxl | `granite-4.0-h-micro-UD-Q8_K_XL.gguf` | granite | `Content-only` | len=6418 sha=9524df67b77a7b25 | ok len=190 sha=d021d4f0534a597f | server template available; registry has no pinned template metadata |
-| 30526 | 3 | gemma4-e2b-q8 | `gemma-4-E2B-it-Q8_0.gguf` | gemma | `Content-only` | len=16317 sha=781d10940fbc44be | ok len=108 sha=655d3fc903900db0 | server template available; registry has no pinned template metadata |
-| 30528 | 10 | gemma4-e4b-q8kxl | `gemma-4-E4B-it-UD-Q8_K_XL.gguf` | gemma | `Content-only` | len=11926 sha=55572b8d3c834204 | ok len=107 sha=0b10e4d934663594 | server template available; registry has no pinned template metadata |
-| 30578 | 22 | qwen3-8b-bf16 | `Qwen3-8B-BF16.gguf` | qwen/chatml | `Content-only` | len=4905 sha=5da44855ab7e0641 | ok len=123 sha=7a404a07af2cb071 | server template available; registry has no pinned template metadata |
-| 30582 | 32 | qwen3-8b-bf16 | `Qwen3-8B-BF16.gguf` | qwen/chatml | `Content-only` | len=4905 sha=5da44855ab7e0641 | ok len=123 sha=7a404a07af2cb071 | server template available; registry has no pinned template metadata |
-| 30584 | 14 | qwen3-4b-instruct-2507-q4km | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` | qwen/chatml | `Content-only` | len=4051 sha=c979e0e71a3e21b8 | ok len=123 sha=7a404a07af2cb071 | server template available; registry has no pinned template metadata |
-| 30788 | 38 | gpt-oss-20b-mxfp4 | `gpt-oss-20b-mxfp4.gguf` | gpt-oss | `Content-only` | len=14580 sha=0f1b6cb32273ad2a | ok len=466 sha=7bb4b3756d07f909 | server template available; registry has no pinned template metadata |
-| 30834 | 2 | meta-llama-31-8b-instruct-q80 | `Llama-3.1-8B-Instruct-Q8_0.gguf` | llama-3 | `Content-only` | len=4613 sha=93c0e9aa3629bbd7 | ok len=289 sha=8df0c197e1667aae | server template available; registry has no pinned template metadata |
-| 30905 | 8 | hunyuan-7b-instruct-q5km | `tencent_Hunyuan-7B-Instruct-Q5_K_M.gguf` | hunyuan | `Content-only` | len=4919 sha=7dfb19355e3c8779 | ok len=98 sha=b9cd8f391c23d070 | server template available; registry has no pinned template metadata |
-| 30920 | 34 | gemma-3-27b-it-q4 | `gemma-3-27b-it-Q4_K_M.gguf` | gemma | `Content-only` | len=1532 sha=7de1c58e208eda46 | ok len=100 sha=45d43bb6ff1ddd31 | server template available; registry has no pinned template metadata |
-| 30926 | 33 | qwen35-9b-q8kxl | `Qwen3.5-9B-UD-Q8_K_XL.gguf` | qwen/chatml | `Content-only` | len=7816 sha=7f0e529032c25183 | ok len=131 sha=eccfed9a9c4a2fa4 | server template available; registry has no pinned template metadata |
-| 30927 | 39 | qwen35-9b-q8kxl | `Qwen3.5-9B-UD-Q8_K_XL.gguf` | qwen/chatml | `Content-only` | len=7816 sha=7f0e529032c25183 | ok len=131 sha=eccfed9a9c4a2fa4 | server template available; registry has no pinned template metadata |
-| 31021 | 6 | glm-4-9b-chat-q4k | `glm-4-9b-chat.Q4_K.gguf` | glm | `Content-only` | len=544 sha=fbd6f678a56640d9 | ok len=89 sha=08a99427e6cb9c0c | server template available; registry has no pinned template metadata |
-| 31329 | 19 | kimi-vl-a3b-instruct-q4km | `Kimi-VL-A3B-Instruct.Q4_K_M.gguf` | kimi | `Content-only` | len=907 sha=8452948e3156f904 | ok len=161 sha=6f264cec2b359859 | server template available; registry has no pinned template metadata |
-| 31466 | 13 | glm-4-9b-chat-q4k | `glm-4-9b-chat.Q4_K.gguf` | glm | `Content-only` | len=544 sha=fbd6f678a56640d9 | ok len=89 sha=08a99427e6cb9c0c | server template available; registry has no pinned template metadata |
-| 31541 | 21 | qwen25-7b-instruct-q5km | `qwen2.5-7b-instruct-q5_k_m.gguf` | qwen/chatml | `Content-only` | len=2509 sha=d5495a1e5db06111 | ok len=123 sha=7a404a07af2cb071 | server template available; registry has no pinned template metadata |
-| 32246 | 5 | qwen25-7b-instruct-q5km | `qwen2.5-7b-instruct-q5_k_m.gguf` | qwen/chatml | `Content-only` | len=2508 sha=4e9918361c284a93 | ok len=123 sha=7a404a07af2cb071 | server template available; registry has no pinned template metadata |
-| 32685 | 7 | meta-llama-31-8b-instruct-q80 | `Llama-3.1-8B-Instruct-Q8_0.gguf` | llama-3 | `Content-only` | len=4613 sha=93c0e9aa3629bbd7 | ok len=289 sha=8df0c197e1667aae | server template available; registry has no pinned template metadata |
-
-## 已配置但当前不可达
-
-| port | registry id | registry model_name | model_url |
-|---:|---|---|---|
-| 30459 | 17 | `phi-4-mini-bf16` | `http://219.222.20.79:30459` |
-| 30498 | 26 | `gemma-3-4b-it-q4` | `http://219.222.20.79:30498` |
-| 30586 | 29 | `qwen25-3b-q8` | `http://219.222.20.79:30586` |
-| 30587 | 28 | `llama32-3b-q8` | `http://219.222.20.79:30587` |
-| 30689 | 30 | `qwen25-7b-instruct-q5km` | `http://219.222.20.79:30689` |
-| 30782 | 37 | `qwen35-27b-q6kxl` | `http://219.222.20.79:30782` |
-| 30784 | 35 | `gpt-oss-20b-mxfp4` | `http://219.222.20.79:30784` |
-| 30786 | 36 | `ministral-14b` | `http://219.222.20.79:30786` |
-| 31136 | 1 | `gpt-oss-20b-mxfp4` | `http://219.222.20.79:31136` |
-| 31323 | 20 | `kimi-vl-a3b-thinking-2506-q4km` | `http://219.222.20.79:31323` |
-| 31464 | 11 | `glm-4-9b-chat-q4k` | `http://219.222.20.79:31464` |
-| 31926 | 4 | `hunyuan-7b-instruct-q5km` | `http://219.222.20.79:31926` |
-| 32310 | 27 | `deepseek-r1-distill-qwen-7b-q4` | `http://219.222.20.79:32310` |
-| 32520 | 31 | `qwen3-30b-a3b-instruct-2507-q5km` | `http://219.222.20.79:32520` |
-| 32767 | 9 | `qwen25-7b-instruct-q5km` | `http://219.222.20.79:32767` |
+| 30403 | 23 | hunyuan-7b-instruct-q5km | `tencent_Hunyuan-7B-Instruct-Q5_K_M.gguf` | hunyuan | `Content-only` | len=4919 sha=7dfb19355e3c8779 | ok len=98 sha=b9cd8f391c23d070 | server chat_template configured; apply-template verified |
+| 30465 | 18 | phi-4-mini-q8 | `Phi-4-mini-instruct.Q8_0.gguf` | phi | `Content-only` | len=398 sha=46bcd040271c497e | ok len=88 sha=cbb413705d324b61 | server chat_template configured; apply-template verified |
+| 30468 | 15 | gemma-3-4b-it-q4 | `gemma-3-4b-it-Q4_K_M.gguf` | gemma | `Content-only` | len=1531 sha=8d9e3a3c114fb205 | ok len=100 sha=45d43bb6ff1ddd31 | server chat_template configured; apply-template verified |
+| 30524 | 24 | ministral-3b-q8kxl | `Ministral-3-3B-Instruct-2512-UD-Q8_K_XL.gguf` | mistral/ministral | `Content-only` | len=7503 sha=a81fa42ad89f88c7 | ok len=87 sha=c8d8b5b82a9a3b6e | server chat_template configured; apply-template verified |
+| 30525 | 16 | granite-h-micro-3b-q8kxl | `granite-4.0-h-micro-UD-Q8_K_XL.gguf` | granite | `Content-only` | len=6418 sha=9524df67b77a7b25 | ok len=190 sha=d021d4f0534a597f | server chat_template configured; apply-template verified |
+| 30526 | 3 | gemma4-e2b-q8 | `gemma-4-E2B-it-Q8_0.gguf` | gemma | `Content-only` | len=16317 sha=781d10940fbc44be | ok len=108 sha=655d3fc903900db0 | server chat_template configured; apply-template verified |
+| 30528 | 10 | gemma4-e4b-q8kxl | `gemma-4-E4B-it-UD-Q8_K_XL.gguf` | gemma | `Content-only` | len=11926 sha=55572b8d3c834204 | ok len=107 sha=0b10e4d934663594 | server chat_template configured; apply-template verified |
+| 30578 | 22 | qwen3-8b-bf16 | `Qwen3-8B-BF16.gguf` | qwen/chatml | `Content-only` | len=4905 sha=5da44855ab7e0641 | ok len=123 sha=7a404a07af2cb071 | server chat_template configured; apply-template verified |
+| 30582 | 32 | qwen3-8b-bf16 | `Qwen3-8B-BF16.gguf` | qwen/chatml | `Content-only` | len=4905 sha=5da44855ab7e0641 | ok len=123 sha=7a404a07af2cb071 | server chat_template configured; apply-template verified |
+| 30584 | 14 | qwen3-4b-instruct-2507-q4km | `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` | qwen/chatml | `Content-only` | len=4051 sha=c979e0e71a3e21b8 | ok len=123 sha=7a404a07af2cb071 | server chat_template configured; apply-template verified |
+| 30788 | 38 | gpt-oss-20b-mxfp4 | `gpt-oss-20b-mxfp4.gguf` | gpt-oss | `Content-only` | len=14580 sha=0f1b6cb32273ad2a | ok len=466 sha=7bb4b3756d07f909 | server chat_template configured; apply-template verified |
+| 30834 | 2 | meta-llama-31-8b-instruct-q80 | `Llama-3.1-8B-Instruct-Q8_0.gguf` | llama-3 | `Content-only` | len=4613 sha=93c0e9aa3629bbd7 | ok len=289 sha=8df0c197e1667aae | server chat_template configured; apply-template verified |
+| 30905 | 8 | hunyuan-7b-instruct-q5km | `tencent_Hunyuan-7B-Instruct-Q5_K_M.gguf` | hunyuan | `Content-only` | len=4919 sha=7dfb19355e3c8779 | ok len=98 sha=b9cd8f391c23d070 | server chat_template configured; apply-template verified |
+| 30920 | 34 | gemma-3-27b-it-q4 | `gemma-3-27b-it-Q4_K_M.gguf` | gemma | `Content-only` | len=1532 sha=7de1c58e208eda46 | ok len=100 sha=45d43bb6ff1ddd31 | server chat_template configured; apply-template verified |
+| 30926 | 33 | qwen35-9b-q8kxl | `Qwen3.5-9B-UD-Q8_K_XL.gguf` | qwen/chatml | `Content-only` | len=7816 sha=7f0e529032c25183 | ok len=131 sha=eccfed9a9c4a2fa4 | server chat_template configured; apply-template verified |
+| 30927 | 39 | qwen35-9b-q8kxl | `Qwen3.5-9B-UD-Q8_K_XL.gguf` | qwen/chatml | `Content-only` | len=7816 sha=7f0e529032c25183 | ok len=131 sha=eccfed9a9c4a2fa4 | server chat_template configured; apply-template verified |
+| 31021 | 6 | glm-4-9b-chat-q4k | `glm-4-9b-chat.Q4_K.gguf` | glm | `Content-only` | len=544 sha=fbd6f678a56640d9 | ok len=89 sha=08a99427e6cb9c0c | server chat_template configured; apply-template verified |
+| 31329 | 19 | kimi-vl-a3b-instruct-q4km | `Kimi-VL-A3B-Instruct.Q4_K_M.gguf` | kimi | `Content-only` | len=907 sha=8452948e3156f904 | ok len=161 sha=6f264cec2b359859 | server chat_template configured; apply-template verified |
+| 31466 | 13 | glm-4-9b-chat-q4k | `glm-4-9b-chat.Q4_K.gguf` | glm | `Content-only` | len=544 sha=fbd6f678a56640d9 | ok len=89 sha=08a99427e6cb9c0c | server chat_template configured; apply-template verified |
+| 31541 | 21 | qwen25-7b-instruct-q5km | `qwen2.5-7b-instruct-q5_k_m.gguf` | qwen/chatml | `Content-only` | len=2509 sha=d5495a1e5db06111 | ok len=123 sha=7a404a07af2cb071 | server chat_template configured; apply-template verified |
+| 32246 | 5 | qwen25-7b-instruct-q5km | `qwen2.5-7b-instruct-q5_k_m.gguf` | qwen/chatml | `Content-only` | len=2508 sha=4e9918361c284a93 | ok len=123 sha=7a404a07af2cb071 | server chat_template configured; apply-template verified |
+| 32685 | 7 | meta-llama-31-8b-instruct-q80 | `Llama-3.1-8B-Instruct-Q8_0.gguf` | llama-3 | `Content-only` | len=4613 sha=93c0e9aa3629bbd7 | ok len=289 sha=8df0c197e1667aae | server chat_template configured; apply-template verified |
 
 ## 模型服务开放但未写入 model_net.yaml
 
@@ -92,9 +72,9 @@
 
 ## 对开发机的配置建议
 
-1. 当前运行时依赖 llama.cpp 的 `POST /apply-template`；`model_net.yaml` 只保存 `model_url/EOS/type/stop_think/expose_raw_logits`，没有保存或校验 `chat_template`。
-2. 建议后续开发把 `/props.chat_template` 的 `sha256`、模板族、`/apply-template` 渲染样例加入模型探测/校验结果，至少在导入或点击“Fetch model info”时提示模板缺失、模板族未知、服务不可达。
-3. 对 DuetNet 严格 raw-logit 工作流，除模板外还要确认对应端口是 raw-logit fork；当前 `model_net.yaml` 只有少数 alias 设置 `expose_raw_logits: true`。
+1. 当前运行时依赖 llama.cpp 的 `POST /apply-template`；本次保留的 22 个已配置端口都已确认服务端存在 `chat_template` 且 `/apply-template` 可渲染。
+2. `model_net.yaml` 只保存 `model_url/EOS/type/stop_think/expose_raw_logits`，完整 Jinja 模板仍由 llama.cpp 服务端持有；不要直接把 `chat_template` 写入 yaml，否则当前 `LlamaCppSpec(extra="forbid")` 会拒绝加载。
+3. 对 DuetNet 严格 raw-logit 工作流，除模板外还要确认对应端口是 raw-logit fork；本次将 q1 从不可达的 `29` 切到可达的 `38`，并在本机配置中为 `38` 补上 `expose_raw_logits: true`。
 4. `chat_format: Content-only` 在这些服务上不等于没有模板；以 `/props.chat_template` 和 `/apply-template` 实际渲染结果为准。
 
 ## curl 查询命令样例

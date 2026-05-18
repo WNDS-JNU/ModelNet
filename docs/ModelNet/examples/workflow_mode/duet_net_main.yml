@@ -15,7 +15,7 @@ app:
     tau_P=0.75, T=1, max_len=512.
 
 
-    Logical labels map to api/configs/model_net.yaml aliases: q1=29, q2=5,
+    Logical labels map to api/configs/model_net.yaml aliases: q1=38, q2=5,
     g4=6, L3=2. These aliases must expose raw logits because duet_net checks
     Capability.LOGITS_RAW at runtime.'
   icon: 🎵
@@ -180,10 +180,10 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Model m=1, q1, model_alias=29. Renders omega and emits a ModelInvocationSpec.
+        desc: Model m=1, q1, model_alias=38. Renders omega and emits a ModelInvocationSpec.
         extra: {}
         inline_spec: null
-        model_alias: '29'
+        model_alias: '38'
         prompt_template: '{{#start_node.question#}}'
         raw_completion: false
         sampling_params:

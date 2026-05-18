@@ -468,12 +468,12 @@ workflow:
       width: 44
       zIndex: 1002
     - data:
-        desc: 模型 m=1，q1，对应 model_alias=29。读取当前共享上下文并产出 ModelInvocationSpec。
+        desc: 模型 m=1，q1，对应 model_alias=38。读取当前共享上下文并产出 ModelInvocationSpec。
         extra: {}
         inline_spec: null
         isInLoop: true
         loop_id: duet_loop
-        model_alias: '29'
+        model_alias: '38'
         prompt_template: '{{#duet_loop.current_prompt#}}'
         raw_completion: false
         sampling_params:
