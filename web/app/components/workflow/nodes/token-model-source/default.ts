@@ -41,6 +41,7 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
     model_alias: '',
     prompt_template: '',
     raw_completion: false,
+    expose_raw_logits: null,
     sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
     extra: {},
     // ``null`` is the canonical "registered alias mode" — keeps the
@@ -148,6 +149,23 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
       && typeof rawCompletion !== 'boolean'
     ) {
       errorMessage = t(`${i18nPrefix}.errorMsg.rawCompletionBoolean`, {
+        ns: 'workflow',
+      })
+    }
+
+    // ── expose_raw_logits: null inherits registry, boolean overrides ──
+    // Registered-alias sources can opt a single source into/out of the
+    // backend raw-logit contract without editing model_net.yaml. Let
+    // legacy DSL omit the field and let ``null`` mean "inherit"; reject
+    // scalar smuggling so the backend never sees an ambiguous override.
+    const exposeRawLogits = payload?.expose_raw_logits
+    if (
+      !errorMessage
+      && exposeRawLogits !== undefined
+      && exposeRawLogits !== null
+      && typeof exposeRawLogits !== 'boolean'
+    ) {
+      errorMessage = t(`${i18nPrefix}.errorMsg.exposeRawLogitsBoolean`, {
         ns: 'workflow',
       })
     }

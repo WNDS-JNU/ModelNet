@@ -51,6 +51,7 @@ def _payload(
     extra: dict | None = None,
     messages_template: list[dict] | None = None,
     inline_spec: dict | None = None,
+    expose_raw_logits: bool | None = None,
 ) -> dict:
     payload: dict = {
         "title": "src",
@@ -68,6 +69,8 @@ def _payload(
         payload["extra"] = extra
     if inline_spec is not None:
         payload["inline_spec"] = inline_spec
+    if expose_raw_logits is not None:
+        payload["expose_raw_logits"] = expose_raw_logits
     return payload
 
 
@@ -106,6 +109,7 @@ class TestRunHappyPath:
         # path is the active default; pin so a regression to ``True``
         # default would surface as a behaviour change here.
         assert spec["raw_completion"] is False
+        assert spec["expose_raw_logits"] is None
         # ``model_alias`` surfaced top-level too for panels that only
         # want the alias without unpacking the spec dict.
         assert nrr.outputs["model_alias"] == "qwen3-4b"
@@ -123,6 +127,15 @@ class TestRunHappyPath:
         nrr = events[0].node_run_result
         assert nrr.status == WorkflowNodeExecutionStatus.SUCCEEDED
         assert nrr.outputs["spec"]["prompt"] == "Plain instruction with no vars."
+
+    def test_expose_raw_logits_override_round_trips_into_spec(self):
+        pool = VariablePool()
+        pool.add(["start", "q"], "x")
+        node = _make_node(pool, _payload(expose_raw_logits=True))
+
+        spec = list(node._run())[0].node_run_result.outputs["spec"]
+
+        assert spec["expose_raw_logits"] is True
 
     def test_overridden_sampling_params_round_trip_into_spec(self):
         pool = VariablePool()

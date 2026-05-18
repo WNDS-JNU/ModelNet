@@ -85,6 +85,10 @@ class TokenModelSourceNode(Node[TokenModelSourceNodeData]):
             # backend-private key per call) does not bleed back into the
             # parsed node-data instance.
             "extra": dict(node_data.extra),
+            # ``None`` means "inherit the registered alias"; a boolean
+            # is a per-source override the parallel-ensemble consumer
+            # applies only on the registry-backed path.
+            "expose_raw_logits": node_data.expose_raw_logits,
             "messages": rendered_messages,
             "raw_completion": node_data.raw_completion,
             # ``inline_spec`` rides through to the parallel-ensemble

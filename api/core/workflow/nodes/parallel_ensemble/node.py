@@ -455,6 +455,15 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                         f"sampling_params must be a dict, got {type(value['sampling_params']).__name__}"
                     ),
                 )
+            expose_raw_logits = value.get("expose_raw_logits")
+            if expose_raw_logits is not None and not isinstance(expose_raw_logits, bool):
+                raise InvalidSpecError(
+                    source_id=ref.source_id,
+                    reason=(
+                        "expose_raw_logits must be a boolean or null when set, "
+                        f"got {type(expose_raw_logits).__name__}"
+                    ),
+                )
             # Optional ``messages`` field carries the chat-mode payload
             # the upstream ``token-model-source`` node produced when the
             # user authored ``messages_template`` instead of
@@ -514,9 +523,12 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         rides on parallel-ensemble's own ``source_id`` uniqueness
         check, so collisions surface earlier.
 
-        Registry path: unchanged behaviour — alias resolves through
-        ``self._model_registry.get`` and raises ``UnknownModelAliasError``
-        if the alias is not present in ``model_net.yaml``.
+        Registry path: alias resolves through ``self._model_registry.get``.
+        If the upstream source carries a boolean ``expose_raw_logits``
+        override, apply it to a per-source copy of that registered spec;
+        ``None`` inherits the yaml entry unchanged. The registry object
+        itself is never mutated, so two sources can point at the same
+        alias with different raw-logit settings.
         """
         out: dict[str, BaseSpec] = {}
         for ref in refs:
@@ -524,7 +536,12 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
             inline = spec_dict.get("inline_spec")
             alias = spec_dict["model_alias"]
             if not inline:
-                out[ref.source_id] = self._model_registry.get(alias)
+                base_spec = self._model_registry.get(alias)
+                out[ref.source_id] = self._apply_registered_spec_overrides(
+                    ref.source_id,
+                    base_spec,
+                    spec_dict,
+                )
                 continue
             if not isinstance(inline, dict):
                 raise InvalidSpecError(
@@ -560,6 +577,49 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
                     reason=f"inline_spec failed {backend_name} validation: {exc}",
                 ) from exc
         return out
+
+    def _apply_registered_spec_overrides(
+        self,
+        source_id: str,
+        base_spec: BaseSpec,
+        spec_dict: dict[str, Any],
+    ) -> BaseSpec:
+        """Return a per-source registered spec with safe UI overrides applied.
+
+        ``ModelRegistry`` stores frozen spec instances shared across
+        workflow runs. A token-model-source can now carry
+        ``expose_raw_logits`` for the registered-alias path, but that
+        must be scoped to this source only: re-validate a copied
+        payload against the backend's spec class instead of mutating
+        the cached registry entry.
+
+        ``_collect_specs`` has already enforced that
+        ``spec_dict["expose_raw_logits"]`` is ``None`` or ``bool``; this
+        helper only routes the override into the backend spec class.
+        """
+        raw_logits_override = spec_dict.get("expose_raw_logits")
+        if raw_logits_override is None:
+            return base_spec
+        if "expose_raw_logits" not in type(base_spec).model_fields:
+            if raw_logits_override is False:
+                return base_spec
+            raise InvalidSpecError(
+                source_id=source_id,
+                reason=(
+                    f"backend '{base_spec.backend}' does not support "
+                    "expose_raw_logits on registered aliases"
+                ),
+            )
+
+        payload = base_spec.model_dump(mode="python")
+        payload["expose_raw_logits"] = raw_logits_override
+        try:
+            return type(base_spec).model_validate(payload)
+        except ValidationError as exc:
+            raise InvalidSpecError(
+                source_id=source_id,
+                reason=f"registered spec override failed {base_spec.backend} validation: {exc}",
+            ) from exc
 
     def _build_effective_params(
         self,

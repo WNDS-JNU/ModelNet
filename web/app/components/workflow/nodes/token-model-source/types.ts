@@ -26,6 +26,7 @@ export type ModelInvocationSpec = {
   prompt: string
   sampling_params: SamplingParams
   extra: Record<string, unknown>
+  expose_raw_logits?: boolean | null
   raw_completion?: boolean
   inline_spec?: InlineModelSpec | null
 }
@@ -71,6 +72,11 @@ export type TokenModelSourceNodeType = CommonNodeType & {
   // ``true`` preserves PN.py-style raw completion for research prompts
   // that already include exact model-specific scaffolding.
   raw_completion?: boolean
+  // ``null`` / ``undefined`` means "inherit the registered alias".
+  // Boolean values are per-source overrides applied only in registered
+  // alias mode; custom inline specs keep their backend-specific knob
+  // inside ``inline_spec.expose_raw_logits``.
+  expose_raw_logits?: boolean | null
   sampling_params: SamplingParams
   extra: Record<string, unknown>
   // ``null`` (the canonical "use registered alias" state) is the

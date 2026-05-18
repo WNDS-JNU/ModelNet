@@ -30,6 +30,7 @@ const createPayload = (
   model_alias: '',
   prompt_template: 'Answer: {{#start.q#}}',
   raw_completion: false,
+  expose_raw_logits: null,
   sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
   extra: {},
   inline_spec: { ...DEFAULT_INLINE_SPEC },
@@ -100,6 +101,18 @@ describe('token-model-source/useConfig', () => {
 
       expect(mockSetInputs).toHaveBeenCalledWith(expect.objectContaining({
         raw_completion: true,
+      }))
+    })
+  })
+
+  describe('Raw logits option', () => {
+    it('should persist the registered-alias raw-logit override', () => {
+      const { result } = renderHook(() => useConfig('token-source', createPayload()))
+
+      result.current.handleExposeRawLogitsChange(true)
+
+      expect(mockSetInputs).toHaveBeenCalledWith(expect.objectContaining({
+        expose_raw_logits: true,
       }))
     })
   })

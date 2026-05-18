@@ -109,6 +109,16 @@ const useConfig = (id: string, payload: TokenModelSourceNodeType) => {
     [inputs, setInputs],
   )
 
+  const handleExposeRawLogitsChange = useCallback(
+    (checked: boolean) => {
+      const next = produce(inputs, (draft) => {
+        draft.expose_raw_logits = checked
+      })
+      setInputs(next)
+    },
+    [inputs, setInputs],
+  )
+
   const handleSamplingParamsChange = useCallback(
     (patch: Partial<SamplingParams>) => {
       const next = produce(inputs, (draft) => {
@@ -149,6 +159,7 @@ const useConfig = (id: string, payload: TokenModelSourceNodeType) => {
     handleInlineSpecChange,
     handlePromptTemplateChange,
     handleRawCompletionChange,
+    handleExposeRawLogitsChange,
     handleSamplingParamsChange,
     handleExtraChange,
   }

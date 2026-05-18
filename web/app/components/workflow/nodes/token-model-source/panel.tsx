@@ -21,6 +21,8 @@ import useConfig from './use-config'
 
 const i18nPrefix = 'nodes.tokenModelSource'
 
+const LOGITS_RAW_CAPABILITY = 'logits_raw'
+
 // All ``VarType`` entries the backend ``VariableTemplateParser`` can
 // safely stringify into a prompt. ``file`` / ``arrayFile`` are
 // deliberately excluded — those are downloaded by the runtime as file
@@ -66,6 +68,7 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
     handleInlineSpecChange,
     handlePromptTemplateChange,
     handleRawCompletionChange,
+    handleExposeRawLogitsChange,
     handleSamplingParamsChange,
   } = useConfig(id, data)
 
@@ -73,6 +76,12 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
     onlyLeafNodeVar: false,
     filterVar: filterPromptVar,
   })
+
+  const selectedModel = models.find(model => model.id === inputs.model_alias)
+  const registeredAliasExposesRawLogits
+    = selectedModel?.capabilities.includes(LOGITS_RAW_CAPABILITY) ?? false
+  const exposeRawLogitsChecked
+    = inputs.expose_raw_logits ?? registeredAliasExposesRawLogits
 
   return (
     <div className="pt-2">
@@ -133,6 +142,23 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
               )}
         </Field>
 
+        {sourceMode === 'registered' && (
+          <Field
+            title={t(`${i18nPrefix}.exposeRawLogits.label`, { ns: 'workflow' })}
+            tooltip={t(`${i18nPrefix}.exposeRawLogits.tooltip`, { ns: 'workflow' })}
+            inline
+            operations={(
+              <Switch
+                checked={exposeRawLogitsChecked}
+                onCheckedChange={handleExposeRawLogitsChange}
+                size="md"
+                disabled={readOnly}
+                aria-label={t(`${i18nPrefix}.exposeRawLogits.label`, { ns: 'workflow' })}
+              />
+            )}
+          />
+        )}
+
         {sourceMode === 'inline' && (
           <InlineSpecForm
             readonly={readOnly}
@@ -182,6 +208,7 @@ const Panel: FC<NodePanelProps<TokenModelSourceNodeType>> = ({
               onCheckedChange={handleRawCompletionChange}
               size="md"
               disabled={readOnly}
+              aria-label={t(`${i18nPrefix}.rawCompletion`, { ns: 'workflow' })}
             />
           )}
         />

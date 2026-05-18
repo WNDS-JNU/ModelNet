@@ -25,6 +25,7 @@ const buildPayload = (
   model_alias: 'qwen3-4b',
   prompt_template: 'Answer: {{#start.q#}}',
   raw_completion: false,
+  expose_raw_logits: null,
   sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
   extra: {},
   ...overrides,
@@ -259,6 +260,43 @@ describe('token-model-source/default.checkValid', () => {
         t,
       )
       expect(result.errorMessage).toContain('rawCompletionBoolean')
+    })
+  })
+
+  describe('expose_raw_logits guard', () => {
+    it('accepts true for registered-alias raw-logit override', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ expose_raw_logits: true }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('accepts null to inherit the registered alias', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ expose_raw_logits: null }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('accepts omitted expose_raw_logits for legacy DSL payloads', () => {
+      const payload = buildPayload()
+      delete payload.expose_raw_logits
+
+      const result = nodeDefault.checkValid(payload, t)
+
+      expect(result.isValid).toBe(true)
+    })
+
+    it('rejects non-boolean expose_raw_logits', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          expose_raw_logits: 'false' as unknown as boolean,
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('exposeRawLogitsBoolean')
     })
   })
 

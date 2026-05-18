@@ -125,6 +125,7 @@ class TestTokenModelSourceNodeData:
         # Defaults flow through.
         assert nd.sampling_params.top_k == 10
         assert nd.extra == {}
+        assert nd.expose_raw_logits is None
 
     def test_blank_model_alias_rejected(self):
         with pytest.raises(ValidationError):
@@ -167,6 +168,15 @@ class TestTokenModelSourceNodeData:
             extra={"repetition_penalty": 1.1, "research_tag": "exp_42"},
         )
         assert nd.extra == {"repetition_penalty": 1.1, "research_tag": "exp_42"}
+
+    def test_expose_raw_logits_override_accepted(self):
+        nd = TokenModelSourceNodeData(
+            title="src",
+            model_alias="qwen3-4b",
+            prompt_template="hi",
+            expose_raw_logits=True,
+        )
+        assert nd.expose_raw_logits is True
 
     def test_sampling_params_typo_propagates(self):
         # ``SamplingParams.extra="forbid"`` must surface through the

@@ -181,6 +181,7 @@ const buildPayload = (
   model_alias: 'llama3-local',
   prompt_template: 'Answer: {{#start.q#}}',
   raw_completion: false,
+  expose_raw_logits: null,
   sampling_params: { ...DEFAULT_SAMPLING_PARAMS },
   extra: {},
   ...overrides,
@@ -202,6 +203,7 @@ const buildConfig = (overrides: Partial<{
   handleInlineSpecChange: ReturnType<typeof vi.fn>
   handlePromptTemplateChange: ReturnType<typeof vi.fn>
   handleRawCompletionChange: ReturnType<typeof vi.fn>
+  handleExposeRawLogitsChange: ReturnType<typeof vi.fn>
   handleSamplingParamsChange: ReturnType<typeof vi.fn>
   handleExtraChange: ReturnType<typeof vi.fn>
 }> = {}) => ({
@@ -217,6 +219,7 @@ const buildConfig = (overrides: Partial<{
   handleInlineSpecChange: overrides.handleInlineSpecChange ?? vi.fn(),
   handlePromptTemplateChange: overrides.handlePromptTemplateChange ?? vi.fn(),
   handleRawCompletionChange: overrides.handleRawCompletionChange ?? vi.fn(),
+  handleExposeRawLogitsChange: overrides.handleExposeRawLogitsChange ?? vi.fn(),
   handleSamplingParamsChange: overrides.handleSamplingParamsChange ?? vi.fn(),
   handleExtraChange: overrides.handleExtraChange ?? vi.fn(),
 })
@@ -289,7 +292,9 @@ describe('token-model-source/panel', () => {
       mockUseConfig.mockReturnValue(buildConfig())
       renderPanel()
 
-      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+      expect(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.rawCompletion',
+      })).toHaveAttribute('aria-checked', 'false')
     })
 
     it('renders raw completion as enabled when the payload opts into raw mode', () => {
@@ -298,7 +303,39 @@ describe('token-model-source/panel', () => {
       }))
       renderPanel()
 
-      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+      expect(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.rawCompletion',
+      })).toHaveAttribute('aria-checked', 'true')
+    })
+
+    it('renders expose raw logits as an off switch in registered mode by default', () => {
+      mockUseConfig.mockReturnValue(buildConfig())
+      renderPanel()
+
+      expect(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.exposeRawLogits.label',
+      })).toHaveAttribute('aria-checked', 'false')
+    })
+
+    it('inherits the raw-logit switch state from a selected registered alias capability', () => {
+      mockUseConfig.mockReturnValue(buildConfig({
+        inputs: buildPayload({ model_alias: 'raw-llama', expose_raw_logits: null }),
+        models: [
+          ...buildModels(),
+          {
+            id: 'raw-llama',
+            backend: 'llama_cpp',
+            model_name: 'raw-llama',
+            capabilities: ['token_step', 'logits_raw'],
+            metadata: {},
+          },
+        ],
+      }))
+      renderPanel()
+
+      expect(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.exposeRawLogits.label',
+      })).toHaveAttribute('aria-checked', 'true')
     })
   })
 
@@ -338,10 +375,25 @@ describe('token-model-source/panel', () => {
       mockUseConfig.mockReturnValue(buildConfig({ handleRawCompletionChange }))
       renderPanel()
 
-      fireEvent.click(screen.getByRole('switch'))
+      fireEvent.click(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.rawCompletion',
+      }))
 
       expect(handleRawCompletionChange).toHaveBeenCalledTimes(1)
       expect(handleRawCompletionChange).toHaveBeenCalledWith(true)
+    })
+
+    it('invokes handleExposeRawLogitsChange when the registered raw-logit switch changes', () => {
+      const handleExposeRawLogitsChange = vi.fn()
+      mockUseConfig.mockReturnValue(buildConfig({ handleExposeRawLogitsChange }))
+      renderPanel()
+
+      fireEvent.click(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.exposeRawLogits.label',
+      }))
+
+      expect(handleExposeRawLogitsChange).toHaveBeenCalledTimes(1)
+      expect(handleExposeRawLogitsChange).toHaveBeenCalledWith(true)
     })
   })
 
@@ -365,7 +417,12 @@ describe('token-model-source/panel', () => {
       // panel could go read-only for the surrounding controls while
       // leaving the prompt freely editable.
       expect(screen.getByTestId('prompt-editor-readonly').textContent).toBe('true')
-      expect(screen.getByRole('switch')).toHaveAttribute('data-disabled', '')
+      expect(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.rawCompletion',
+      })).toHaveAttribute('data-disabled', '')
+      expect(screen.getByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.exposeRawLogits.label',
+      })).toHaveAttribute('data-disabled', '')
     })
 
     it('forwards an empty models list to the alias selector', () => {
@@ -398,6 +455,9 @@ describe('token-model-source/panel', () => {
       renderPanel()
       expect(screen.queryByTestId('model-alias-select')).not.toBeInTheDocument()
       expect(screen.getByTestId('inline-spec-form')).toBeInTheDocument()
+      expect(screen.queryByRole('switch', {
+        name: 'workflow.nodes.tokenModelSource.exposeRawLogits.label',
+      })).not.toBeInTheDocument()
       // The inline-spec form must receive the saved inline_spec; the
       // panel falls back to DEFAULT_INLINE_SPEC only when the input
       // is null (verified below).

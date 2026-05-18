@@ -115,6 +115,15 @@ class ModelInvocationSpec(TypedDict):
     prompt: str
     sampling_params: dict[str, Any]
     extra: dict[str, Any]
+    expose_raw_logits: NotRequired[bool | None]
+    """Optional registered-alias override for llama.cpp raw-logit mode.
+
+    ``None`` means "inherit the registry alias's spec". ``True`` /
+    ``False`` are explicit per-source overrides applied by the
+    parallel-ensemble consumer on the registry-backed path. Inline
+    sources keep using ``inline_spec.expose_raw_logits`` because the
+    full backend spec already rides inside the payload.
+    """
     messages: NotRequired[list[ChatMessageDict] | None]
     inline_spec: NotRequired[dict[str, Any] | None]
     """Optional inline backend spec for sources that bypass
@@ -209,6 +218,16 @@ class TokenModelSourceNodeData(BaseNodeData):
     the model validator below)."""
     sampling_params: SamplingParams = Field(default_factory=SamplingParams)
     extra: dict[str, Any] = Field(default_factory=dict)
+    expose_raw_logits: bool | None = None
+    """Registered-alias raw-logit override.
+
+    ``None`` preserves the alias exactly as registered in
+    ``model_net.yaml``. A boolean value lets one token source opt a
+    registered alias into or out of the backend's raw-logit contract
+    without editing the process-wide registry. Inline/custom sources
+    carry the same backend-specific knob inside ``inline_spec`` and do
+    not read this top-level field.
+    """
 
     NODE_TYPE: ClassVar[str] = TOKEN_MODEL_SOURCE_NODE_TYPE
 

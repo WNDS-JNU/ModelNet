@@ -139,6 +139,37 @@ class _SyntheticSpec(BaseSpec):
     type: str = "normal"
 
 
+class _RawToggleSpec(BaseSpec):
+    """Registered spec that supports the ``expose_raw_logits`` override."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    expose_raw_logits: bool = False
+
+
+class _RawToggleBackend(ModelBackend):
+    """Backend whose LOGITS_RAW capability follows the spec override."""
+
+    name = "raw_toggle_backend"
+    spec_class: ClassVar[type[BaseSpec]] = _RawToggleSpec
+
+    @classmethod
+    def capabilities(cls, spec: BaseSpec) -> frozenset[Capability]:
+        caps = {Capability.TOKEN_STEP, Capability.TOP_PROBS}
+        if isinstance(spec, _RawToggleSpec) and spec.expose_raw_logits:
+            caps.add(Capability.LOGITS_RAW)
+        return frozenset(caps)
+
+    @classmethod
+    def validate_requirements(cls, spec: BaseSpec, requirements: list[Requirement]) -> list[ValidationIssue]:
+        del spec, requirements
+        return []
+
+    def generate(self, prompt: str, params: GenerationParams) -> GenerationResult:
+        del prompt, params
+        return GenerationResult(text="ok", finish_reason="stop", metadata={})
+
+
 class _TokenStepBackend(ModelBackend):
     """Declares the full PN.py capability set (TOKEN_STEP + TOP_PROBS)."""
 
@@ -571,6 +602,7 @@ def _make_spec_dict(
     extra: dict[str, Any] | None = None,
     messages: list[dict[str, str]] | None = None,
     inline_spec: dict[str, Any] | None = None,
+    expose_raw_logits: bool | None = None,
 ) -> dict[str, Any]:
     """Build a ``ModelInvocationSpec``-shaped dict for the variable pool.
 
@@ -596,6 +628,8 @@ def _make_spec_dict(
         spec["messages"] = [dict(m) for m in messages]
     if inline_spec is not None:
         spec["inline_spec"] = dict(inline_spec)
+    if expose_raw_logits is not None:
+        spec["expose_raw_logits"] = expose_raw_logits
     return spec
 
 
@@ -1213,6 +1247,20 @@ class TestSpecResolution:
         assert exc.value.source_id == "s1"
         assert "prompt" in exc.value.reason
 
+    def test_invalid_expose_raw_logits_type_raises(self):
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1"))
+        malformed = _make_spec_dict(model_alias="m2")
+        malformed["expose_raw_logits"] = "true"
+        pool.add(["src_1", "spec"], malformed)
+        node = _make_node(pool=pool, selectors=[["src_0", "spec"], ["src_1", "spec"]])
+
+        with pytest.raises(InvalidSpecError) as exc:
+            list(node._run())
+
+        assert exc.value.source_id == "s1"
+        assert "expose_raw_logits" in exc.value.reason
+
     def test_invalid_sampling_params_wrapped_with_source_id(self):
         """Spec carrying nonsense sampling (e.g. ``top_k=-1``) trips
         ``TokenStepParams`` validation; the node wraps the bare pydantic
@@ -1263,6 +1311,85 @@ class TestSpecResolution:
 
 
 # ── Inline-spec resolution ──────────────────────────────────────────────
+
+
+class TestRegisteredSpecOverrides:
+    """Per-source overrides must not mutate the registered alias spec."""
+
+    def test_expose_raw_logits_true_copies_registered_spec(self):
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(model_alias="raw-alias", expose_raw_logits=True),
+        )
+        registered = _RawToggleSpec(
+            id="raw-alias",
+            backend="raw_toggle",
+            model_name="raw-model",
+            expose_raw_logits=False,
+        )
+        node = _make_node(
+            model_aliases=["raw-alias"],
+            pool=pool,
+            selectors=[["src_0", "spec"]],
+            specs={"raw-alias": registered},
+            backends={"raw_toggle": _RawToggleBackend},
+        )
+
+        refs = node._node_data.ensemble.token_sources
+        resolved = node._resolve_base_specs(refs, node._collect_specs(refs))
+
+        assert isinstance(resolved["s0"], _RawToggleSpec)
+        assert resolved["s0"].expose_raw_logits is True
+        assert registered.expose_raw_logits is False
+
+    def test_expose_raw_logits_false_can_disable_raw_registered_alias(self):
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(model_alias="raw-alias", expose_raw_logits=False),
+        )
+        registered = _RawToggleSpec(
+            id="raw-alias",
+            backend="raw_toggle",
+            model_name="raw-model",
+            expose_raw_logits=True,
+        )
+        node = _make_node(
+            model_aliases=["raw-alias"],
+            pool=pool,
+            selectors=[["src_0", "spec"]],
+            specs={"raw-alias": registered},
+            backends={"raw_toggle": _RawToggleBackend},
+        )
+
+        refs = node._node_data.ensemble.token_sources
+        resolved = node._resolve_base_specs(refs, node._collect_specs(refs))
+
+        assert isinstance(resolved["s0"], _RawToggleSpec)
+        assert resolved["s0"].expose_raw_logits is False
+        assert registered.expose_raw_logits is True
+
+    def test_expose_raw_logits_true_on_unsupported_backend_is_attributed(self):
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(model_alias="plain", expose_raw_logits=True),
+        )
+        node = _make_node(
+            model_aliases=["plain"],
+            pool=pool,
+            selectors=[["src_0", "spec"]],
+            specs={"plain": _SyntheticSpec(id="plain", backend="synthetic", model_name="plain")},
+            backends={"synthetic": _ResponseOnlyBackend},
+        )
+
+        refs = node._node_data.ensemble.token_sources
+        with pytest.raises(InvalidSpecError) as exc:
+            node._resolve_base_specs(refs, node._collect_specs(refs))
+
+        assert exc.value.source_id == "s0"
+        assert "expose_raw_logits" in exc.value.reason
 
 
 class TestInlineSpecResolution:
