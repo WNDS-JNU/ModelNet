@@ -8,7 +8,10 @@ app:
 
     工作流在进入循环前使用 data-loader 节点从本地 C-Eval JSONL 数据集读取样本，
     再将样本问题转换为所有模型共享的初始 prompt。循环在遇到 EOS/空 token 或达到
-    512 个 token 后结束。'
+    512 个 token 后结束。
+
+    循环完成后，评测节点会按样本里的 extractor 字段抽取最终答案，并输出
+    prediction、normalized_gold、is_correct、raw_answer 和数据集元信息。'
   icon: 🔁
   icon_background: '#DCE5FF'
   mode: workflow
@@ -206,9 +209,21 @@ workflow:
         isInIteration: false
         isInLoop: false
         sourceType: loop
-        targetType: end
-      id: duet-loop-to-end
+        targetType: code
+      id: duet-loop-to-evaluate-answer
       source: duet_loop
+      sourceHandle: source
+      target: evaluate_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: evaluate-answer-to-end
+      source: evaluate_answer
       sourceHandle: source
       target: end_node
       targetHandle: target
@@ -238,7 +253,7 @@ workflow:
         desc: 从本地 C-Eval JSONL 文件读取一个标准化评测样本，输出 items、questions、answers 和元数据。
         loader_name: jsonl_file
         loader_config:
-          path: /home/xianghe/temp/dify/dev/modelnet/datasets/c_eval.jsonl
+          path: /home/duxianghe/dify/dev/modelnet/datasets/c_eval.jsonl
           dataset_name: C-Eval
           split: validation-sample
           encoding: utf-8
@@ -271,27 +286,48 @@ workflow:
       width: 244
     - data:
         code: |
-          def main(items: list) -> dict:
+          def main(items: list, dataset: str, split: str, loader_metadata: dict) -> dict:
               if not items:
                   return {
                       "prompt": "",
                       "sample_id": "",
                       "gold_answer": "",
+                      "subject": "",
+                      "extractor": "last_abcd",
+                      "dataset": dataset or "",
+                      "split": split or "",
+                      "source_path": (loader_metadata or {}).get("path", ""),
+                      "sample_metadata": {},
                   }
 
               item = items[0] or {}
               data = item.get("data") or {}
+              metadata = item.get("metadata") or {}
               question = item.get("question") or data.get("question") or ""
               answer = item.get("answer") or data.get("answer") or ""
               sample_id = item.get("id") or data.get("id") or ""
+              subject = metadata.get("subject") or data.get("subject") or ""
+              extractor = metadata.get("extractor") or data.get("extractor") or "last_abcd"
               return {
                   "prompt": str(question),
                   "sample_id": str(sample_id),
                   "gold_answer": str(answer),
+                  "subject": str(subject),
+                  "extractor": str(extractor),
+                  "dataset": dataset or "",
+                  "split": split or "",
+                  "source_path": (loader_metadata or {}).get("path", ""),
+                  "sample_metadata": metadata,
               }
         code_language: python3
         desc: 将数据加载器输出的第一条样本整理成 DuetNet 共享输入 omega，并保留样本 ID 与标准答案。
         outputs:
+          dataset:
+            children: null
+            type: string
+          extractor:
+            children: null
+            type: string
           gold_answer:
             children: null
             type: string
@@ -299,6 +335,18 @@ workflow:
             children: null
             type: string
           sample_id:
+            children: null
+            type: string
+          sample_metadata:
+            children: null
+            type: object
+          source_path:
+            children: null
+            type: string
+          split:
+            children: null
+            type: string
+          subject:
             children: null
             type: string
         selected: false
@@ -309,7 +357,19 @@ workflow:
           - sample_loader
           - items
           variable: items
-      height: 106
+        - value_selector:
+          - sample_loader
+          - dataset
+          variable: dataset
+        - value_selector:
+          - sample_loader
+          - split
+          variable: split
+        - value_selector:
+          - sample_loader
+          - metadata
+          variable: loader_metadata
+      height: 154
       id: prepare_sample
       position:
         x: 638
@@ -441,6 +501,96 @@ workflow:
       type: custom
       width: 244
       zIndex: 1002
+    - data:
+        code: |
+          import re
+
+
+          def _last_abcd(text: str) -> str:
+              cleaned = (text or "").upper()
+              matches = re.findall(r"(?<![A-Z])([ABCD])(?![A-Z])", cleaned)
+              if matches:
+                  return matches[-1]
+              for char in reversed(cleaned):
+                  if char in {"A", "B", "C", "D"}:
+                      return char
+              return ""
+
+
+          def _last_bool(text: str) -> str:
+              cleaned = (text or "").strip().lower()
+              matches = re.findall(r"\b(true|false|yes|no)\b", cleaned)
+              if not matches:
+                  return ""
+              value = matches[-1]
+              if value == "yes":
+                  return "true"
+              if value == "no":
+                  return "false"
+              return value
+
+
+          def _normalize(text: str, extractor: str) -> str:
+              strategy = (extractor or "").strip().lower()
+              if strategy == "last_bool":
+                  return _last_bool(text)
+              return _last_abcd(text)
+
+
+          def main(raw_answer: str, gold_answer: str, extractor: str) -> dict:
+              prediction = _normalize(raw_answer or "", extractor or "last_abcd")
+              normalized_gold = _normalize(gold_answer or "", extractor or "last_abcd")
+              is_correct = bool(prediction) and prediction == normalized_gold
+              return {
+                  "raw_answer": raw_answer or "",
+                  "prediction": prediction,
+                  "normalized_gold": normalized_gold,
+                  "is_correct": is_correct,
+              }
+        code_language: python3
+        desc: 根据样本 extractor 字段从最终生成文本中抽取预测答案，并和标准答案做归一化比较。
+        outputs:
+          is_correct:
+            children: null
+            type: boolean
+          normalized_gold:
+            children: null
+            type: string
+          prediction:
+            children: null
+            type: string
+          raw_answer:
+            children: null
+            type: string
+        selected: false
+        title: 评测：抽取并对比答案
+        type: code
+        variables:
+        - value_selector:
+          - duet_loop
+          - generated_text
+          variable: raw_answer
+        - value_selector:
+          - prepare_sample
+          - gold_answer
+          variable: gold_answer
+        - value_selector:
+          - prepare_sample
+          - extractor
+          variable: extractor
+      height: 154
+      id: evaluate_answer
+      position:
+        x: 2450
+        y: 404
+      positionAbsolute:
+        x: 2450
+        y: 404
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
     - data:
         desc: 模型 m=2，q2，对应 model_alias=5。读取当前共享上下文并产出 ModelInvocationSpec。
         extra: {}
@@ -755,35 +905,80 @@ workflow:
           value_type: string
           variable: sample_id
         - value_selector:
-          - sample_loader
+          - prepare_sample
           - dataset
           value_type: string
           variable: dataset
+        - value_selector:
+          - prepare_sample
+          - split
+          value_type: string
+          variable: split
+        - value_selector:
+          - prepare_sample
+          - subject
+          value_type: string
+          variable: subject
+        - value_selector:
+          - prepare_sample
+          - extractor
+          value_type: string
+          variable: extractor
+        - value_selector:
+          - prepare_sample
+          - source_path
+          value_type: string
+          variable: source_path
         - value_selector:
           - prepare_sample
           - gold_answer
           value_type: string
           variable: gold_answer
         - value_selector:
-          - duet_loop
-          - generated_text
+          - evaluate_answer
+          - normalized_gold
           value_type: string
-          variable: answer
+          variable: normalized_gold
+        - value_selector:
+          - evaluate_answer
+          - prediction
+          value_type: string
+          variable: prediction
+        - value_selector:
+          - evaluate_answer
+          - is_correct
+          value_type: boolean
+          variable: is_correct
+        - value_selector:
+          - evaluate_answer
+          - raw_answer
+          value_type: string
+          variable: raw_answer
         - value_selector:
           - duet_loop
           - step
           value_type: number
           variable: generated_tokens
+        - value_selector:
+          - sample_loader
+          - total
+          value_type: number
+          variable: dataset_total
+        - value_selector:
+          - sample_loader
+          - next_offset
+          value_type: number
+          variable: next_offset
         selected: false
         title: 结束：输出评测结果
         type: end
-      height: 142
+      height: 260
       id: end_node
       position:
-        x: 2450
+        x: 2754
         y: 404
       positionAbsolute:
-        x: 2450
+        x: 2754
         y: 404
       selected: false
       sourcePosition: right
