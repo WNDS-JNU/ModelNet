@@ -1,0 +1,796 @@
+app:
+  description: '《Token-Level Collaborative Reasoning for Parallel Multi-Models》
+    的 DuetNet 中文复现 DSL。
+
+    本版本把原先隐藏在 parallel-ensemble 内部的 token 级自回归过程显式画成
+    Dify Loop：每轮只生成 1 个 token，循环执行联合 Top-K/Top-P 截断、候选
+    token 并集聚合、累计 logit Top-T 选择，并把选中的 token 追加回共享上下文。
+
+    工作流在进入循环前使用 data-loader 节点从本地 C-Eval JSONL 数据集读取样本，
+    再将样本问题转换为所有模型共享的初始 prompt。循环在遇到 EOS/空 token 或达到
+    512 个 token 后结束。'
+  icon: 🔁
+  icon_background: '#DCE5FF'
+  mode: workflow
+  name: DuetNet 显式循环 + 数据加载
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: data-loader
+      id: start-to-sample-loader
+      source: start_node
+      sourceHandle: source
+      target: sample_loader
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: data-loader
+        targetType: code
+      id: sample-loader-to-prepare-sample
+      source: sample_loader
+      sourceHandle: source
+      target: prepare_sample
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: loop
+      id: prepare-sample-to-duet-loop
+      source: prepare_sample
+      sourceHandle: source
+      target: duet_loop
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: loop-start
+        targetType: token-model-source
+      id: duet-loop-start-to-q1
+      source: duet_loop_start
+      sourceHandle: source
+      target: q1_source
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: loop-start
+        targetType: token-model-source
+      id: duet-loop-start-to-q2
+      source: duet_loop_start
+      sourceHandle: source
+      target: q2_source
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: loop-start
+        targetType: token-model-source
+      id: duet-loop-start-to-g4
+      source: duet_loop_start
+      sourceHandle: source
+      target: g4_source
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: loop-start
+        targetType: token-model-source
+      id: duet-loop-start-to-L3
+      source: duet_loop_start
+      sourceHandle: source
+      target: L3_source
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: q1-to-token-vote
+      source: q1_source
+      sourceHandle: source
+      target: token_vote
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: q2-to-token-vote
+      source: q2_source
+      sourceHandle: source
+      target: token_vote
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: g4-to-token-vote
+      source: g4_source
+      sourceHandle: source
+      target: token_vote
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: L3-to-token-vote
+      source: L3_source
+      sourceHandle: source
+      target: token_vote
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: parallel-ensemble
+        targetType: code
+      id: token-vote-to-advance-state
+      source: token_vote
+      sourceHandle: source
+      target: advance_state
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: true
+        loop_id: duet_loop
+        sourceType: code
+        targetType: assigner
+      id: advance-state-to-update-loop-vars
+      source: advance_state
+      sourceHandle: source
+      target: update_loop_vars
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: loop
+        targetType: end
+      id: duet-loop-to-end
+      source: duet_loop
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 工作流入口。本版本默认从数据加载器读取评测样本，因此不需要用户手动输入问题。
+        selected: false
+        title: 开始
+        type: start
+        variables: []
+      height: 74
+      id: start_node
+      position:
+        x: 30
+        y: 420
+      positionAbsolute:
+        x: 30
+        y: 420
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: 从本地 C-Eval JSONL 文件读取一个标准化评测样本，输出 items、questions、answers 和元数据。
+        loader_name: jsonl_file
+        loader_config:
+          path: /home/xianghe/temp/dify/dev/modelnet/datasets/c_eval.jsonl
+          dataset_name: C-Eval
+          split: validation-sample
+          encoding: utf-8
+          id_key: id
+          question_key: question
+          answer_key: answer
+          metadata_keys:
+          - subject
+          - extractor
+          max_rows: 50
+        limit: 1
+        offset: 0
+        seed: 42
+        selected: false
+        shuffle: false
+        title: 数据集加载：读取 C-Eval 样本
+        type: data-loader
+      height: 142
+      id: sample_loader
+      position:
+        x: 334
+        y: 386
+      positionAbsolute:
+        x: 334
+        y: 386
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        code: |
+          def main(items: list) -> dict:
+              if not items:
+                  return {
+                      "prompt": "",
+                      "sample_id": "",
+                      "gold_answer": "",
+                  }
+
+              item = items[0] or {}
+              data = item.get("data") or {}
+              question = item.get("question") or data.get("question") or ""
+              answer = item.get("answer") or data.get("answer") or ""
+              sample_id = item.get("id") or data.get("id") or ""
+              return {
+                  "prompt": str(question),
+                  "sample_id": str(sample_id),
+                  "gold_answer": str(answer),
+              }
+        code_language: python3
+        desc: 将数据加载器输出的第一条样本整理成 DuetNet 共享输入 omega，并保留样本 ID 与标准答案。
+        outputs:
+          gold_answer:
+            children: null
+            type: string
+          prompt:
+            children: null
+            type: string
+          sample_id:
+            children: null
+            type: string
+        selected: false
+        title: 样本整理：生成共享问题
+        type: code
+        variables:
+        - value_selector:
+          - sample_loader
+          - items
+          variable: items
+      height: 106
+      id: prepare_sample
+      position:
+        x: 638
+        y: 404
+      positionAbsolute:
+        x: 638
+        y: 404
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        break_conditions:
+        - comparison_operator: is
+          id: break-on-eos
+          value: true
+          varType: boolean
+          variable_selector:
+          - duet_loop
+          - is_done
+        - comparison_operator: ≥
+          id: break-on-max-step
+          value: '512'
+          varType: number
+          variable_selector:
+          - duet_loop
+          - step
+        desc: 显式 token 级循环。每轮调用四个模型源，DuetNet 聚合器只选择下一个 token，并更新共享上下文。
+        error_handle_mode: terminated
+        height: 760
+        logical_operator: or
+        loop_count: 512
+        loop_variables:
+        - id: loop-var-current-prompt
+          label: current_prompt
+          value:
+          - prepare_sample
+          - prompt
+          value_type: variable
+          var_type: string
+        - id: loop-var-generated-text
+          label: generated_text
+          value: ''
+          value_type: constant
+          var_type: string
+        - id: loop-var-step
+          label: step
+          value: '0'
+          value_type: constant
+          var_type: number
+        - id: loop-var-is-done
+          label: is_done
+          value: false
+          value_type: constant
+          var_type: boolean
+        selected: false
+        start_node_id: duet_loop_start
+        title: 循环：逐 token 协作推理
+        type: loop
+        width: 1448
+      height: 760
+      id: duet_loop
+      position:
+        x: 942
+        y: 90
+      positionAbsolute:
+        x: 942
+        y: 90
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 1448
+      zIndex: 1
+    - data:
+        desc: 循环起点，每次迭代都会使用最新 current_prompt 触发四个模型源。
+        isInLoop: true
+        selected: false
+        title: ''
+        type: loop-start
+      draggable: false
+      height: 48
+      id: duet_loop_start
+      parentId: duet_loop
+      position:
+        x: 58
+        y: 348
+      positionAbsolute:
+        x: 1000
+        y: 438
+      selectable: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom-loop-start
+      width: 44
+      zIndex: 1002
+    - data:
+        desc: 模型 m=1，q1，对应 model_alias=29。读取当前共享上下文并产出 ModelInvocationSpec。
+        extra: {}
+        inline_spec: null
+        isInLoop: true
+        loop_id: duet_loop
+        model_alias: '29'
+        prompt_template: '{{#duet_loop.current_prompt#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.7
+          top_k: 10
+          top_p: null
+        selected: false
+        title: 模型源 m=1：q1
+        type: token-model-source
+      height: 130
+      id: q1_source
+      parentId: duet_loop
+      position:
+        x: 162
+        y: 62
+      positionAbsolute:
+        x: 1104
+        y: 152
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: 模型 m=2，q2，对应 model_alias=5。读取当前共享上下文并产出 ModelInvocationSpec。
+        extra: {}
+        inline_spec: null
+        isInLoop: true
+        loop_id: duet_loop
+        model_alias: '5'
+        prompt_template: '{{#duet_loop.current_prompt#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.7
+          top_k: 10
+          top_p: null
+        selected: false
+        title: 模型源 m=2：q2
+        type: token-model-source
+      height: 130
+      id: q2_source
+      parentId: duet_loop
+      position:
+        x: 162
+        y: 244
+      positionAbsolute:
+        x: 1104
+        y: 334
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: 模型 m=3，g4，对应 model_alias=6。读取当前共享上下文并产出 ModelInvocationSpec。
+        extra: {}
+        inline_spec: null
+        isInLoop: true
+        loop_id: duet_loop
+        model_alias: '6'
+        prompt_template: '{{#duet_loop.current_prompt#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.7
+          top_k: 10
+          top_p: null
+        selected: false
+        title: 模型源 m=3：g4
+        type: token-model-source
+      height: 130
+      id: g4_source
+      parentId: duet_loop
+      position:
+        x: 162
+        y: 426
+      positionAbsolute:
+        x: 1104
+        y: 516
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: 模型 m=4，L3，对应 model_alias=2。读取当前共享上下文并产出 ModelInvocationSpec。
+        extra: {}
+        inline_spec: null
+        isInLoop: true
+        loop_id: duet_loop
+        model_alias: '2'
+        prompt_template: '{{#duet_loop.current_prompt#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.7
+          top_k: 10
+          top_p: null
+        selected: false
+        title: 模型源 m=4：L3
+        type: token-model-source
+      height: 130
+      id: L3_source
+      parentId: duet_loop
+      position:
+        x: 162
+        y: 608
+      positionAbsolute:
+        x: 1104
+        y: 698
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: DuetNet 单 token 聚合步骤：联合 tau_K/tau_P 截断候选集合，按原始 logit 累计分数聚合，并用 Top-T 选出下一个 token。
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_k: 10
+            tau_p: 0.75
+            top_t: 1
+            use_weights: false
+          aggregator_name: duet_net
+          diagnostics:
+            enable_trace_stream: false
+            include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: false
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_think_trace: false
+            include_token_candidates: true
+            max_trace_tokens: 512
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 1
+          runner_name: token_step
+          token_sources:
+          - extra: {}
+            fallback_weight: null
+            source_id: q1
+            spec_selector:
+            - q1_source
+            - spec
+            top_k_override: null
+            weight: 1.0
+          - extra: {}
+            fallback_weight: null
+            source_id: q2
+            spec_selector:
+            - q2_source
+            - spec
+            top_k_override: null
+            weight: 1.0
+          - extra: {}
+            fallback_weight: null
+            source_id: g4
+            spec_selector:
+            - g4_source
+            - spec
+            top_k_override: null
+            weight: 1.0
+          - extra: {}
+            fallback_weight: null
+            source_id: L3
+            spec_selector:
+            - L3_source
+            - spec
+            top_k_override: null
+            weight: 1.0
+        isInLoop: true
+        loop_id: duet_loop
+        selected: false
+        title: DuetNet 聚合：选择下一个 token
+        type: parallel-ensemble
+      height: 236
+      id: token_vote
+      parentId: duet_loop
+      position:
+        x: 500
+        y: 262
+      positionAbsolute:
+        x: 1442
+        y: 352
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        code: |
+          def main(current_prompt: str, generated_text: str, selected_token: str) -> dict:
+              token = selected_token or ""
+              eos_tokens = {"<end>", "</s>", "<|endoftext|>", "<|im_end|>"}
+              normalized = token.strip()
+              is_done = normalized in eos_tokens or token == ""
+
+              if is_done:
+                  return {
+                      "next_prompt": current_prompt or "",
+                      "next_generated_text": generated_text or "",
+                      "is_done": True,
+                  }
+
+              next_generated_text = f"{generated_text or ''}{token}"
+              return {
+                  "next_prompt": f"{current_prompt or ''}{token}",
+                  "next_generated_text": next_generated_text,
+                  "is_done": False,
+              }
+        code_language: python3
+        desc: 将本轮选中的 token 追加到生成文本和下一轮共享 prompt；若命中结束 token，则设置停止标记。
+        isInLoop: true
+        loop_id: duet_loop
+        outputs:
+          is_done:
+            children: null
+            type: boolean
+          next_generated_text:
+            children: null
+            type: string
+          next_prompt:
+            children: null
+            type: string
+        selected: false
+        title: 状态更新：追加 token
+        type: code
+        variables:
+        - value_selector:
+          - duet_loop
+          - current_prompt
+          variable: current_prompt
+        - value_selector:
+          - duet_loop
+          - generated_text
+          variable: generated_text
+        - value_selector:
+          - token_vote
+          - text
+          variable: selected_token
+      height: 130
+      id: advance_state
+      parentId: duet_loop
+      position:
+        x: 820
+        y: 315
+      positionAbsolute:
+        x: 1762
+        y: 405
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: 将状态更新节点产出的 next_prompt、next_generated_text、is_done 写回 Loop 变量，并把 step 加 1。
+        isInIteration: false
+        isInLoop: true
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - advance_state
+          - next_prompt
+          variable_selector:
+          - duet_loop
+          - current_prompt
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - advance_state
+          - next_generated_text
+          variable_selector:
+          - duet_loop
+          - generated_text
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - advance_state
+          - is_done
+          variable_selector:
+          - duet_loop
+          - is_done
+          write_mode: over-write
+        - input_type: constant
+          operation: +=
+          value: 1
+          variable_selector:
+          - duet_loop
+          - step
+          write_mode: over-write
+        loop_id: duet_loop
+        selected: false
+        title: 写回循环变量
+        type: assigner
+        version: '2'
+      height: 142
+      id: update_loop_vars
+      parentId: duet_loop
+      position:
+        x: 1138
+        y: 310
+      positionAbsolute:
+        x: 2080
+        y: 400
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 1002
+    - data:
+        desc: 输出最终协作生成文本、循环步数、样本 ID 和标准答案，便于后续评测准确率。
+        outputs:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          value_type: string
+          variable: sample_id
+        - value_selector:
+          - sample_loader
+          - dataset
+          value_type: string
+          variable: dataset
+        - value_selector:
+          - prepare_sample
+          - gold_answer
+          value_type: string
+          variable: gold_answer
+        - value_selector:
+          - duet_loop
+          - generated_text
+          value_type: string
+          variable: answer
+        - value_selector:
+          - duet_loop
+          - step
+          value_type: number
+          variable: generated_tokens
+        selected: false
+        title: 结束：输出评测结果
+        type: end
+      height: 142
+      id: end_node
+      position:
+        x: 2450
+        y: 404
+      positionAbsolute:
+        x: 2450
+        y: 404
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: -98
+      y: 18
+      zoom: 0.52
