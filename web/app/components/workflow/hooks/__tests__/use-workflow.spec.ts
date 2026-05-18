@@ -1,12 +1,13 @@
 import { act, renderHook } from '@testing-library/react'
-import { createNode } from '../../__tests__/fixtures'
+import { createEdge, createNode, createStartNode } from '../../__tests__/fixtures'
 import { baseRunningData, renderWorkflowFlowHook, renderWorkflowHook } from '../../__tests__/workflow-test-env'
-import { WorkflowRunningStatus } from '../../types'
+import { BlockEnum, WorkflowRunningStatus } from '../../types'
 import {
   useIsChatMode,
   useIsNodeInIteration,
   useIsNodeInLoop,
   useNodesReadOnly,
+  useWorkflow,
   useWorkflowReadOnly,
 } from '../use-workflow'
 
@@ -47,6 +48,53 @@ describe('useIsChatMode', () => {
     mockAppMode = 'completion'
     const { result } = renderHook(() => useIsChatMode())
     expect(result.current).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// useWorkflow
+// ---------------------------------------------------------------------------
+
+describe('useWorkflow', () => {
+  it('includes data-loader nodes as upstream variable providers', () => {
+    const startNode = createStartNode({ id: 'start-node' })
+    const dataLoaderNode = createNode({
+      id: 'data-loader-node',
+      data: {
+        type: BlockEnum.DataLoader,
+        title: 'Data Loader',
+      },
+    })
+    const downstreamNode = createNode({ id: 'downstream-node' })
+    const edges = [
+      createEdge({
+        id: 'start-to-loader',
+        source: startNode.id,
+        target: dataLoaderNode.id,
+        data: {
+          sourceType: BlockEnum.Start,
+          targetType: BlockEnum.DataLoader,
+        },
+      }),
+      createEdge({
+        id: 'loader-to-downstream',
+        source: dataLoaderNode.id,
+        target: downstreamNode.id,
+        data: {
+          sourceType: BlockEnum.DataLoader,
+          targetType: BlockEnum.Code,
+        },
+      }),
+    ]
+
+    const { result } = renderWorkflowFlowHook(() => useWorkflow(), {
+      nodes: [startNode, dataLoaderNode, downstreamNode],
+      edges,
+      hooksStoreProps: {},
+    })
+
+    expect(result.current.getBeforeNodesInSameBranch(downstreamNode.id).map(node => node.id))
+      .toEqual([startNode.id, dataLoaderNode.id])
   })
 })
 
