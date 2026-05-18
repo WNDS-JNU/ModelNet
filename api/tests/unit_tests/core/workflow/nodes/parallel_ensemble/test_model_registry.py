@@ -106,6 +106,74 @@ def test_list_aliases_omits_url(tmp_path):
         assert set(info.keys()) == {"id", "backend", "model_name", "capabilities", "metadata"}
 
 
+def test_lookup_probe_metadata_returns_eos_for_matching_url(tmp_path):
+    entries = [
+        {
+            "id": "llama",
+            "backend": "llama_cpp",
+            "model_name": "meta-llama-31-8b-instruct-q80",
+            "model_url": "http://219.222.20.79:30834",
+            "EOS": "<|end_of_text|>",
+        }
+    ]
+    path = _write_yaml(tmp_path, entries)
+    registry = ModelRegistry.for_testing(str(path))
+
+    assert registry.lookup_probe_metadata(
+        "http://219.222.20.79:30834/",
+        "meta-llama-31-8b-instruct-q80",
+    ) == {"EOS": "<|end_of_text|>"}
+
+
+def test_lookup_probe_metadata_uses_unique_model_name_eos_fallback(tmp_path):
+    entries = [
+        {
+            "id": "llama-a",
+            "backend": "llama_cpp",
+            "model_name": "meta-llama-31-8b-instruct-q80",
+            "model_url": "http://219.222.20.79:30834",
+            "EOS": "<|end_of_text|>",
+        },
+        {
+            "id": "llama-b",
+            "backend": "llama_cpp",
+            "model_name": "meta-llama-31-8b-instruct-q80",
+            "model_url": "http://219.222.20.79:32685",
+            "EOS": "<|end_of_text|>",
+        },
+    ]
+    path = _write_yaml(tmp_path, entries)
+    registry = ModelRegistry.for_testing(str(path))
+
+    assert registry.lookup_probe_metadata(
+        "http://10.0.0.1:9000",
+        "meta-llama-31-8b-instruct-q80",
+    ) == {"EOS": "<|end_of_text|>"}
+
+
+def test_lookup_probe_metadata_ignores_ambiguous_model_name_eos(tmp_path):
+    entries = [
+        {
+            "id": "qwen",
+            "backend": "llama_cpp",
+            "model_name": "shared-name",
+            "model_url": "http://219.222.20.79:32246",
+            "EOS": "<|im_end|>",
+        },
+        {
+            "id": "llama",
+            "backend": "llama_cpp",
+            "model_name": "shared-name",
+            "model_url": "http://219.222.20.79:30431",
+            "EOS": "<|end_of_text|>",
+        },
+    ]
+    path = _write_yaml(tmp_path, entries)
+    registry = ModelRegistry.for_testing(str(path))
+
+    assert registry.lookup_probe_metadata("http://10.0.0.1:9000", "shared-name") == {}
+
+
 # ── Smoke 4: unknown alias raises typed error ─────────────────────────
 
 

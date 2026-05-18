@@ -148,17 +148,21 @@ class TestProbeModelInfo:
         return resp
 
     def test_happy_path_returns_first_model_id(self) -> None:
+        raw_url = "https://inference.cluster.aimodelnetwork.cn/tencent/Hunyuan-7B-Instruct-AWQ-Int4"
         upstream = self._mock_response(
             200,
             {"data": [{"id": "tencent/Hunyuan-7B-Instruct-AWQ-Int4", "object": "model"}]},
         )
+        registry = Mock()
+        registry.lookup_probe_metadata.return_value = {}
         with patch(
             "controllers.console.workflow_probe_model.ssrf_proxy.get",
             return_value=upstream,
-        ) as mocked_get:
-            result = probe_model_info(
-                "https://inference.cluster.aimodelnetwork.cn/tencent/Hunyuan-7B-Instruct-AWQ-Int4",
-            )
+        ) as mocked_get, patch(
+            "controllers.console.workflow_probe_model.ModelRegistry.instance",
+            return_value=registry,
+        ):
+            result = probe_model_info(raw_url)
 
         assert result == {"model_name": "tencent/Hunyuan-7B-Instruct-AWQ-Int4"}
         # The handler must hand the upstream-shaped probe URL to
@@ -168,6 +172,32 @@ class TestProbeModelInfo:
         assert called_url == (
             "https://inference.cluster.aimodelnetwork.cn/tencent/Hunyuan-7B-Instruct-AWQ-Int4/v1/models"
         )
+        registry.lookup_probe_metadata.assert_called_once_with(
+            raw_url,
+            "tencent/Hunyuan-7B-Instruct-AWQ-Int4",
+        )
+
+    def test_happy_path_includes_registered_eos_when_available(self) -> None:
+        raw_url = "http://219.222.20.79:30834"
+        upstream = self._mock_response(
+            200,
+            {"data": [{"id": "meta-llama-31-8b-instruct-q80", "object": "model"}]},
+        )
+        registry = Mock()
+        registry.lookup_probe_metadata.return_value = {"EOS": "<|end_of_text|>"}
+        with patch(
+            "controllers.console.workflow_probe_model.ssrf_proxy.get",
+            return_value=upstream,
+        ), patch(
+            "controllers.console.workflow_probe_model.ModelRegistry.instance",
+            return_value=registry,
+        ):
+            result = probe_model_info(raw_url)
+
+        assert result == {
+            "model_name": "meta-llama-31-8b-instruct-q80",
+            "EOS": "<|end_of_text|>",
+        }
 
     @pytest.mark.parametrize(
         "raw_url",

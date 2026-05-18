@@ -112,6 +112,11 @@ const buildModelsProbeUrl = (raw: string): string | null => {
   }
 }
 
+type ProbeModelInfoResponse = {
+  model_name: string
+  EOS?: string
+}
+
 type Props = {
   readonly: boolean
   value: InlineModelSpec
@@ -151,17 +156,22 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
       // before it left the browser. The console endpoint reissues
       // the GET through ``ssrf_proxy`` so the same egress / SSRF
       // guards apply and CORS is no longer a barrier — the OpenAI-
-      // compat response shape (``data[].id``) is parsed server-side.
+      // compat response shape (``data[].id``) is parsed server-side;
+      // if the URL / model name matches ``model_net.yaml``, the
+      // endpoint also returns the registered ``EOS`` value.
       // ``silent: true`` suppresses the global error toast so the
       // panel can show the diagnostic inline like before.
-      const resp = await post<{ model_name: string }>(
+      const resp = await post<ProbeModelInfoResponse>(
         '/workflow/probe-model-info',
         { body: { url: value.model_url ?? '' } },
         { silent: true },
       )
       if (!resp?.model_name)
         throw new Error('no model in response')
-      onChange({ model_name: resp.model_name })
+      const patch: Partial<InlineModelSpec> = { model_name: resp.model_name }
+      if (typeof resp.EOS === 'string' && resp.EOS.length > 0)
+        patch.EOS = resp.EOS
+      onChange(patch)
       setProbeOk(true)
     }
     catch (e) {

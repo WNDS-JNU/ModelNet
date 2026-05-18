@@ -8,15 +8,17 @@ Moving the probe server-side bypasses CORS entirely; the request still
 travels through ``ssrf_proxy`` so the same egress / SSRF guards apply
 as any other workflow-node-issued HTTP call.
 
-Returns only the first model id the upstream reports — the inline form
-uses that one value to fill ``model_name`` and discards the rest.
+Returns the first model id the upstream reports, plus optional
+registered-file defaults such as llama.cpp ``EOS``. The inline form uses
+those values to fill ``model_name`` / ``EOS`` while keeping registered
+URLs and credentials server-side.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 from urllib.parse import urlparse, urlunparse
 
 from flask import request
@@ -25,6 +27,7 @@ from flask_restx import Resource
 from controllers.console import console_ns
 from controllers.console.wraps import account_initialization_required, setup_required
 from core.helper import ssrf_proxy
+from core.workflow.nodes.parallel_ensemble.registry import ModelRegistry
 from libs.exception import BaseHTTPException
 from libs.login import login_required
 
@@ -52,6 +55,11 @@ class ProbeModelUpstreamError(BaseHTTPException):
     error_code = "probe_model_upstream_error"
     description = "Upstream /v1/models probe failed."
     code = 502
+
+
+class ProbeModelInfo(TypedDict):
+    model_name: str
+    EOS: NotRequired[str]
 
 
 def _build_probe_url(raw: str) -> str | None:
@@ -110,7 +118,27 @@ def _extract_first_model_id(payload: Any) -> str | None:
     return None
 
 
-def probe_model_info(raw_url: str | None) -> dict[str, str]:
+def _lookup_registered_eos(raw_url: str, model_name: str) -> str | None:
+    """Best-effort lookup of a registered EOS token for the probed model.
+
+    Registry metadata is an optional enhancement to the probe. A bad or
+    unavailable registry should not turn a successful upstream
+    ``/v1/models`` response into a failed button click, so lookup errors
+    are logged and ignored.
+    """
+    try:
+        metadata = ModelRegistry.instance().lookup_probe_metadata(raw_url, model_name)
+    except Exception as exc:
+        logger.info("probe-model registry metadata lookup failed for %s: %s", raw_url, exc)
+        return None
+
+    eos = metadata.get("EOS")
+    if isinstance(eos, str) and eos:
+        return eos
+    return None
+
+
+def probe_model_info(raw_url: str | None) -> ProbeModelInfo:
     """Run the full probe pipeline against ``raw_url``.
 
     Extracted from the Resource method so the unit-test suite can hit
@@ -119,11 +147,17 @@ def probe_model_info(raw_url: str | None) -> dict[str, str]:
     ``ProbeModelMalformedURLError`` (400) or ``ProbeModelUpstreamError``
     (502) on any failure; the Flask error handler renders the right
     status code + ``{code, message, status}`` body from there.
+
+    The response always includes ``model_name``. When ``raw_url`` and /
+    or ``model_name`` can be matched to ``model_net.yaml``, it also
+    includes the registered ``EOS`` value so the inline spec can fill the
+    termination token without exposing the registered URL list.
     """
     if not isinstance(raw_url, str) or not raw_url.strip():
         raise ProbeModelMalformedURLError(description="url is required")
 
-    probe_url = _build_probe_url(raw_url.strip())
+    normalized_raw_url = raw_url.strip()
+    probe_url = _build_probe_url(normalized_raw_url)
     if probe_url is None:
         raise ProbeModelMalformedURLError()
 
@@ -153,14 +187,19 @@ def probe_model_info(raw_url: str | None) -> dict[str, str]:
     if not model_name:
         raise ProbeModelUpstreamError(description="no model in response")
 
-    return {"model_name": model_name}
+    result = ProbeModelInfo(model_name=model_name)
+    eos = _lookup_registered_eos(normalized_raw_url, model_name)
+    if eos:
+        result["EOS"] = eos
+    return result
 
 
 @console_ns.route("/workflow/probe-model-info")
 class ProbeModelInfoApi(Resource):
     """``POST /console/api/workflow/probe-model-info``.
 
-    Body: ``{"url": "<model_url>"}``. Response: ``{"model_name": "..."}``.
+    Body: ``{"url": "<model_url>"}``.
+    Response: ``{"model_name": "...", "EOS": "..."?}``.
     """
 
     @setup_required

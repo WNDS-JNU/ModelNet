@@ -24,7 +24,8 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
+from urllib.parse import urlparse, urlunparse
 
 import yaml
 from pydantic import ValidationError
@@ -56,6 +57,46 @@ DEFAULT_REGISTRY_PATH = str(API_ROOT / "configs" / "model_net.yaml")
 # — re-exporting the name avoids a noisy import diff for callers that
 # only used the type for annotations, not field access.
 AliasInfo = BackendInfo
+
+
+class ProbeMetadata(TypedDict, total=False):
+    """Non-secret backend fields the inline model probe can reuse."""
+
+    EOS: str
+
+
+def _normalize_model_url(value: object) -> str | None:
+    """Canonicalise a registry URL for internal equality checks.
+
+    ``model_url`` is intentionally not exposed to the console API, but
+    the server-side probe may compare a user-entered URL with registered
+    specs to recover non-secret defaults such as ``EOS``. Pydantic's
+    ``AnyUrl`` string form may add a trailing slash, so matching trims
+    trailing slashes and strips query / fragment noise.
+    """
+    raw = str(value).strip()
+    if not raw:
+        return None
+    try:
+        parsed = urlparse(raw)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    path = parsed.path.rstrip("/")
+    return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, "", "", ""))
+
+
+def _unique_probe_metadata(specs: list[BaseSpec]) -> ProbeMetadata:
+    """Return metadata only when the candidate specs agree on it."""
+    eos_values = {
+        eos
+        for spec in specs
+        if isinstance((eos := getattr(spec, "EOS", None)), str) and eos
+    }
+    if len(eos_values) == 1:
+        return ProbeMetadata(EOS=next(iter(eos_values)))
+    return {}
 
 
 class ModelRegistry:
@@ -208,6 +249,47 @@ class ModelRegistry:
                 )
             )
         return out
+
+    def lookup_probe_metadata(self, raw_url: str, model_name: str | None = None) -> ProbeMetadata:
+        """Return non-secret registered defaults for a probed model URL.
+
+        The token-model-source "Fetch model info" button already sends
+        ``model_url`` to the backend so the probe can call
+        ``/v1/models`` through ``ssrf_proxy``. This method lets that same
+        server-side flow compare the URL against ``model_net.yaml`` and
+        return safe inline-spec defaults (currently llama.cpp ``EOS``)
+        without exposing registered URLs or credentials to the frontend.
+
+        If URL matching fails, the method falls back to ``model_name``
+        only when every registered row with that name agrees on the
+        metadata; otherwise it returns nothing rather than guessing.
+        """
+        normalized_url = _normalize_model_url(raw_url)
+        url_matches: list[BaseSpec] = []
+        if normalized_url is not None:
+            url_matches = [
+                spec
+                for spec in self._models.values()
+                if _normalize_model_url(getattr(spec, "model_url", None)) == normalized_url
+            ]
+
+        if model_name:
+            named_url_matches = [spec for spec in url_matches if spec.model_name == model_name]
+            metadata = _unique_probe_metadata(named_url_matches)
+            if metadata:
+                return metadata
+
+        metadata = _unique_probe_metadata(url_matches)
+        if metadata:
+            return metadata
+        if url_matches:
+            return {}
+
+        if not model_name:
+            return {}
+
+        named_matches = [spec for spec in self._models.values() if spec.model_name == model_name]
+        return _unique_probe_metadata(named_matches)
 
     def __contains__(self, alias: object) -> bool:
         return isinstance(alias, str) and alias in self._models

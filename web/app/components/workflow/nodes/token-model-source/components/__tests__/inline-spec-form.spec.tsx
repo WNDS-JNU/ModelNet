@@ -449,6 +449,27 @@ describe('token-model-source/inline-spec-form', () => {
       expect(screen.getByTestId('probe-ok')).toBeInTheDocument()
     })
 
+    it('dispatches EOS when the probe endpoint resolves it from the registry', async () => {
+      mockedPost.mockResolvedValue({
+        model_name: 'meta-llama-31-8b-instruct-q80',
+        EOS: '<|end_of_text|>',
+      })
+      const { onChange } = renderForm({
+        value: buildValue({ model_url: 'http://219.222.20.79:30834' }),
+      })
+
+      await act(async () => {
+        fireEvent.click(probeButton())
+      })
+
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith({
+          model_name: 'meta-llama-31-8b-instruct-q80',
+          EOS: '<|end_of_text|>',
+        })
+      })
+    })
+
     it('forwards a hosted-router URL verbatim (path prefix preserved on the wire)', async () => {
       // The server is responsible for appending ``/v1/models`` while
       // preserving any path prefix (e.g. ``/tencent/Hunyuan…``). The
