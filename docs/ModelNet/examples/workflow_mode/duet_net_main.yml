@@ -1,41 +1,23 @@
 app:
-  description: 'DuetNet main-method reference (Wang et al., 2025, Token-Level Collaborative
-    Reasoning for Parallel Multi-Models, 计算机学报 48(11)).
+  description: 'DuetNet main-method reference for "Token-Level Collaborative Reasoning
+    for Parallel Multi-Models" (Wang et al., 2025).
 
 
-    Reproduces Algorithm 1 (§3.3) end-to-end with the paper''s default hyperparameters
-    (τ_K=10, τ_P=0.75, T=1) and the principal 4-model setup from Table 1 (q1, q2,
-    g4, L3). Each `token-model-source` node renders the prompt for one model and emits
-    a ModelInvocationSpec (Eq. 1, logit_m = G_m(ω)); the `parallel-ensemble` node
-    drives the `token_step` runner with the `duet_net` aggregator, which executes the
-    three algorithmic steps at every decoding position:
+    This workflow recreates Algorithm 1 with the current ModelNet workflow nodes:
+    Start -> 4 x token-model-source -> parallel-ensemble(token_step + duet_net)
+    -> End.
 
 
-    Step 1 — Joint truncation (Alg. 1 lines 4-7, Eq. 2): per model, retain Top-τ_K
-    tokens whose cumulative softmax mass reaches τ_P. Controlled by `sampling_params.top_k`
-    on each source (per-model τ_K) and `aggregator_config.tau_k` / `tau_p` (jointly
-    enforced inside the aggregator).
+    The token-model-source nodes render the shared prompt omega and emit one
+    ModelInvocationSpec per model. The parallel-ensemble node drives the per-token
+    loop: joint tau_K/tau_P truncation, raw-logit aggregation over the candidate
+    union, and Top-T token selection. Defaults mirror the paper setup: tau_K=10,
+    tau_P=0.75, T=1, max_len=512.
 
 
-    Step 2 — Aggregation (Alg. 1 lines 9-10, Eqs. 3-5): take the union U of the surviving
-    candidate sets, then sum raw logits per token, X_m(u)=logit_m(u) if u∈π_m else
-    0, to obtain C_u=Σ_m X_m(u). This is logit-space (not normalised-probability)
-    so well-calibrated models dominate noisy ones (paper §3.3, §4.3.3). Selected via
-    `aggregator_name: duet_net`.
-
-
-    Step 3 — Top-T stochastic sampling (Alg. 1 lines 11-13, Eq. 6): take the T highest-C_u
-    candidates, then sample one proportional to its logit. T=1 reduces to greedy on
-    C_u (paper §4.2 recommends T=1). Controlled by `aggregator_config.top_t`.
-
-
-    The loop terminates when the chosen token is the EOS or `runner_config.max_len`
-    is reached (Alg. 1 line 15). Logical labels map to numeric model aliases {''q1'':
-    ''29'', ''q2'': ''5'', ''g4'': ''6'', ''L3'': ''2''} in api/configs/model_net.yaml;
-    every aliased backend must declare expose_raw_logits: true so the aggregator''s
-    Capability.LOGITS_RAW self-check passes. To reproduce the parameter sweeps in
-    Figs. 12-13 vary `aggregator_config.tau_k` / `tau_p` / `top_t`; to reproduce 2-
-    and 3-model rows in Tables 4-5 remove the corresponding source nodes and edges.'
+    Logical labels map to api/configs/model_net.yaml aliases: q1=29, q2=5,
+    g4=6, L3=2. These aliases must expose raw logits because duet_net checks
+    Capability.LOGITS_RAW at runtime.'
   icon: 🎵
   icon_background: '#DCE5FF'
   mode: workflow
@@ -173,7 +155,7 @@ workflow:
       zIndex: 0
     nodes:
     - data:
-        desc: Input ω in Alg. 1 — the prompt shared by all M parallel models.
+        desc: Input omega in Algorithm 1, shared by all parallel models.
         selected: false
         title: Start
         type: start
@@ -198,17 +180,19 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: 'Model m=1 (q1, Qwen2.5-3B (q8), model_alias=29). Renders ω for this
-          model and emits the ModelInvocationSpec consumed by the ensemble; logit_m=G_m(ω)
-          (Eq. 1) is computed inside the runner. sampling_params.top_k is the per-source
-          τ_K seed (Alg. 1 line 6).'
+        desc: Model m=1, q1, model_alias=29. Renders omega and emits a ModelInvocationSpec.
         extra: {}
+        inline_spec: null
         model_alias: '29'
         prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
         sampling_params:
           max_tokens: 1024
+          seed: null
+          stop: []
           temperature: 0.7
           top_k: 10
+          top_p: null
         selected: false
         title: Token Source m=1 (q1)
         type: token-model-source
@@ -226,15 +210,19 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Model m=2 (q2, Qwen2.5-7B-Instruct, model_alias=5). Same role as q1_source
-          for m=2.
+        desc: Model m=2, q2, model_alias=5. Renders omega and emits a ModelInvocationSpec.
         extra: {}
+        inline_spec: null
         model_alias: '5'
         prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
         sampling_params:
           max_tokens: 1024
+          seed: null
+          stop: []
           temperature: 0.7
           top_k: 10
+          top_p: null
         selected: false
         title: Token Source m=2 (q2)
         type: token-model-source
@@ -252,15 +240,19 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Model m=3 (g4, GLM-4-9B-Chat, model_alias=6). Same role as q1_source
-          for m=3.
+        desc: Model m=3, g4, model_alias=6. Renders omega and emits a ModelInvocationSpec.
         extra: {}
+        inline_spec: null
         model_alias: '6'
         prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
         sampling_params:
           max_tokens: 1024
+          seed: null
+          stop: []
           temperature: 0.7
           top_k: 10
+          top_p: null
         selected: false
         title: Token Source m=3 (g4)
         type: token-model-source
@@ -278,15 +270,19 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Model m=4 (L3, Meta-Llama-3.1-8B-Instruct, model_alias=2). Same role
-          as q1_source for m=4.
+        desc: Model m=4, L3, model_alias=2. Renders omega and emits a ModelInvocationSpec.
         extra: {}
+        inline_spec: null
         model_alias: '2'
         prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
         sampling_params:
           max_tokens: 1024
+          seed: null
+          stop: []
           temperature: 0.7
           top_k: 10
+          top_p: null
         selected: false
         title: Token Source m=4 (L3)
         type: token-model-source
@@ -304,11 +300,9 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: 'DuetNet aggregator (Alg. 1, §3.3). Per decoding step: (1) joint Top-τ_K
-          + Top-τ_P truncation on each model''s raw logits (Eq. 2); (2) union U of
-          surviving candidates and cumulative-logit C_u=Σ_m X_m(u) (Eqs. 3-5); (3)
-          Top-T stochastic sampling proportional to logit (Eq. 6). Paper defaults:
-          τ_K=10, τ_P=0.75, T=1 (greedy on cumulative logit).'
+        desc: DuetNet executor for Algorithm 1. Per token step, it applies joint
+          tau_K/tau_P truncation, sums raw logits on the candidate union, and
+          selects from the Top-T cumulative-logit candidates.
         ensemble:
           aggregator_config:
             seed: null
@@ -318,9 +312,13 @@ workflow:
             use_weights: false
           aggregator_name: duet_net
           diagnostics:
+            enable_trace_stream: false
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: false
             include_per_backend_errors: true
             include_response_timings: true
+            include_think_trace: false
             include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
@@ -329,25 +327,37 @@ workflow:
             max_len: 512
           runner_name: token_step
           token_sources:
-          - source_id: q1
+          - extra: {}
+            fallback_weight: null
+            source_id: q1
             spec_selector:
             - q1_source
             - spec
+            top_k_override: null
             weight: 1.0
-          - source_id: q2
+          - extra: {}
+            fallback_weight: null
+            source_id: q2
             spec_selector:
             - q2_source
             - spec
+            top_k_override: null
             weight: 1.0
-          - source_id: g4
+          - extra: {}
+            fallback_weight: null
+            source_id: g4
             spec_selector:
             - g4_source
             - spec
+            top_k_override: null
             weight: 1.0
-          - source_id: L3
+          - extra: {}
+            fallback_weight: null
+            source_id: L3
             spec_selector:
             - L3_source
             - spec
+            top_k_override: null
             weight: 1.0
         selected: false
         title: Parallel Ensemble (DuetNet)
@@ -366,9 +376,8 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Output A in Alg. 1 — the autoregressively decoded answer. `metadata`
-          carries the per-token DuetNet trace (candidate sets, cumulative logits,
-          chosen token) for verifying Eqs. 3-6 step-by-step.
+        desc: Output A in Algorithm 1. Metadata contains the DuetNet trace for
+          inspecting candidate sets, cumulative logits, and selected tokens.
         outputs:
         - value_selector:
           - ensemble
