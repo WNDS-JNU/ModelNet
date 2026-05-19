@@ -133,10 +133,10 @@ pnpm test -- --run app/components/workflow/nodes/response-aggregator app/compone
 
 ## 关键文档
 
-- [`docs/ModelNet/DEVELOPMENT_PLAN_v3.md`](./docs/ModelNet/DEVELOPMENT_PLAN_v3.md)：当前 token-source / parallel-ensemble 架构。
-- [`docs/ModelNet/BACKEND_CAPABILITIES.md`](./docs/ModelNet/BACKEND_CAPABILITIES.md)：后端能力矩阵，以及 probability / logit 语义边界。
-- [`docs/ModelNet/EXTENSIBILITY_SPEC.md`](./docs/ModelNet/EXTENSIBILITY_SPEC.md)：backend、runner、aggregator 的 SPI 边界。
-- [`docs/ModelNet/EXTENSION_GUIDE.md`](./docs/ModelNet/EXTENSION_GUIDE.md)：新增策略和后端的二次开发指南。
+- [`docs/ModelNet/history/DEVELOPMENT_PLAN_v3.md`](./docs/ModelNet/history/DEVELOPMENT_PLAN_v3.md)：当前 token-source / parallel-ensemble 架构。
+- [`docs/ModelNet/architecture/BACKEND_CAPABILITIES.md`](./docs/ModelNet/architecture/BACKEND_CAPABILITIES.md)：后端能力矩阵，以及 probability / logit 语义边界。
+- [`docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md`](./docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md)：backend、runner、aggregator 的 SPI 边界。
+- [`docs/ModelNet/architecture/EXTENSION_GUIDE.md`](./docs/ModelNet/architecture/EXTENSION_GUIDE.md)：新增策略和后端的二次开发指南。
 - [`api/configs/MODEL_NET_README.md`](./api/configs/MODEL_NET_README.md)：模型注册表契约和 SSRF 说明。
 
 ## 来源与许可证

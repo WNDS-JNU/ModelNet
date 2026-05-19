@@ -11,7 +11,7 @@ Bodies are decoded via ``json.loads(response.text)`` because the graphon
 ``HttpResponse`` deliberately exposes only ``text`` / ``content`` /
 ``raise_for_status`` — there is no ``.json()`` on that contract.
 
-Wire shape mirrors PN.py (``docs/ModelNet/PN.py``) so the existing
+Wire shape mirrors PN.py (``docs/ModelNet/research/references/PN.py``) so the existing
 research workload upgrades by swapping the orchestration layer rather
 than the request bodies. The two functions split out at module scope
 (``parse_top_probs`` / ``parse_sse_chunks``) are the ones a Phase 4

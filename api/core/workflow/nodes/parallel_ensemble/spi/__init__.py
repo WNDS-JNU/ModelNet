@@ -1,6 +1,6 @@
 """Three-axis SPI (capability / backend / runner / aggregator / trace).
 
-Frozen by P2.1.5 — see `docs/ModelNet/EXTENSIBILITY_SPEC.md` §2-7. Once
+Frozen by P2.1.5 — see `docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md` §2-7. Once
 this package's public surface lands, downstream tasks (P2.2-P2.10) treat
 it as contract: extensions go through subclassing or new registry entries,
 not breaking edits to these ABCs / TypedDicts.

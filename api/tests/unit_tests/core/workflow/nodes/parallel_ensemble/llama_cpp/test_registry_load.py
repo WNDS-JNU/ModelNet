@@ -33,7 +33,7 @@ from core.workflow.nodes.parallel_ensemble.spi.capability import Capability
 def _entry(**overrides: object) -> dict[str, object]:
     """One canonical llama_cpp yaml entry; overrides win field-by-field.
 
-    Mirrors the seven-entry shape ``docs/ModelNet/model_info.json``
+    Mirrors the seven-entry shape ``docs/ModelNet/research/references/model_info.json``
     publishes plus the new ``backend`` discriminator P2.1.5 added.
     """
     base: dict[str, object] = {

@@ -3,7 +3,7 @@ SPI swap from monolithic ``ModelSpec`` to ``BackendRegistry``-dispatched
 ``LlamaCppSpec``.
 
 Covers the 10 P2.1 inline smoke checks that landed in
-``docs/ModelNet/P2.1_LANDING.md`` §90 (now formal pytest per the P2.3
+``docs/ModelNet/history/LANDING.md`` (P2.1) §90 (now formal pytest per the P2.3
 plan), plus the new dispatch path (yaml entry's ``backend`` field drives
 the spec class lookup).
 

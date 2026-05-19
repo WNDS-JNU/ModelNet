@@ -16,7 +16,7 @@ working while callers migrate. New code should import directly from
 required no ``backend`` field; ``LlamaCppSpec`` requires
 ``backend: "llama_cpp"`` so ``ModelRegistry._load`` can dispatch by
 backend string. Existing yaml files need exactly one new line per
-entry — see ``docs/ModelNet/EXTENSIBILITY_SPEC.md`` §4.3.3.
+entry — see ``docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md`` §4.3.3.
 """
 
 from __future__ import annotations
