@@ -4,7 +4,7 @@
 Emits one AI-ModelNet hybrid router workflow-mode DSL. The router selects
 among the 6 S2P / P2S token-level fusion paths at runtime via a required
 ``path`` input. The paper-model roles are {Q=Qwen2.5-7B,
-D=Qwen3-8B thinking stand-in, Y=GLM-4-9B-Chat}. The file is written to
+D=Qwen3-8B thinking-model substitute, Y=GLM-4-9B-Chat}. The file is written to
 ``docs/ModelNet/examples/workflow_mode/paper_hybrid_router.yml``.
 Idempotent — overwrites the router file and removes stale ``paper_*.yml``
 files from older multi-file generations.
@@ -24,7 +24,7 @@ Pre-flight:
    override if your install registers a different provider.
 2. Hybrid parallel stages use ``parallel-ensemble`` + ``token-model-source`` and *do*
    read ``model_net.yaml``. Aliases ``5`` / ``22`` / ``6`` must be
-   present. Alias ``22`` is the current reachable D-role stand-in because
+   present. Alias ``22`` is the current reachable D-role substitute because
    the original DeepSeek endpoint is unavailable on this host.
 
 S2P and P2S use ``parallel-ensemble`` for their parallel stage so the
@@ -70,7 +70,7 @@ class PaperModel:
 
 
 Q = PaperModel("Q", "5", "qwen25-7b-instruct-q5km", "Qwen2.5-7B-Instruct")
-D = PaperModel("D", "22", "qwen3-8b-bf16", "Qwen3-8B-BF16 (D-role stand-in)")
+D = PaperModel("D", "22", "qwen3-8b-bf16", "Qwen3-8B-BF16（D 角色替代模型）")
 Y = PaperModel("Y", "6", "glm-4-9b-chat-q4k", "GLM-4-9B-Chat")
 
 PAPER_MODELS: list[PaperModel] = [Q, D, Y]
@@ -82,38 +82,47 @@ PAPER_MODELS: list[PaperModel] = [Q, D, Y]
 # produce a final answer; serial steps see the prior step's reply for
 # refinement; the synthesis model sees the token-level parallel answer.
 
-SYS_LEAF = (
-    "You are a careful problem-solver. Read the question, reason step "
-    "by step, and provide your final answer at the end of the reply."
-)
+SYS_LEAF = "你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。"
 SYS_REFINE = (
-    "You are a careful problem-solver. A peer model has produced a "
-    "candidate answer to the same question. Read it, decide whether to "
-    "keep or correct it, then provide your own final answer."
+    "你是严谨的问题求解助手。已有一个模型给出了候选答案。请阅读问题和候选答案，"
+    "判断是否需要保留或修正，然后给出你自己的最终答案。"
 )
 SYS_SYNTHESIZE = (
-    "You are a careful problem-solver. Read the question and the "
-    "candidate answers from peer models, then provide a unified final "
-    "answer that you have validated."
+    "你是严谨的问题求解助手。请阅读问题和 token 级并行融合得到的候选答案，"
+    "核验后给出统一的最终答案。"
 )
 
 USR_LEAF = "{{#start_node.question#}}"
 _USR_REFINE_TPL = (
-    "Question:\n{{{{#start_node.question#}}}}\n\n"
-    "A peer model proposed:\n{{{{#{prev_node}.text#}}}}\n\n"
-    "Provide your own final answer:"
+    "问题：\n{{{{#start_node.question#}}}}\n\n"
+    "上一阶段模型给出的候选答案：\n{{{{#{prev_node}.text#}}}}\n\n"
+    "请给出你自己的最终答案："
 )
 _USR_SYNTHESIZE_TPL = (
-    "Question:\n{{{{#start_node.question#}}}}\n\n"
-    "Candidate answer from the parallel token-level ensemble:\n{{{{#{aggregator}.text#}}}}\n\n"
-    "Provide your unified final answer:"
+    "问题：\n{{{{#start_node.question#}}}}\n\n"
+    "token 级并行融合得到的候选答案：\n{{{{#{aggregator}.text#}}}}\n\n"
+    "请给出核验后的统一最终答案："
 )
 
 _USR_S2P_PARALLEL_TPL = (
-    "Question:\n{{{{#start_node.question#}}}}\n\n"
-    "Stage-1 semantic draft:\n{{{{#{serial_node}.text#}}}}\n\n"
-    "Use the draft as shared context, refine it, and put the final answer at the end."
+    "问题：\n{{{{#start_node.question#}}}}\n\n"
+    "第一阶段语义草稿：\n{{{{#{serial_node}.text#}}}}\n\n"
+    "请基于该草稿继续推理或修正，并在回答末尾给出最终答案。"
 )
+
+
+PATH_LABELS = {
+    "paper_s2p_Q_DY": "S2P：Q 串行 → [D, Y] 并行",
+    "paper_s2p_D_QY": "S2P：D 串行 → [Q, Y] 并行",
+    "paper_s2p_Y_QD": "S2P：Y 串行 → [Q, D] 并行",
+    "paper_p2s_QD_Y": "P2S：[Q, D] 并行 → Y 综合",
+    "paper_p2s_QY_D": "P2S：[Q, Y] 并行 → D 综合",
+    "paper_p2s_DY_Q": "P2S：[D, Y] 并行 → Q 综合",
+}
+
+
+def _path_label(path_name: str) -> str:
+    return PATH_LABELS.get(path_name, path_name)
 
 
 def _refine_user(prev_node: str) -> str:
@@ -150,7 +159,7 @@ def _start_node(y: int = 252, *, path_options: list[str] | None = None) -> dict:
     if path_options:
         variables.append(
             {
-                "label": "path",
+                "label": "实验路径（使用下方 ID）",
                 "max_length": 128,
                 "options": path_options,
                 "required": True,
@@ -160,7 +169,7 @@ def _start_node(y: int = 252, *, path_options: list[str] | None = None) -> dict:
         )
     variables.append(
         {
-            "label": "question",
+            "label": "问题",
             "max_length": 4096,
             "options": [],
             "required": True,
@@ -172,9 +181,9 @@ def _start_node(y: int = 252, *, path_options: list[str] | None = None) -> dict:
         "id": "start_node",
         "type": "custom",
         "data": {
-            "desc": "User question routed to the paradigm topology.",
+            "desc": "选择实验路径并输入待推理问题。",
             "selected": False,
-            "title": "Start",
+            "title": "开始",
             "type": "start",
             "variables": variables,
         },
@@ -194,8 +203,8 @@ def _end_node(
     y: int = 252,
     *,
     node_id: str = "end_node",
-    title: str = "End",
-    desc: str = "Emit the paradigm's final answer.",
+    title: str = "结束",
+    desc: str = "输出该路径的最终答案。",
 ) -> dict:
     return {
         "id": node_id,
@@ -292,8 +301,8 @@ def _token_source_node(
         "data": {
             "desc": (
                 desc
-                or f"Renders the prompt for {model.title}, "
-                f"alias {model.model_alias}; emits a ModelInvocationSpec."
+                or f"为 {model.title} 渲染提示词，使用 alias {model.model_alias}，"
+                "并输出 ModelInvocationSpec。"
             ),
             "extra": {},
             "model_alias": model.model_alias,
@@ -304,7 +313,7 @@ def _token_source_node(
                 "top_k": 10,
             },
             "selected": False,
-            "title": title or f"Token Source ({model.letter})",
+            "title": title or f"Token Source（{model.letter}）",
             "type": "token-model-source",
         },
         "height": 130,
@@ -323,7 +332,7 @@ def _ensemble_node(
     y: int = 252,
     *,
     node_id: str = "ensemble",
-    title: str = "Parallel Ensemble (PI)",
+    title: str = "并行融合",
     desc: str | None = None,
     token_node_ids: list[str] | None = None,
 ) -> dict:
@@ -334,9 +343,8 @@ def _ensemble_node(
         "data": {
             "desc": (
                 desc
-                or "Token-level parallel ensemble — sum_score aggregator "
-                "(probability-sum vote across the union of top-k "
-                "candidates from each backend per decode step)."
+                or "token 级并行融合，使用 sum_score 聚合器；每个解码步在各后端 "
+                "top-k 候选 token 的并集上做概率求和投票。"
             ),
             "ensemble": {
                 "aggregator_config": {"seed": None, "tau_p": 1.0, "use_weights": False},
@@ -661,8 +669,8 @@ def _route_node(path_names: list[str], *, x: int = 334, y: int = 1180) -> dict:
         "id": "route_path",
         "type": "custom",
         "data": {
-            "desc": "Route one unified hybrid workflow to the requested S2P/P2S path.",
-            "_targetBranches": [{"id": name, "name": name} for name in path_names],
+            "desc": "根据 path 输入选择一个 S2P/P2S 混合推理分支。",
+            "_targetBranches": [{"id": name, "name": _path_label(name)} for name in path_names],
             "cases": [
                 {
                     "case_id": name,
@@ -682,7 +690,7 @@ def _route_node(path_names: list[str], *, x: int = 334, y: int = 1180) -> dict:
             "isInIteration": False,
             "isInLoop": False,
             "selected": False,
-            "title": "Route: hybrid path",
+            "title": "路由：实验路径",
             "type": "if-else",
         },
         "height": 250,
@@ -706,11 +714,12 @@ def _add_s2p_router_branch(
     edges: list[dict],
 ) -> None:
     serial_id = f"{path_name}__llm_{serial.letter}_serial"
+    path_label = _path_label(path_name)
     nodes.append(
         _llm_node(
             node_id=serial_id,
-            title=f"{path_name}: {serial.letter} serial",
-            desc=f"{path_name} stage 1 — {serial.description}.",
+            title=f"{path_label}：{serial.letter} 串行草稿",
+            desc=f"{path_label} 第一阶段：由 {serial.description} 生成语义草稿。",
             model_name=serial.model_name,
             provider=provider,
             system=SYS_LEAF,
@@ -738,10 +747,10 @@ def _add_s2p_router_branch(
                 x=942,
                 y=base_y + i * 152,
                 node_id=node_id,
-                title=f"{path_name}: token source {m.letter}",
+                title=f"{path_label}：{m.letter} 并行源",
                 desc=(
-                    f"{path_name} parallel source — {m.description} receives the "
-                    "stage-1 semantic draft and participates in token-level fusion."
+                    f"{path_label} 并行源：{m.description} 接收第一阶段语义草稿，"
+                    "参与 token 级融合。"
                 ),
                 prompt_template=_s2p_parallel_prompt(serial_id),
             )
@@ -756,8 +765,8 @@ def _add_s2p_router_branch(
             x=1246,
             y=base_y + 76,
             node_id=aggregator_id,
-            title=f"{path_name}: parallel ensemble",
-            desc=f"{path_name} token-level S2P parallel ensemble.",
+            title=f"{path_label}：token 级并行融合",
+            desc=f"{path_label} 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。",
             token_node_ids=token_ids,
         )
     )
@@ -778,8 +787,8 @@ def _add_s2p_router_branch(
             x=1550,
             y=base_y + 76,
             node_id=end_id,
-            title=f"End: {path_name}",
-            desc=f"Emit answer for {path_name}.",
+            title=f"结束：{path_label}",
+            desc=f"输出 {path_label} 的最终答案。",
         )
     )
     edges.append(_edge(src=aggregator_id, dst=end_id, src_type="parallel-ensemble", dst_type="end"))
@@ -796,6 +805,7 @@ def _add_p2s_router_branch(
     edges: list[dict],
 ) -> None:
     token_ids: list[str] = []
+    path_label = _path_label(path_name)
     for i, m in enumerate(parallel):
         node_id = f"{path_name}__token_{m.letter}_par"
         nodes.append(
@@ -804,8 +814,8 @@ def _add_p2s_router_branch(
                 x=638,
                 y=base_y + i * 152,
                 node_id=node_id,
-                title=f"{path_name}: token source {m.letter}",
-                desc=f"{path_name} parallel source — {m.description} participates in token-level fusion.",
+                title=f"{path_label}：{m.letter} 并行源",
+                desc=f"{path_label} 并行源：{m.description} 参与 token 级融合。",
                 prompt_template=USR_LEAF,
             )
         )
@@ -827,8 +837,8 @@ def _add_p2s_router_branch(
             x=942,
             y=base_y + 76,
             node_id=aggregator_id,
-            title=f"{path_name}: parallel ensemble",
-            desc=f"{path_name} token-level P2S parallel ensemble.",
+            title=f"{path_label}：token 级并行融合",
+            desc=f"{path_label} 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。",
             token_node_ids=token_ids,
         )
     )
@@ -846,8 +856,8 @@ def _add_p2s_router_branch(
     nodes.append(
         _llm_node(
             node_id=serial_id,
-            title=f"{path_name}: {serial.letter} synthesizer",
-            desc=f"{path_name} serial synthesizer — {serial.description}.",
+            title=f"{path_label}：{serial.letter} 串行综合",
+            desc=f"{path_label} 第二阶段：由 {serial.description} 综合融合后的中间答案。",
             model_name=serial.model_name,
             provider=provider,
             system=SYS_SYNTHESIZE,
@@ -865,8 +875,8 @@ def _add_p2s_router_branch(
             x=1550,
             y=base_y + 76,
             node_id=end_id,
-            title=f"End: {path_name}",
-            desc=f"Emit answer for {path_name}.",
+            title=f"结束：{path_label}",
+            desc=f"输出 {path_label} 的最终答案。",
         )
     )
     edges.append(_edge(src=serial_id, dst=end_id, src_type="llm", dst_type="end"))
@@ -907,11 +917,10 @@ def build_hybrid_router(provider: str) -> dict:
             )
 
     return _wrap(
-        name="paper_hybrid_router (workflow)",
+        name="AI-ModelNet 混合路径总入口 (workflow)",
         desc=(
-            "Unified AI-ModelNet hybrid workflow. The required `path` input selects "
-            "one of the six S2P/P2S token-level fusion paths, while `question` is "
-            "routed into that branch."
+            "AI-ModelNet 混合推理总入口。必填输入 `path` 选择六条 S2P/P2S "
+            "token 级融合路径之一，`question` 会被路由到对应分支。"
         ),
         nodes=nodes,
         edges=edges,
@@ -1006,6 +1015,15 @@ def main() -> int:
         )
         return 1
 
+    class _DslDumper(yaml.SafeDumper):
+        pass
+
+    def _str_representer(dumper: yaml.SafeDumper, value: str):
+        style = "|" if "\n" in value else None
+        return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+    _DslDumper.add_representer(str, _str_representer)
+
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
@@ -1023,12 +1041,13 @@ def main() -> int:
     for name, dsl in paths:
         path = out_dir / f"{name}.yml"
         with path.open("w", encoding="utf-8") as fh:
-            yaml.safe_dump(
+            yaml.dump(
                 dsl,
                 fh,
+                Dumper=_DslDumper,
                 allow_unicode=True,
-                sort_keys=True,
-                width=80,
+                sort_keys=False,
+                width=100,
                 default_flow_style=False,
             )
         try:

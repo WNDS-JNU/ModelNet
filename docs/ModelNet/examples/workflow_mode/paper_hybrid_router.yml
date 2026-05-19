@@ -1,11 +1,9 @@
 app:
-  description: Unified AI-ModelNet hybrid workflow. The required `path` input selects
-    one of the six S2P/P2S token-level fusion paths, while `question` is routed into
-    that branch.
+  description: AI-ModelNet 混合推理总入口。必填输入 `path` 选择六条 S2P/P2S token 级融合路径之一，`question` 会被路由到对应分支。
   icon: 🎼
   icon_background: '#DCE5FF'
   mode: workflow
-  name: paper_hybrid_router (workflow)
+  name: AI-ModelNet 混合路径总入口 (workflow)
   use_icon_as_answer_icon: false
 kind: app
 version: 0.3.1
@@ -29,458 +27,460 @@ workflow:
       enabled: false
   graph:
     edges:
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: start
-        targetType: if-else
-      id: start_node-source-to-route_path
+    - id: start_node-source-to-route_path
       source: start_node
       sourceHandle: source
       target: route_path
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
-        targetType: llm
-      id: route_path-paper_s2p_Q_DY-to-paper_s2p_Q_DY__llm_Q_serial
+        sourceType: start
+        targetType: if-else
+    - id: route_path-paper_s2p_Q_DY-to-paper_s2p_Q_DY__llm_Q_serial
       source: route_path
       sourceHandle: paper_s2p_Q_DY
       target: paper_s2p_Q_DY__llm_Q_serial
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
-        targetType: token-model-source
-      id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_D_par
+        sourceType: if-else
+        targetType: llm
+    - id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_D_par
       source: paper_s2p_Q_DY__llm_Q_serial
       sourceHandle: source
       target: paper_s2p_Q_DY__token_D_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
-      id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_Y_par
+    - id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_Y_par
       source: paper_s2p_Q_DY__llm_Q_serial
       sourceHandle: source
       target: paper_s2p_Q_DY__token_Y_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: paper_s2p_Q_DY__token_D_par-source-to-paper_s2p_Q_DY__aggregator
+        sourceType: llm
+        targetType: token-model-source
+    - id: paper_s2p_Q_DY__token_D_par-source-to-paper_s2p_Q_DY__aggregator
       source: paper_s2p_Q_DY__token_D_par
       sourceHandle: source
       target: paper_s2p_Q_DY__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-      id: paper_s2p_Q_DY__token_Y_par-source-to-paper_s2p_Q_DY__aggregator
+    - id: paper_s2p_Q_DY__token_Y_par-source-to-paper_s2p_Q_DY__aggregator
       source: paper_s2p_Q_DY__token_Y_par
       sourceHandle: source
       target: paper_s2p_Q_DY__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: end
-      id: paper_s2p_Q_DY__aggregator-source-to-paper_s2p_Q_DY__end
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+    - id: paper_s2p_Q_DY__aggregator-source-to-paper_s2p_Q_DY__end
       source: paper_s2p_Q_DY__aggregator
       sourceHandle: source
       target: paper_s2p_Q_DY__end
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
-        targetType: llm
-      id: route_path-paper_s2p_D_QY-to-paper_s2p_D_QY__llm_D_serial
+        sourceType: parallel-ensemble
+        targetType: end
+    - id: route_path-paper_s2p_D_QY-to-paper_s2p_D_QY__llm_D_serial
       source: route_path
       sourceHandle: paper_s2p_D_QY
       target: paper_s2p_D_QY__llm_D_serial
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
-        targetType: token-model-source
-      id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Q_par
+        sourceType: if-else
+        targetType: llm
+    - id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Q_par
       source: paper_s2p_D_QY__llm_D_serial
       sourceHandle: source
       target: paper_s2p_D_QY__token_Q_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
-      id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Y_par
+    - id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Y_par
       source: paper_s2p_D_QY__llm_D_serial
       sourceHandle: source
       target: paper_s2p_D_QY__token_Y_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: paper_s2p_D_QY__token_Q_par-source-to-paper_s2p_D_QY__aggregator
+        sourceType: llm
+        targetType: token-model-source
+    - id: paper_s2p_D_QY__token_Q_par-source-to-paper_s2p_D_QY__aggregator
       source: paper_s2p_D_QY__token_Q_par
       sourceHandle: source
       target: paper_s2p_D_QY__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-      id: paper_s2p_D_QY__token_Y_par-source-to-paper_s2p_D_QY__aggregator
+    - id: paper_s2p_D_QY__token_Y_par-source-to-paper_s2p_D_QY__aggregator
       source: paper_s2p_D_QY__token_Y_par
       sourceHandle: source
       target: paper_s2p_D_QY__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: end
-      id: paper_s2p_D_QY__aggregator-source-to-paper_s2p_D_QY__end
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+    - id: paper_s2p_D_QY__aggregator-source-to-paper_s2p_D_QY__end
       source: paper_s2p_D_QY__aggregator
       sourceHandle: source
       target: paper_s2p_D_QY__end
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
-        targetType: llm
-      id: route_path-paper_s2p_Y_QD-to-paper_s2p_Y_QD__llm_Y_serial
+        sourceType: parallel-ensemble
+        targetType: end
+    - id: route_path-paper_s2p_Y_QD-to-paper_s2p_Y_QD__llm_Y_serial
       source: route_path
       sourceHandle: paper_s2p_Y_QD
       target: paper_s2p_Y_QD__llm_Y_serial
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
-        targetType: token-model-source
-      id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_Q_par
+        sourceType: if-else
+        targetType: llm
+    - id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_Q_par
       source: paper_s2p_Y_QD__llm_Y_serial
       sourceHandle: source
       target: paper_s2p_Y_QD__token_Q_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
-      id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_D_par
+    - id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_D_par
       source: paper_s2p_Y_QD__llm_Y_serial
       sourceHandle: source
       target: paper_s2p_Y_QD__token_D_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: paper_s2p_Y_QD__token_Q_par-source-to-paper_s2p_Y_QD__aggregator
+        sourceType: llm
+        targetType: token-model-source
+    - id: paper_s2p_Y_QD__token_Q_par-source-to-paper_s2p_Y_QD__aggregator
       source: paper_s2p_Y_QD__token_Q_par
       sourceHandle: source
       target: paper_s2p_Y_QD__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-      id: paper_s2p_Y_QD__token_D_par-source-to-paper_s2p_Y_QD__aggregator
+    - id: paper_s2p_Y_QD__token_D_par-source-to-paper_s2p_Y_QD__aggregator
       source: paper_s2p_Y_QD__token_D_par
       sourceHandle: source
       target: paper_s2p_Y_QD__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: end
-      id: paper_s2p_Y_QD__aggregator-source-to-paper_s2p_Y_QD__end
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+    - id: paper_s2p_Y_QD__aggregator-source-to-paper_s2p_Y_QD__end
       source: paper_s2p_Y_QD__aggregator
       sourceHandle: source
       target: paper_s2p_Y_QD__end
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
-        targetType: token-model-source
-      id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_Q_par
+        sourceType: parallel-ensemble
+        targetType: end
+    - id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_Q_par
       source: route_path
       sourceHandle: paper_p2s_QD_Y
       target: paper_p2s_QD_Y__token_Q_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
-      id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_D_par
+    - id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_D_par
       source: route_path
       sourceHandle: paper_p2s_QD_Y
       target: paper_p2s_QD_Y__token_D_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: paper_p2s_QD_Y__token_Q_par-source-to-paper_p2s_QD_Y__aggregator
+        sourceType: if-else
+        targetType: token-model-source
+    - id: paper_p2s_QD_Y__token_Q_par-source-to-paper_p2s_QD_Y__aggregator
       source: paper_p2s_QD_Y__token_Q_par
       sourceHandle: source
       target: paper_p2s_QD_Y__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-      id: paper_p2s_QD_Y__token_D_par-source-to-paper_p2s_QD_Y__aggregator
+    - id: paper_p2s_QD_Y__token_D_par-source-to-paper_p2s_QD_Y__aggregator
       source: paper_p2s_QD_Y__token_D_par
       sourceHandle: source
       target: paper_p2s_QD_Y__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: llm
-      id: paper_p2s_QD_Y__aggregator-source-to-paper_p2s_QD_Y__llm_Y_serial
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+    - id: paper_p2s_QD_Y__aggregator-source-to-paper_p2s_QD_Y__llm_Y_serial
       source: paper_p2s_QD_Y__aggregator
       sourceHandle: source
       target: paper_p2s_QD_Y__llm_Y_serial
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
-        targetType: end
-      id: paper_p2s_QD_Y__llm_Y_serial-source-to-paper_p2s_QD_Y__end
+        sourceType: parallel-ensemble
+        targetType: llm
+    - id: paper_p2s_QD_Y__llm_Y_serial-source-to-paper_p2s_QD_Y__end
       source: paper_p2s_QD_Y__llm_Y_serial
       sourceHandle: source
       target: paper_p2s_QD_Y__end
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
-        targetType: token-model-source
-      id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Q_par
+        sourceType: llm
+        targetType: end
+    - id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Q_par
       source: route_path
       sourceHandle: paper_p2s_QY_D
       target: paper_p2s_QY_D__token_Q_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
-      id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Y_par
+    - id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Y_par
       source: route_path
       sourceHandle: paper_p2s_QY_D
       target: paper_p2s_QY_D__token_Y_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: paper_p2s_QY_D__token_Q_par-source-to-paper_p2s_QY_D__aggregator
+        sourceType: if-else
+        targetType: token-model-source
+    - id: paper_p2s_QY_D__token_Q_par-source-to-paper_p2s_QY_D__aggregator
       source: paper_p2s_QY_D__token_Q_par
       sourceHandle: source
       target: paper_p2s_QY_D__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-      id: paper_p2s_QY_D__token_Y_par-source-to-paper_p2s_QY_D__aggregator
+    - id: paper_p2s_QY_D__token_Y_par-source-to-paper_p2s_QY_D__aggregator
       source: paper_p2s_QY_D__token_Y_par
       sourceHandle: source
       target: paper_p2s_QY_D__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: llm
-      id: paper_p2s_QY_D__aggregator-source-to-paper_p2s_QY_D__llm_D_serial
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+    - id: paper_p2s_QY_D__aggregator-source-to-paper_p2s_QY_D__llm_D_serial
       source: paper_p2s_QY_D__aggregator
       sourceHandle: source
       target: paper_p2s_QY_D__llm_D_serial
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
-        targetType: end
-      id: paper_p2s_QY_D__llm_D_serial-source-to-paper_p2s_QY_D__end
+        sourceType: parallel-ensemble
+        targetType: llm
+    - id: paper_p2s_QY_D__llm_D_serial-source-to-paper_p2s_QY_D__end
       source: paper_p2s_QY_D__llm_D_serial
       sourceHandle: source
       target: paper_p2s_QY_D__end
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
-        targetType: token-model-source
-      id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_D_par
+        sourceType: llm
+        targetType: end
+    - id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_D_par
       source: route_path
       sourceHandle: paper_p2s_DY_Q
       target: paper_p2s_DY_Q__token_D_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
-      id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_Y_par
+    - id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_Y_par
       source: route_path
       sourceHandle: paper_p2s_DY_Q
       target: paper_p2s_DY_Q__token_Y_par
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: paper_p2s_DY_Q__token_D_par-source-to-paper_p2s_DY_Q__aggregator
+        sourceType: if-else
+        targetType: token-model-source
+    - id: paper_p2s_DY_Q__token_D_par-source-to-paper_p2s_DY_Q__aggregator
       source: paper_p2s_DY_Q__token_D_par
       sourceHandle: source
       target: paper_p2s_DY_Q__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-      id: paper_p2s_DY_Q__token_Y_par-source-to-paper_p2s_DY_Q__aggregator
+    - id: paper_p2s_DY_Q__token_Y_par-source-to-paper_p2s_DY_Q__aggregator
       source: paper_p2s_DY_Q__token_Y_par
       sourceHandle: source
       target: paper_p2s_DY_Q__aggregator
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: llm
-      id: paper_p2s_DY_Q__aggregator-source-to-paper_p2s_DY_Q__llm_Q_serial
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+    - id: paper_p2s_DY_Q__aggregator-source-to-paper_p2s_DY_Q__llm_Q_serial
       source: paper_p2s_DY_Q__aggregator
       sourceHandle: source
       target: paper_p2s_DY_Q__llm_Q_serial
       targetHandle: target
       type: custom
       zIndex: 0
-    - data:
+      data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
-        targetType: end
-      id: paper_p2s_DY_Q__llm_Q_serial-source-to-paper_p2s_DY_Q__end
+        sourceType: parallel-ensemble
+        targetType: llm
+    - id: paper_p2s_DY_Q__llm_Q_serial-source-to-paper_p2s_DY_Q__end
       source: paper_p2s_DY_Q__llm_Q_serial
       sourceHandle: source
       target: paper_p2s_DY_Q__end
       targetHandle: target
       type: custom
       zIndex: 0
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
     nodes:
-    - data:
-        desc: User question routed to the paradigm topology.
+    - id: start_node
+      type: custom
+      data:
+        desc: 选择实验路径并输入待推理问题。
         selected: false
-        title: Start
+        title: 开始
         type: start
         variables:
-        - label: path
+        - label: 实验路径（使用下方 ID）
           max_length: 128
           options:
           - paper_s2p_Q_DY
@@ -492,14 +492,13 @@ workflow:
           required: true
           type: select
           variable: path
-        - label: question
+        - label: 问题
           max_length: 4096
           options: []
           required: true
           type: paragraph
           variable: question
       height: 112
-      id: start_node
       position:
         x: 30
         y: 1180
@@ -509,91 +508,91 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: route_path
+      type: custom
+      data:
+        desc: 根据 path 输入选择一个 S2P/P2S 混合推理分支。
         _targetBranches:
         - id: paper_s2p_Q_DY
-          name: paper_s2p_Q_DY
+          name: S2P：Q 串行 → [D, Y] 并行
         - id: paper_s2p_D_QY
-          name: paper_s2p_D_QY
+          name: S2P：D 串行 → [Q, Y] 并行
         - id: paper_s2p_Y_QD
-          name: paper_s2p_Y_QD
+          name: S2P：Y 串行 → [Q, D] 并行
         - id: paper_p2s_QD_Y
-          name: paper_p2s_QD_Y
+          name: P2S：[Q, D] 并行 → Y 综合
         - id: paper_p2s_QY_D
-          name: paper_p2s_QY_D
+          name: P2S：[Q, Y] 并行 → D 综合
         - id: paper_p2s_DY_Q
-          name: paper_p2s_DY_Q
+          name: P2S：[D, Y] 并行 → Q 综合
         cases:
         - case_id: paper_s2p_Q_DY
+          logical_operator: and
           conditions:
-          - comparison_operator: is
-            id: cond_paper_s2p_Q_DY
+          - id: cond_paper_s2p_Q_DY
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+            comparison_operator: is
             value: paper_s2p_Q_DY
-            varType: string
-            variable_selector:
-            - start_node
-            - path
-          logical_operator: and
         - case_id: paper_s2p_D_QY
+          logical_operator: and
           conditions:
-          - comparison_operator: is
-            id: cond_paper_s2p_D_QY
+          - id: cond_paper_s2p_D_QY
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+            comparison_operator: is
             value: paper_s2p_D_QY
-            varType: string
-            variable_selector:
-            - start_node
-            - path
-          logical_operator: and
         - case_id: paper_s2p_Y_QD
+          logical_operator: and
           conditions:
-          - comparison_operator: is
-            id: cond_paper_s2p_Y_QD
+          - id: cond_paper_s2p_Y_QD
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+            comparison_operator: is
             value: paper_s2p_Y_QD
-            varType: string
-            variable_selector:
-            - start_node
-            - path
-          logical_operator: and
         - case_id: paper_p2s_QD_Y
+          logical_operator: and
           conditions:
-          - comparison_operator: is
-            id: cond_paper_p2s_QD_Y
+          - id: cond_paper_p2s_QD_Y
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+            comparison_operator: is
             value: paper_p2s_QD_Y
-            varType: string
-            variable_selector:
-            - start_node
-            - path
-          logical_operator: and
         - case_id: paper_p2s_QY_D
+          logical_operator: and
           conditions:
-          - comparison_operator: is
-            id: cond_paper_p2s_QY_D
+          - id: cond_paper_p2s_QY_D
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+            comparison_operator: is
             value: paper_p2s_QY_D
-            varType: string
-            variable_selector:
-            - start_node
-            - path
-          logical_operator: and
         - case_id: paper_p2s_DY_Q
+          logical_operator: and
           conditions:
-          - comparison_operator: is
-            id: cond_paper_p2s_DY_Q
-            value: paper_p2s_DY_Q
+          - id: cond_paper_p2s_DY_Q
             varType: string
             variable_selector:
             - start_node
             - path
-          logical_operator: and
-        desc: Route one unified hybrid workflow to the requested S2P/P2S path.
+            comparison_operator: is
+            value: paper_p2s_DY_Q
         isInIteration: false
         isInLoop: false
         selected: false
-        title: 'Route: hybrid path'
+        title: 路由：实验路径
         type: if-else
       height: 250
-      id: route_path
       position:
         x: 334
         y: 1180
@@ -603,13 +602,14 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: paper_s2p_Q_DY__llm_Q_serial
+      type: custom
+      data:
         context:
           enabled: false
           variable_selector: []
-        desc: paper_s2p_Q_DY stage 1 — Qwen2.5-7B-Instruct.
+        desc: S2P：Q 串行 → [D, Y] 并行 第一阶段：由 Qwen2.5-7B-Instruct 生成语义草稿。
         memory:
           query_prompt_template: '{{#sys.query#}}'
           role_prefix:
@@ -628,19 +628,17 @@ workflow:
         prompt_template:
         - id: ea49def7-e102-5f4a-8e43-24c9e705d179
           role: system
-          text: You are a careful problem-solver. Read the question, reason step by
-            step, and provide your final answer at the end of the reply.
+          text: 你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。
         - id: fb68696e-42a1-52d7-aba9-6b54b5ea9b63
           role: user
           text: '{{#start_node.question#}}'
         selected: false
-        title: 'paper_s2p_Q_DY: Q serial'
+        title: S2P：Q 串行 → [D, Y] 并行：Q 串行草稿
         type: llm
         variables: []
         vision:
           enabled: false
       height: 90
-      id: paper_s2p_Q_DY__llm_Q_serial
       position:
         x: 638
         y: 156
@@ -650,34 +648,29 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_Q_DY parallel source — Qwen3-8B-BF16 (D-role stand-in) receives
-          the stage-1 semantic draft and participates in token-level fusion.
+    - id: paper_s2p_Q_DY__token_D_par
+      type: custom
+      data:
+        desc: S2P：Q 串行 → [D, Y] 并行 并行源：Qwen3-8B-BF16（D 角色替代模型） 接收第一阶段语义草稿，参与 token 级融合。
         extra: {}
         model_alias: '22'
-        prompt_template: 'Question:
-
+        prompt_template: |-
+          问题：
           {{#start_node.question#}}
 
-
-          Stage-1 semantic draft:
-
+          第一阶段语义草稿：
           {{#paper_s2p_Q_DY__llm_Q_serial.text#}}
 
-
-          Use the draft as shared context, refine it, and put the final answer at
-          the end.'
+          请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_s2p_Q_DY: token source D'
+        title: S2P：Q 串行 → [D, Y] 并行：D 并行源
         type: token-model-source
       height: 130
-      id: paper_s2p_Q_DY__token_D_par
       position:
         x: 942
         y: 80
@@ -687,34 +680,29 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_Q_DY parallel source — GLM-4-9B-Chat receives the stage-1
-          semantic draft and participates in token-level fusion.
+    - id: paper_s2p_Q_DY__token_Y_par
+      type: custom
+      data:
+        desc: S2P：Q 串行 → [D, Y] 并行 并行源：GLM-4-9B-Chat 接收第一阶段语义草稿，参与 token 级融合。
         extra: {}
         model_alias: '6'
-        prompt_template: 'Question:
-
+        prompt_template: |-
+          问题：
           {{#start_node.question#}}
 
-
-          Stage-1 semantic draft:
-
+          第一阶段语义草稿：
           {{#paper_s2p_Q_DY__llm_Q_serial.text#}}
 
-
-          Use the draft as shared context, refine it, and put the final answer at
-          the end.'
+          请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_s2p_Q_DY: token source Y'
+        title: S2P：Q 串行 → [D, Y] 并行：Y 并行源
         type: token-model-source
       height: 130
-      id: paper_s2p_Q_DY__token_Y_par
       position:
         x: 942
         y: 232
@@ -724,10 +712,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_Q_DY token-level S2P parallel ensemble.
+    - id: paper_s2p_Q_DY__aggregator
+      type: custom
+      data:
+        desc: S2P：Q 串行 → [D, Y] 并行 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
             seed: null
@@ -757,10 +746,9 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: 'paper_s2p_Q_DY: parallel ensemble'
+        title: S2P：Q 串行 → [D, Y] 并行：token 级并行融合
         type: parallel-ensemble
       height: 200
-      id: paper_s2p_Q_DY__aggregator
       position:
         x: 1246
         y: 156
@@ -770,10 +758,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: Emit answer for paper_s2p_Q_DY.
+    - id: paper_s2p_Q_DY__end
+      type: custom
+      data:
+        desc: 输出 S2P：Q 串行 → [D, Y] 并行 的最终答案。
         outputs:
         - value_selector:
           - paper_s2p_Q_DY__aggregator
@@ -781,10 +770,9 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: 'End: paper_s2p_Q_DY'
+        title: 结束：S2P：Q 串行 → [D, Y] 并行
         type: end
       height: 90
-      id: paper_s2p_Q_DY__end
       position:
         x: 1550
         y: 156
@@ -794,13 +782,14 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: paper_s2p_D_QY__llm_D_serial
+      type: custom
+      data:
         context:
           enabled: false
           variable_selector: []
-        desc: paper_s2p_D_QY stage 1 — Qwen3-8B-BF16 (D-role stand-in).
+        desc: S2P：D 串行 → [Q, Y] 并行 第一阶段：由 Qwen3-8B-BF16（D 角色替代模型） 生成语义草稿。
         memory:
           query_prompt_template: '{{#sys.query#}}'
           role_prefix:
@@ -819,19 +808,17 @@ workflow:
         prompt_template:
         - id: 3fba5bed-fda3-52e6-afcf-3cd051421cff
           role: system
-          text: You are a careful problem-solver. Read the question, reason step by
-            step, and provide your final answer at the end of the reply.
+          text: 你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。
         - id: 80e956a0-a62c-5115-a9c2-82db082e2127
           role: user
           text: '{{#start_node.question#}}'
         selected: false
-        title: 'paper_s2p_D_QY: D serial'
+        title: S2P：D 串行 → [Q, Y] 并行：D 串行草稿
         type: llm
         variables: []
         vision:
           enabled: false
       height: 90
-      id: paper_s2p_D_QY__llm_D_serial
       position:
         x: 638
         y: 516
@@ -841,34 +828,29 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_D_QY parallel source — Qwen2.5-7B-Instruct receives the stage-1
-          semantic draft and participates in token-level fusion.
+    - id: paper_s2p_D_QY__token_Q_par
+      type: custom
+      data:
+        desc: S2P：D 串行 → [Q, Y] 并行 并行源：Qwen2.5-7B-Instruct 接收第一阶段语义草稿，参与 token 级融合。
         extra: {}
         model_alias: '5'
-        prompt_template: 'Question:
-
+        prompt_template: |-
+          问题：
           {{#start_node.question#}}
 
-
-          Stage-1 semantic draft:
-
+          第一阶段语义草稿：
           {{#paper_s2p_D_QY__llm_D_serial.text#}}
 
-
-          Use the draft as shared context, refine it, and put the final answer at
-          the end.'
+          请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_s2p_D_QY: token source Q'
+        title: S2P：D 串行 → [Q, Y] 并行：Q 并行源
         type: token-model-source
       height: 130
-      id: paper_s2p_D_QY__token_Q_par
       position:
         x: 942
         y: 440
@@ -878,34 +860,29 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_D_QY parallel source — GLM-4-9B-Chat receives the stage-1
-          semantic draft and participates in token-level fusion.
+    - id: paper_s2p_D_QY__token_Y_par
+      type: custom
+      data:
+        desc: S2P：D 串行 → [Q, Y] 并行 并行源：GLM-4-9B-Chat 接收第一阶段语义草稿，参与 token 级融合。
         extra: {}
         model_alias: '6'
-        prompt_template: 'Question:
-
+        prompt_template: |-
+          问题：
           {{#start_node.question#}}
 
-
-          Stage-1 semantic draft:
-
+          第一阶段语义草稿：
           {{#paper_s2p_D_QY__llm_D_serial.text#}}
 
-
-          Use the draft as shared context, refine it, and put the final answer at
-          the end.'
+          请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_s2p_D_QY: token source Y'
+        title: S2P：D 串行 → [Q, Y] 并行：Y 并行源
         type: token-model-source
       height: 130
-      id: paper_s2p_D_QY__token_Y_par
       position:
         x: 942
         y: 592
@@ -915,10 +892,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_D_QY token-level S2P parallel ensemble.
+    - id: paper_s2p_D_QY__aggregator
+      type: custom
+      data:
+        desc: S2P：D 串行 → [Q, Y] 并行 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
             seed: null
@@ -948,10 +926,9 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: 'paper_s2p_D_QY: parallel ensemble'
+        title: S2P：D 串行 → [Q, Y] 并行：token 级并行融合
         type: parallel-ensemble
       height: 200
-      id: paper_s2p_D_QY__aggregator
       position:
         x: 1246
         y: 516
@@ -961,10 +938,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: Emit answer for paper_s2p_D_QY.
+    - id: paper_s2p_D_QY__end
+      type: custom
+      data:
+        desc: 输出 S2P：D 串行 → [Q, Y] 并行 的最终答案。
         outputs:
         - value_selector:
           - paper_s2p_D_QY__aggregator
@@ -972,10 +950,9 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: 'End: paper_s2p_D_QY'
+        title: 结束：S2P：D 串行 → [Q, Y] 并行
         type: end
       height: 90
-      id: paper_s2p_D_QY__end
       position:
         x: 1550
         y: 516
@@ -985,13 +962,14 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: paper_s2p_Y_QD__llm_Y_serial
+      type: custom
+      data:
         context:
           enabled: false
           variable_selector: []
-        desc: paper_s2p_Y_QD stage 1 — GLM-4-9B-Chat.
+        desc: S2P：Y 串行 → [Q, D] 并行 第一阶段：由 GLM-4-9B-Chat 生成语义草稿。
         memory:
           query_prompt_template: '{{#sys.query#}}'
           role_prefix:
@@ -1010,19 +988,17 @@ workflow:
         prompt_template:
         - id: 41e67bf0-f746-5473-a239-5e4221309f03
           role: system
-          text: You are a careful problem-solver. Read the question, reason step by
-            step, and provide your final answer at the end of the reply.
+          text: 你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。
         - id: 512578bc-29f3-5947-a0ce-b71a35bd43a2
           role: user
           text: '{{#start_node.question#}}'
         selected: false
-        title: 'paper_s2p_Y_QD: Y serial'
+        title: S2P：Y 串行 → [Q, D] 并行：Y 串行草稿
         type: llm
         variables: []
         vision:
           enabled: false
       height: 90
-      id: paper_s2p_Y_QD__llm_Y_serial
       position:
         x: 638
         y: 876
@@ -1032,34 +1008,29 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_Y_QD parallel source — Qwen2.5-7B-Instruct receives the stage-1
-          semantic draft and participates in token-level fusion.
+    - id: paper_s2p_Y_QD__token_Q_par
+      type: custom
+      data:
+        desc: S2P：Y 串行 → [Q, D] 并行 并行源：Qwen2.5-7B-Instruct 接收第一阶段语义草稿，参与 token 级融合。
         extra: {}
         model_alias: '5'
-        prompt_template: 'Question:
-
+        prompt_template: |-
+          问题：
           {{#start_node.question#}}
 
-
-          Stage-1 semantic draft:
-
+          第一阶段语义草稿：
           {{#paper_s2p_Y_QD__llm_Y_serial.text#}}
 
-
-          Use the draft as shared context, refine it, and put the final answer at
-          the end.'
+          请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_s2p_Y_QD: token source Q'
+        title: S2P：Y 串行 → [Q, D] 并行：Q 并行源
         type: token-model-source
       height: 130
-      id: paper_s2p_Y_QD__token_Q_par
       position:
         x: 942
         y: 800
@@ -1069,34 +1040,29 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_Y_QD parallel source — Qwen3-8B-BF16 (D-role stand-in) receives
-          the stage-1 semantic draft and participates in token-level fusion.
+    - id: paper_s2p_Y_QD__token_D_par
+      type: custom
+      data:
+        desc: S2P：Y 串行 → [Q, D] 并行 并行源：Qwen3-8B-BF16（D 角色替代模型） 接收第一阶段语义草稿，参与 token 级融合。
         extra: {}
         model_alias: '22'
-        prompt_template: 'Question:
-
+        prompt_template: |-
+          问题：
           {{#start_node.question#}}
 
-
-          Stage-1 semantic draft:
-
+          第一阶段语义草稿：
           {{#paper_s2p_Y_QD__llm_Y_serial.text#}}
 
-
-          Use the draft as shared context, refine it, and put the final answer at
-          the end.'
+          请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_s2p_Y_QD: token source D'
+        title: S2P：Y 串行 → [Q, D] 并行：D 并行源
         type: token-model-source
       height: 130
-      id: paper_s2p_Y_QD__token_D_par
       position:
         x: 942
         y: 952
@@ -1106,10 +1072,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_s2p_Y_QD token-level S2P parallel ensemble.
+    - id: paper_s2p_Y_QD__aggregator
+      type: custom
+      data:
+        desc: S2P：Y 串行 → [Q, D] 并行 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
             seed: null
@@ -1139,10 +1106,9 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: 'paper_s2p_Y_QD: parallel ensemble'
+        title: S2P：Y 串行 → [Q, D] 并行：token 级并行融合
         type: parallel-ensemble
       height: 200
-      id: paper_s2p_Y_QD__aggregator
       position:
         x: 1246
         y: 876
@@ -1152,10 +1118,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: Emit answer for paper_s2p_Y_QD.
+    - id: paper_s2p_Y_QD__end
+      type: custom
+      data:
+        desc: 输出 S2P：Y 串行 → [Q, D] 并行 的最终答案。
         outputs:
         - value_selector:
           - paper_s2p_Y_QD__aggregator
@@ -1163,10 +1130,9 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: 'End: paper_s2p_Y_QD'
+        title: 结束：S2P：Y 串行 → [Q, D] 并行
         type: end
       height: 90
-      id: paper_s2p_Y_QD__end
       position:
         x: 1550
         y: 876
@@ -1176,11 +1142,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_QD_Y parallel source — Qwen2.5-7B-Instruct participates in
-          token-level fusion.
+    - id: paper_p2s_QD_Y__token_Q_par
+      type: custom
+      data:
+        desc: P2S：[Q, D] 并行 → Y 综合 并行源：Qwen2.5-7B-Instruct 参与 token 级融合。
         extra: {}
         model_alias: '5'
         prompt_template: '{{#start_node.question#}}'
@@ -1189,10 +1155,9 @@ workflow:
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_p2s_QD_Y: token source Q'
+        title: P2S：[Q, D] 并行 → Y 综合：Q 并行源
         type: token-model-source
       height: 130
-      id: paper_p2s_QD_Y__token_Q_par
       position:
         x: 638
         y: 1160
@@ -1202,11 +1167,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_QD_Y parallel source — Qwen3-8B-BF16 (D-role stand-in) participates
-          in token-level fusion.
+    - id: paper_p2s_QD_Y__token_D_par
+      type: custom
+      data:
+        desc: P2S：[Q, D] 并行 → Y 综合 并行源：Qwen3-8B-BF16（D 角色替代模型） 参与 token 级融合。
         extra: {}
         model_alias: '22'
         prompt_template: '{{#start_node.question#}}'
@@ -1215,10 +1180,9 @@ workflow:
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_p2s_QD_Y: token source D'
+        title: P2S：[Q, D] 并行 → Y 综合：D 并行源
         type: token-model-source
       height: 130
-      id: paper_p2s_QD_Y__token_D_par
       position:
         x: 638
         y: 1312
@@ -1228,10 +1192,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_QD_Y token-level P2S parallel ensemble.
+    - id: paper_p2s_QD_Y__aggregator
+      type: custom
+      data:
+        desc: P2S：[Q, D] 并行 → Y 综合 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
             seed: null
@@ -1261,10 +1226,9 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: 'paper_p2s_QD_Y: parallel ensemble'
+        title: P2S：[Q, D] 并行 → Y 综合：token 级并行融合
         type: parallel-ensemble
       height: 200
-      id: paper_p2s_QD_Y__aggregator
       position:
         x: 942
         y: 1236
@@ -1274,13 +1238,14 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: paper_p2s_QD_Y__llm_Y_serial
+      type: custom
+      data:
         context:
           enabled: false
           variable_selector: []
-        desc: paper_p2s_QD_Y serial synthesizer — GLM-4-9B-Chat.
+        desc: P2S：[Q, D] 并行 → Y 综合 第二阶段：由 GLM-4-9B-Chat 综合融合后的中间答案。
         memory:
           query_prompt_template: '{{#sys.query#}}'
           role_prefix:
@@ -1299,30 +1264,24 @@ workflow:
         prompt_template:
         - id: f1a8369a-bc73-597f-a2e5-b7f0d5be4071
           role: system
-          text: You are a careful problem-solver. Read the question and the candidate
-            answers from peer models, then provide a unified final answer that you
-            have validated.
+          text: 你是严谨的问题求解助手。请阅读问题和 token 级并行融合得到的候选答案，核验后给出统一的最终答案。
         - id: 4f5668be-ce10-5479-a05e-c32309cfe8c6
           role: user
-          text: 'Question:
-
+          text: |-
+            问题：
             {{#start_node.question#}}
 
-
-            Candidate answer from the parallel token-level ensemble:
-
+            token 级并行融合得到的候选答案：
             {{#paper_p2s_QD_Y__aggregator.text#}}
 
-
-            Provide your unified final answer:'
+            请给出核验后的统一最终答案：
         selected: false
-        title: 'paper_p2s_QD_Y: Y synthesizer'
+        title: P2S：[Q, D] 并行 → Y 综合：Y 串行综合
         type: llm
         variables: []
         vision:
           enabled: false
       height: 90
-      id: paper_p2s_QD_Y__llm_Y_serial
       position:
         x: 1246
         y: 1236
@@ -1332,10 +1291,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: Emit answer for paper_p2s_QD_Y.
+    - id: paper_p2s_QD_Y__end
+      type: custom
+      data:
+        desc: 输出 P2S：[Q, D] 并行 → Y 综合 的最终答案。
         outputs:
         - value_selector:
           - paper_p2s_QD_Y__llm_Y_serial
@@ -1343,10 +1303,9 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: 'End: paper_p2s_QD_Y'
+        title: 结束：P2S：[Q, D] 并行 → Y 综合
         type: end
       height: 90
-      id: paper_p2s_QD_Y__end
       position:
         x: 1550
         y: 1236
@@ -1356,11 +1315,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_QY_D parallel source — Qwen2.5-7B-Instruct participates in
-          token-level fusion.
+    - id: paper_p2s_QY_D__token_Q_par
+      type: custom
+      data:
+        desc: P2S：[Q, Y] 并行 → D 综合 并行源：Qwen2.5-7B-Instruct 参与 token 级融合。
         extra: {}
         model_alias: '5'
         prompt_template: '{{#start_node.question#}}'
@@ -1369,10 +1328,9 @@ workflow:
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_p2s_QY_D: token source Q'
+        title: P2S：[Q, Y] 并行 → D 综合：Q 并行源
         type: token-model-source
       height: 130
-      id: paper_p2s_QY_D__token_Q_par
       position:
         x: 638
         y: 1520
@@ -1382,11 +1340,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_QY_D parallel source — GLM-4-9B-Chat participates in token-level
-          fusion.
+    - id: paper_p2s_QY_D__token_Y_par
+      type: custom
+      data:
+        desc: P2S：[Q, Y] 并行 → D 综合 并行源：GLM-4-9B-Chat 参与 token 级融合。
         extra: {}
         model_alias: '6'
         prompt_template: '{{#start_node.question#}}'
@@ -1395,10 +1353,9 @@ workflow:
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_p2s_QY_D: token source Y'
+        title: P2S：[Q, Y] 并行 → D 综合：Y 并行源
         type: token-model-source
       height: 130
-      id: paper_p2s_QY_D__token_Y_par
       position:
         x: 638
         y: 1672
@@ -1408,10 +1365,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_QY_D token-level P2S parallel ensemble.
+    - id: paper_p2s_QY_D__aggregator
+      type: custom
+      data:
+        desc: P2S：[Q, Y] 并行 → D 综合 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
             seed: null
@@ -1441,10 +1399,9 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: 'paper_p2s_QY_D: parallel ensemble'
+        title: P2S：[Q, Y] 并行 → D 综合：token 级并行融合
         type: parallel-ensemble
       height: 200
-      id: paper_p2s_QY_D__aggregator
       position:
         x: 942
         y: 1596
@@ -1454,13 +1411,14 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: paper_p2s_QY_D__llm_D_serial
+      type: custom
+      data:
         context:
           enabled: false
           variable_selector: []
-        desc: paper_p2s_QY_D serial synthesizer — Qwen3-8B-BF16 (D-role stand-in).
+        desc: P2S：[Q, Y] 并行 → D 综合 第二阶段：由 Qwen3-8B-BF16（D 角色替代模型） 综合融合后的中间答案。
         memory:
           query_prompt_template: '{{#sys.query#}}'
           role_prefix:
@@ -1479,30 +1437,24 @@ workflow:
         prompt_template:
         - id: 2b869b8f-593c-5b6a-98dc-312fcd1fd09a
           role: system
-          text: You are a careful problem-solver. Read the question and the candidate
-            answers from peer models, then provide a unified final answer that you
-            have validated.
+          text: 你是严谨的问题求解助手。请阅读问题和 token 级并行融合得到的候选答案，核验后给出统一的最终答案。
         - id: 90d08100-4828-51e4-b7e0-83673460e4af
           role: user
-          text: 'Question:
-
+          text: |-
+            问题：
             {{#start_node.question#}}
 
-
-            Candidate answer from the parallel token-level ensemble:
-
+            token 级并行融合得到的候选答案：
             {{#paper_p2s_QY_D__aggregator.text#}}
 
-
-            Provide your unified final answer:'
+            请给出核验后的统一最终答案：
         selected: false
-        title: 'paper_p2s_QY_D: D synthesizer'
+        title: P2S：[Q, Y] 并行 → D 综合：D 串行综合
         type: llm
         variables: []
         vision:
           enabled: false
       height: 90
-      id: paper_p2s_QY_D__llm_D_serial
       position:
         x: 1246
         y: 1596
@@ -1512,10 +1464,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: Emit answer for paper_p2s_QY_D.
+    - id: paper_p2s_QY_D__end
+      type: custom
+      data:
+        desc: 输出 P2S：[Q, Y] 并行 → D 综合 的最终答案。
         outputs:
         - value_selector:
           - paper_p2s_QY_D__llm_D_serial
@@ -1523,10 +1476,9 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: 'End: paper_p2s_QY_D'
+        title: 结束：P2S：[Q, Y] 并行 → D 综合
         type: end
       height: 90
-      id: paper_p2s_QY_D__end
       position:
         x: 1550
         y: 1596
@@ -1536,11 +1488,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_DY_Q parallel source — Qwen3-8B-BF16 (D-role stand-in) participates
-          in token-level fusion.
+    - id: paper_p2s_DY_Q__token_D_par
+      type: custom
+      data:
+        desc: P2S：[D, Y] 并行 → Q 综合 并行源：Qwen3-8B-BF16（D 角色替代模型） 参与 token 级融合。
         extra: {}
         model_alias: '22'
         prompt_template: '{{#start_node.question#}}'
@@ -1549,10 +1501,9 @@ workflow:
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_p2s_DY_Q: token source D'
+        title: P2S：[D, Y] 并行 → Q 综合：D 并行源
         type: token-model-source
       height: 130
-      id: paper_p2s_DY_Q__token_D_par
       position:
         x: 638
         y: 1880
@@ -1562,11 +1513,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_DY_Q parallel source — GLM-4-9B-Chat participates in token-level
-          fusion.
+    - id: paper_p2s_DY_Q__token_Y_par
+      type: custom
+      data:
+        desc: P2S：[D, Y] 并行 → Q 综合 并行源：GLM-4-9B-Chat 参与 token 级融合。
         extra: {}
         model_alias: '6'
         prompt_template: '{{#start_node.question#}}'
@@ -1575,10 +1526,9 @@ workflow:
           temperature: 0.7
           top_k: 10
         selected: false
-        title: 'paper_p2s_DY_Q: token source Y'
+        title: P2S：[D, Y] 并行 → Q 综合：Y 并行源
         type: token-model-source
       height: 130
-      id: paper_p2s_DY_Q__token_Y_par
       position:
         x: 638
         y: 2032
@@ -1588,10 +1538,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: paper_p2s_DY_Q token-level P2S parallel ensemble.
+    - id: paper_p2s_DY_Q__aggregator
+      type: custom
+      data:
+        desc: P2S：[D, Y] 并行 → Q 综合 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
             seed: null
@@ -1621,10 +1572,9 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: 'paper_p2s_DY_Q: parallel ensemble'
+        title: P2S：[D, Y] 并行 → Q 综合：token 级并行融合
         type: parallel-ensemble
       height: 200
-      id: paper_p2s_DY_Q__aggregator
       position:
         x: 942
         y: 1956
@@ -1634,13 +1584,14 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
+    - id: paper_p2s_DY_Q__llm_Q_serial
+      type: custom
+      data:
         context:
           enabled: false
           variable_selector: []
-        desc: paper_p2s_DY_Q serial synthesizer — Qwen2.5-7B-Instruct.
+        desc: P2S：[D, Y] 并行 → Q 综合 第二阶段：由 Qwen2.5-7B-Instruct 综合融合后的中间答案。
         memory:
           query_prompt_template: '{{#sys.query#}}'
           role_prefix:
@@ -1659,30 +1610,24 @@ workflow:
         prompt_template:
         - id: 9d98d1a6-580b-56d4-95ff-89753baac9b0
           role: system
-          text: You are a careful problem-solver. Read the question and the candidate
-            answers from peer models, then provide a unified final answer that you
-            have validated.
+          text: 你是严谨的问题求解助手。请阅读问题和 token 级并行融合得到的候选答案，核验后给出统一的最终答案。
         - id: b3d669e4-591d-5df2-a04b-f5f63d72d14d
           role: user
-          text: 'Question:
-
+          text: |-
+            问题：
             {{#start_node.question#}}
 
-
-            Candidate answer from the parallel token-level ensemble:
-
+            token 级并行融合得到的候选答案：
             {{#paper_p2s_DY_Q__aggregator.text#}}
 
-
-            Provide your unified final answer:'
+            请给出核验后的统一最终答案：
         selected: false
-        title: 'paper_p2s_DY_Q: Q synthesizer'
+        title: P2S：[D, Y] 并行 → Q 综合：Q 串行综合
         type: llm
         variables: []
         vision:
           enabled: false
       height: 90
-      id: paper_p2s_DY_Q__llm_Q_serial
       position:
         x: 1246
         y: 1956
@@ -1692,10 +1637,11 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
-    - data:
-        desc: Emit answer for paper_p2s_DY_Q.
+    - id: paper_p2s_DY_Q__end
+      type: custom
+      data:
+        desc: 输出 P2S：[D, Y] 并行 → Q 综合 的最终答案。
         outputs:
         - value_selector:
           - paper_p2s_DY_Q__llm_Q_serial
@@ -1703,10 +1649,9 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: 'End: paper_p2s_DY_Q'
+        title: 结束：P2S：[D, Y] 并行 → Q 综合
         type: end
       height: 90
-      id: paper_p2s_DY_Q__end
       position:
         x: 1550
         y: 1956
@@ -1716,7 +1661,6 @@ workflow:
       selected: false
       sourcePosition: right
       targetPosition: left
-      type: custom
       width: 244
     viewport:
       x: 0
