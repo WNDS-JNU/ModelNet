@@ -1,0 +1,480 @@
+app:
+  description: 用 Dify Code 节点把业务输入组装成统一 prompt，再交给多个 token-model-source 和 parallel-ensemble 做 token 级协作。
+  icon: 🧱
+  icon_background: '#DCE5FF'
+  mode: workflow
+  name: Parallel Ensemble Prompt Composer
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: code
+      id: start_node-source-compose_prompt-target
+      source: start_node
+      sourceHandle: source
+      target: compose_prompt
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: token-model-source
+      id: compose_prompt-source-qwen_source-target
+      source: compose_prompt
+      sourceHandle: source
+      target: qwen_source
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: qwen_source-source-ensemble-target
+      source: qwen_source
+      sourceHandle: source
+      target: ensemble
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: token-model-source
+      id: compose_prompt-source-glm_source-target
+      source: compose_prompt
+      sourceHandle: source
+      target: glm_source
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: glm_source-source-ensemble-target
+      source: glm_source
+      sourceHandle: source
+      target: ensemble
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: token-model-source
+      id: compose_prompt-source-llama_source-target
+      source: compose_prompt
+      sourceHandle: source
+      target: llama_source
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: llama_source-source-ensemble-target
+      source: llama_source
+      sourceHandle: source
+      target: ensemble
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: code
+      id: ensemble-source-format_answer-target
+      source: ensemble
+      sourceHandle: source
+      target: format_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: format_answer-source-end_node-target
+      source: format_answer
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 输入业务问题、目标受众和回答约束。
+        title: 开始
+        variables:
+        - label: 问题
+          max_length: 4096
+          options: []
+          required: true
+          type: paragraph
+          variable: question
+        - label: 受众
+          max_length: 128
+          options:
+          - engineer
+          - researcher
+          - student
+          required: true
+          type: select
+          variable: audience
+        - label: 约束
+          max_length: 2048
+          options: []
+          required: false
+          type: paragraph
+          variable: constraints
+        selected: false
+        type: start
+      height: 150
+      id: start_node
+      position:
+        x: 30
+        y: 300
+      positionAbsolute:
+        x: 30
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        code: |
+          def main(question: str, audience: str, constraints: str) -> dict:
+              audience = audience or "engineer"
+              constraints = constraints or "回答需要结构清晰、避免空泛表述。"
+              prompt = (
+                  f"目标受众：{audience}\n"
+                  f"回答约束：{constraints}\n\n"
+                  f"问题：{question or ''}\n\n"
+                  "请先识别关键假设，再给出可执行结论。"
+              )
+              return {"prompt": prompt, "audience": audience, "constraints_used": constraints}
+        code_language: python3
+        desc: 将 Start 的多字段业务输入转换为统一 prompt，供所有 token source 复用。
+        outputs:
+          prompt:
+            children: null
+            type: string
+          audience:
+            children: null
+            type: string
+          constraints_used:
+            children: null
+            type: string
+        title: 原生 Code：组装 Prompt
+        variables:
+        - value_selector:
+          - start_node
+          - question
+          variable: question
+        - value_selector:
+          - start_node
+          - audience
+          variable: audience
+        - value_selector:
+          - start_node
+          - constraints
+          variable: constraints
+        selected: false
+        type: code
+      height: 154
+      id: compose_prompt
+      position:
+        x: 334
+        y: 300
+      positionAbsolute:
+        x: 334
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: 'qwen: model_alias=5, temperature=0.5, top_k=10; 输出 ModelInvocationSpec。'
+        extra: {}
+        inline_spec: null
+        model_alias: '5'
+        prompt_template: '{{#compose_prompt.prompt#}}'
+        raw_completion: false
+        expose_raw_logits: null
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.5
+          top_k: 10
+          top_p: null
+        title: Token Source (qwen)
+        selected: false
+        type: token-model-source
+      height: 130
+      id: qwen_source
+      position:
+        x: 638
+        y: 132
+      positionAbsolute:
+        x: 638
+        y: 132
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: 'glm: model_alias=6, temperature=0.6, top_k=10; 输出 ModelInvocationSpec。'
+        extra: {}
+        inline_spec: null
+        model_alias: '6'
+        prompt_template: '{{#compose_prompt.prompt#}}'
+        raw_completion: false
+        expose_raw_logits: null
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.6
+          top_k: 10
+          top_p: null
+        title: Token Source (glm)
+        selected: false
+        type: token-model-source
+      height: 130
+      id: glm_source
+      position:
+        x: 638
+        y: 288
+      positionAbsolute:
+        x: 638
+        y: 288
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: 'llama: model_alias=2, temperature=0.5, top_k=10; 输出 ModelInvocationSpec。'
+        extra: {}
+        inline_spec: null
+        model_alias: '2'
+        prompt_template: '{{#compose_prompt.prompt#}}'
+        raw_completion: false
+        expose_raw_logits: null
+        sampling_params:
+          max_tokens: 1024
+          seed: null
+          stop: []
+          temperature: 0.5
+          top_k: 10
+          top_p: null
+        title: Token Source (llama)
+        selected: false
+        type: token-model-source
+      height: 130
+      id: llama_source
+      position:
+        x: 638
+        y: 444
+      positionAbsolute:
+        x: 638
+        y: 444
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: 复用统一 prompt，按静态专家权重聚合每步 token 概率。
+        ensemble:
+          aggregator_config:
+            skip_empty_voters: true
+            use_weights: true
+          aggregator_name: sum_score
+          diagnostics:
+            enable_trace_stream: false
+            include_aggregator_reasoning: true
+            include_logits: false
+            include_model_outputs: false
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_think_trace: false
+            include_token_candidates: true
+            max_trace_tokens: 512
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 320
+          runner_name: token_step
+          token_sources:
+          - extra: {}
+            fallback_weight: null
+            source_id: qwen
+            spec_selector:
+            - qwen_source
+            - spec
+            top_k_override: null
+            weight: 1.2
+          - extra: {}
+            fallback_weight: null
+            source_id: glm
+            spec_selector:
+            - glm_source
+            - spec
+            top_k_override: null
+            weight: 1.0
+          - extra: {}
+            fallback_weight: null
+            source_id: llama
+            spec_selector:
+            - llama_source
+            - spec
+            top_k_override: null
+            weight: 1.0
+        title: 多模型协作：加权 sum_score
+        selected: false
+        type: parallel-ensemble
+      height: 200
+      id: ensemble
+      position:
+        x: 942
+        y: 300
+      positionAbsolute:
+        x: 942
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        code: |
+          def main(answer: str, audience: str, constraints_used: str, tokens_count: int) -> dict:
+              header = f"Audience: {audience or 'engineer'} | Tokens: {tokens_count or 0}"
+              formatted = f"{header}\n\n{answer or ''}"
+              return {
+                  "answer": answer or "",
+                  "formatted_answer": formatted,
+                  "constraints_used": constraints_used or "",
+              }
+        code_language: python3
+        desc: 把生成结果和业务上下文整理为最终输出。
+        outputs:
+          answer:
+            children: null
+            type: string
+          formatted_answer:
+            children: null
+            type: string
+          constraints_used:
+            children: null
+            type: string
+        title: 原生 Code：格式化输出
+        variables:
+        - value_selector:
+          - ensemble
+          - text
+          variable: answer
+        - value_selector:
+          - compose_prompt
+          - audience
+          variable: audience
+        - value_selector:
+          - compose_prompt
+          - constraints_used
+          variable: constraints_used
+        - value_selector:
+          - ensemble
+          - tokens_count
+          variable: tokens_count
+        selected: false
+        type: code
+      height: 154
+      id: format_answer
+      position:
+        x: 1246
+        y: 300
+      positionAbsolute:
+        x: 1246
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: 输出格式化答案和实际使用的 prompt 约束。
+        outputs:
+        - value_selector:
+          - format_answer
+          - answer
+          value_type: string
+          variable: answer
+        - value_selector:
+          - format_answer
+          - formatted_answer
+          value_type: string
+          variable: formatted_answer
+        - value_selector:
+          - compose_prompt
+          - prompt
+          value_type: string
+          variable: prompt
+        title: 结束：输出答案
+        selected: false
+        type: end
+      height: 154
+      id: end_node
+      position:
+        x: 1550
+        y: 300
+      positionAbsolute:
+        x: 1550
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: -80
+      y: -20
+      zoom: 0.62
