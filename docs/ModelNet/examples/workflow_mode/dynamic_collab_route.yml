@@ -1,9 +1,9 @@
 app:
-  description: Dynamic collaborative routing reproduction using the existing ModelNet registry and parallel-ensemble SPI.
+  description: 基于现有 ModelNet 注册表和 parallel-ensemble SPI 复现动态协作模型路由方法。
   icon: "\U0001F500"
   icon_background: '#DCE5FF'
   mode: workflow
-  name: Dynamic Collaborative Route
+  name: 动态协作路由
   use_icon_as_answer_icon: false
 kind: app
 version: 0.3.1
@@ -113,12 +113,12 @@ workflow:
       zIndex: 0
     nodes:
     - data:
-        desc: User task.
+        desc: 用户输入的待回答问题。
         selected: false
-        title: Start
+        title: 开始
         type: start
         variables:
-        - label: question
+        - label: 问题
           max_length: 4096
           options: []
           required: true
@@ -138,7 +138,7 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Q source, alias 5 in api/configs/model_net.yaml.
+        desc: Q 模型源，对应 api/configs/model_net.yaml 中的别名 5。
         extra: {}
         model_alias: '5'
         prompt_template: '{{#start_node.question#}}'
@@ -148,7 +148,7 @@ workflow:
           temperature: 0.0
           top_k: 10
         selected: false
-        title: Token Source Q
+        title: Q 模型源
         type: token-model-source
       height: 130
       id: token_Q
@@ -164,7 +164,7 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: D source, alias 27 in api/configs/model_net.yaml.
+        desc: D 模型源，对应 api/configs/model_net.yaml 中的别名 27。
         extra: {}
         model_alias: '27'
         prompt_template: '{{#start_node.question#}}'
@@ -174,7 +174,7 @@ workflow:
           temperature: 0.0
           top_k: 10
         selected: false
-        title: Token Source D
+        title: D 模型源
         type: token-model-source
       height: 130
       id: token_D
@@ -190,7 +190,7 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Y source, alias 6 in api/configs/model_net.yaml.
+        desc: Y 模型源，对应 api/configs/model_net.yaml 中的别名 6。
         extra: {}
         model_alias: '6'
         prompt_template: '{{#start_node.question#}}'
@@ -200,7 +200,7 @@ workflow:
           temperature: 0.0
           top_k: 10
         selected: false
-        title: Token Source Y
+        title: Y 模型源
         type: token-model-source
       height: 130
       id: token_Y
@@ -216,7 +216,7 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Response-level serial route using the paper's consensus rule.
+        desc: 按论文的一致同意规则执行响应级串联路由。
         ensemble:
           aggregator_config: {}
           aggregator_name: noop_route
@@ -255,7 +255,7 @@ workflow:
             - spec
             weight: 1.0
         selected: false
-        title: Dynamic Collaborative Route
+        title: 动态协作路由
         type: parallel-ensemble
       height: 220
       id: ensemble
@@ -271,7 +271,7 @@ workflow:
       type: custom
       width: 244
     - data:
-        desc: Final answer.
+        desc: 输出最终答案。
         outputs:
         - value_selector:
           - ensemble
@@ -279,7 +279,7 @@ workflow:
           value_type: string
           variable: answer
         selected: false
-        title: End
+        title: 结束
         type: end
       height: 90
       id: end_node
