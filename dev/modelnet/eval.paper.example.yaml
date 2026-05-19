@@ -1,6 +1,6 @@
 # Sample config for the AI-ModelNet paper reproduction (Tables 4 / 6-7).
-# See docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md §6 (direction D) and
-# docs/ModelNet/PAPER_REPRODUCTION_PLAN.md for the design.
+# See docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md §6 (direction D) and
+# docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md for the design.
 #
 # Copy to eval.paper.yaml (gitignored), import the paper_*.yml DSLs into
 # Dify Studio, paste each app's API key below, then:
@@ -20,8 +20,9 @@ response_mode: blocking
 request_timeout_s: 600
 
 # ── workflow keys ─────────────────────────────────────────────────────
-# 3 paper models  Q = Qwen2.5-7B (alias 5)
-#                D = DeepSeek-R1-Distill-Qwen-7B (alias 27)
+# 3 paper-model roles
+#                Q = Qwen2.5-7B (alias 5)
+#                D = Qwen3-8B-BF16 thinking-model stand-in (alias 22)
 #                Y = glm-4-9b-chat (alias 6, replacing the unavailable Yi-1.5-9B)
 #
 # 13 paths total: SI 6 (3! permutations) + PI 1 + S2P 3 + P2S 3.

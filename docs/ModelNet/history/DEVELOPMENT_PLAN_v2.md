@@ -3,11 +3,11 @@
 我现在要针对工作流模式进行修改。现在的工作流就是全回复级别的串联和并联，我现在要在工作流中增加token级别的并联操作，请你给出修改计划 还要考虑API的问题，要求并联过程中可以提供实时的logit值。
 
 > **目标读者**：在 `xianghe/temp/dify` 这个 fork 上做二次开发的工程师。
-> **基线代码**：`docs/ModelNet/PN.py`（参考算法）、`docs/ModelNet/model_info.json`（模型清单格式）。
+> **基线代码**：`docs/ModelNet/research/references/PN.py`（参考算法）、`docs/ModelNet/research/references/model_info.json`（模型清单格式）。
 > **修改版后端**：本地 llama.cpp 服务，`/completion` 端点已暴露 `completion_probabilities[0].top_probs`。
 > **版本**：v2.4（v2 架构 review 修订 + v2.1 Phase 0 spike 闭环 + v2.2 P1.1 landing 前 schema 钉死 + v2.3 P1.1 schema 兜底加固 + **v2.4 把 EXTENSIBILITY_SPEC v0.2.2 的三轴 SPI 融入 Phase 2，新增 Phase 4 v0.3 backend pack**；review 见底部"修订历史"）。
 >
-> **架构合约（Phase 2 起）**：`docs/ModelNet/EXTENSIBILITY_SPEC.md` v0.2.2 是 Phase 2
+> **架构合约（Phase 2 起）**：`docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md` v0.2.2 是 Phase 2
 > 三轴 SPI（ModelBackend / EnsembleRunner / Aggregator）+ Capability/Requirements
 > 双层校验 + Trace 一等公民的**详细契约**。本文 §6 描述 Phase 2 的实施计划，
 > 字段级 / 接口级签名以 EXTENSIBILITY_SPEC 为准。Phase 4 是 v0.3 增量的 backend
@@ -74,7 +74,7 @@
 
 **目标**：澄清 graphon 内部协议的剩余未知项。Review 已闭环掉事件协议（Issue 2）；剩下的主要是节点类型与注册机制。
 
-**Phase 0 状态（2026-04-18）**：✅ **全部完成**。Graphon spike 结论已并入 `docs/ModelNet/TASKS.md` 的 Phase 0 段落；四项探针全绿；本章节 §4.1 的 Q1/Q3/Q4/Q5 均已闭环；§8 风险登记 R1 → closed、R10 → mitigated。
+**Phase 0 状态（2026-04-18）**：✅ **全部完成**。Graphon spike 结论已并入 `docs/ModelNet/active/TASKS.md` 的 Phase 0 段落；四项探针全绿；本章节 §4.1 的 Q1/Q3/Q4/Q5 均已闭环；§8 风险登记 R1 → closed、R10 → mitigated。
 
 ### 4.1 已验证的接口
 
@@ -87,7 +87,7 @@
 | Q5 | 前后端 schema 一致性 | ✅ 已闭环 | `BaseNodeData.type: NodeType = str`（`graphon/entities/base_node_data.py:142`），前端 `BlockEnum` 是字符串枚举（`types.ts:28`）。序列化到 JSON 是普通字符串，Pydantic 直接接受，无需 validator |
 
 ### 4.2 Spike 产出
-原 `docs/ModelNet/SPIKE_GRAPHON.md`（2026-04-18 产出）已清理；保留结论见 `docs/ModelNet/TASKS.md` 的 Phase 0 段落，包含 Q1/Q3/Q4/Q5 证据、graphon 关键文件行号索引、对本计划的回溯动作清单，以及 `self.id == self._node_id` 的误述更正。
+原 `docs/ModelNet/SPIKE_GRAPHON.md`（2026-04-18 产出）已清理；保留结论见 `docs/ModelNet/active/TASKS.md` 的 Phase 0 段落，包含 Q1/Q3/Q4/Q5 证据、graphon 关键文件行号索引、对本计划的回溯动作清单，以及 `self.id == self._node_id` 的误述更正。
 
 ### 4.3 重要更正：`self.id` 并非 execution id
 
@@ -326,7 +326,7 @@ web/app/components/workflow/nodes/response-aggregator/
 - **节点引用**：节点配置中只存 `model_aliases: list[str]`（即 yaml 里的 `id` 字段）。
 - **HTTP 客户端**：所有调 llama.cpp 的请求**必须**通过 `core.helper.ssrf_proxy`（ADR-8）。
 
-#### 6.0.2 配置文件 schema（与 `docs/ModelNet/model_info.json` 字段名严格一致）
+#### 6.0.2 配置文件 schema（与 `docs/ModelNet/research/references/model_info.json` 字段名严格一致）
 ```yaml
 # api/configs/model_net.yaml
 models:
@@ -907,8 +907,8 @@ Day 23-26 Phase 3 (测试 + 文档 + 4 份 DSL + i18n)
 | **前端必填注册点 ⑦ 输出变量解析** | `web/app/components/workflow/nodes/_base/components/variable/utils.ts:2092` | `getNodeOutputVars` switch 加 case |
 | **前端必填注册点 ⑧ 单跑能力** | `web/app/components/workflow/utils/workflow.ts:16` | `canRunBySingle` |
 | **前端必填注册点 ⑨ i18n** | `web/i18n/{en-US,zh-Hans}/workflow.ts` | 显示文案（CLAUDE.md 强制） |
-| 算法参考 | `docs/ModelNet/PN.py` | |
-| 模型清单 schema 参考 | `docs/ModelNet/model_info.json` | 字段名（`EOS` 大写、`stop_think`、`type`）严格照抄 |
+| 算法参考 | `docs/ModelNet/research/references/PN.py` | |
+| 模型清单 schema 参考 | `docs/ModelNet/research/references/model_info.json` | 字段名（`EOS` 大写、`stop_think`、`type`）严格照抄 |
 | 项目规范 | `CLAUDE.md`, `api/AGENTS.md`, `web/AGENTS.md` | |
 
 ---

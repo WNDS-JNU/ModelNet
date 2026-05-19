@@ -3,7 +3,16 @@
 **Paper**: Multi-model serial and parallel collaborative inference in AI-ModelNet
 **Source**: `docs/ModelNet/Multi-model serial and parallel collaborative inference in AI-ModelNet.pdf`
 **Drafted**: 2026-05-05
-**Status**: Plan v0.1 — pending implementation
+**Status**: Implementation update — strict token-level hybrid DSLs in progress
+
+> 2026-05-19 update: the earlier response-level S2P/P2S plan below is
+> superseded for implementation. The current repo's `response-aggregator`
+> is synthesis-only and rejects legacy `strategy_name` / `strategy_config`.
+> Strict paper reproduction therefore uses `parallel-ensemble` for every
+> parallel stage: PI, S2P stage 2, and P2S stage 1. The original DeepSeek
+> endpoint/alias `27` is unavailable in the current runtime; the D-role DSLs
+> use reachable alias `22` (`qwen3-8b-bf16`) as a thinking-model stand-in and
+> this substitution must be reported with the final numbers.
 
 ---
 
@@ -234,7 +243,7 @@ uv run --project api python dev/modelnet/duet_net_eval.py --config dev/modelnet/
 
 ### 只读参考
 - 论文：`docs/ModelNet/Multi-model serial and parallel collaborative inference in AI-ModelNet.pdf`
-- PI 算法：`docs/ModelNet/PN.py`
+- PI 算法：`docs/ModelNet/research/references/PN.py`
 - 已有 eval：`dev/modelnet/duet_net_eval.py`
 - 配置模板：`dev/modelnet/eval.example.yaml`
 - DSL 写法（PI 参考）：`docs/ModelNet/examples/workflow_mode/duet_net_q1_q2_g4.yml`（注意 alias 旧）

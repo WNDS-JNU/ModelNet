@@ -1,44 +1,24 @@
 # ModelNet Docs
 
-This directory contains the ModelNet design notes, implementation task list, landing records, and runtime/debugging plans for the Dify ModelNet workflow work.
+ModelNet documentation is grouped by lifecycle. Start with the active docs, then use architecture, operations, research, or history depending on the task.
 
 ## Start Here
 
-- `TASKS.md`: execution checklist and current project status.
-- `LANDING.md`: consolidated landing record for all old `P*_LANDING.md` phase shards.
-- `TOKENLEVEL_VLLM_COMPAT_PLAN.md`: current hotfix plan for TokenLevel vLLM backend compatibility.
-- `EXTENSIBILITY_SPEC.md`: backend / runner / aggregator SPI contract.
-- `BACKEND_CAPABILITIES.md`: backend capability and probability semantics contract.
+- `active/TASKS.md`: current execution checklist and project status.
+- `active/ROADMAP.md`: short current-state roadmap and reading guide.
+- `architecture/EXTENSIBILITY_SPEC.md`: backend / runner / aggregator SPI contract.
+- `architecture/BACKEND_CAPABILITIES.md`: capability and probability-semantics quick reference.
+- `operations/vllm/TOKENLEVEL_VLLM_PLAN.md`: active vLLM compatibility and chat-token plan.
 
-## Planning Docs
+## Directory Map
 
-- `DEVELOPMENT_PLAN.md`: original v2 development plan.
-- `DEVELOPMENT_PLAN_v3.md`: v3 plan for response weighting, token source relocation, and token-model-source node work.
-- `EXTENSION_GUIDE.md`: implementation guide for extending ModelNet.
-- `PAPER_REPRODUCTION_PLAN.md`: paper reproduction plan.
-- `UNDERGRAD_RESEARCH_PLAYBOOK.md`: research playbook.
-
-## Operational Notes
-
-- `DUET_NET_TRACE_PUSH_FIX_PLAN.md`: DuetNet trace push fix plan.
-- `MODELNET_LOCAL_CHAT_TEMPLATES.md`: local chat template notes.
-- `BRANDING_REBRAND_PLAN.md`: naming and branding cleanup plan.
-
-## Data And Examples
-
-- `examples/`: workflow-mode YAML examples.
-- `model_info.json` / `model_info.xlsx`: model metadata.
-- `PN.py`: original PN.py reference script.
-- PDFs: source papers and reference material.
+- `active/`: current project status and next-step planning.
+- `architecture/`: stable design contracts and extension guidance.
+- `operations/`: runtime inventories, hotfix plans, branding work, and operational notes.
+- `research/`: paper reproduction plans, student research guide, source papers, model metadata, and PN.py reference code.
+- `history/`: superseded development plans and consolidated landing records.
+- `examples/`: workflow-mode DSL examples.
 
 ## Cleanup Policy
 
-The old phase landing shards `P1.*_LANDING.md`, `P2.*_LANDING.md`, `P3.A.*_LANDING.md`, and `P3.B.*_LANDING.md` have been merged into `LANDING.md` and removed as standalone files.
-
-`SPIKE_GRAPHON.md` was merged into the Phase 0 section of `TASKS.md` and removed as a standalone file. `DEPLOYMENT_PORTS.md` was removed because it described an old local Docker deployment under `/home/xianghe/temp/dify`, not the current `/home/duxianghe/dify` runtime.
-
-When adding new landing notes:
-
-- Prefer appending or regenerating `LANDING.md` instead of creating another phase shard.
-- Keep historical source filenames inside `LANDING.md` as provenance markers.
-- Update this README if a new top-level document becomes an entry point.
+Top-level files should stay limited to this README and durable entry points. New implementation plans should usually live under `operations/<topic>/`; historical landing notes should be appended to `history/LANDING.md` rather than added as new top-level shards.

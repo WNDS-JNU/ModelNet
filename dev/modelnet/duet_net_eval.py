@@ -9,8 +9,8 @@ Drives two paper reproductions through Dify's workflow run API:
 * **AI-ModelNet** (Li et al., 2025) — 4 paradigms × 13 paths on
   ``GSM8K``, ``C-Eval`` (multi-subject), ``HendrycksMATH``. Output
   matches paper Tables 4 / 6-7. See
-  ``docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md`` §6 and
-  ``docs/ModelNet/PAPER_REPRODUCTION_PLAN.md``.
+  ``docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md`` §6 and
+  ``docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md``.
 
 Single-model baselines and any other comparison method (Unite, GaC, DK,
 DP) are configured the same way: register a workflow app per method in

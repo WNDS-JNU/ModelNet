@@ -8,8 +8,8 @@ Idempotent — overwrites existing files.
 
 Reproduction context:
 
-* Framing: ``docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md`` §6 (direction D).
-* Stage plan: ``docs/ModelNet/PAPER_REPRODUCTION_PLAN.md`` §5 (Stage B).
+* Framing: ``docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md`` §6 (direction D).
+* Stage plan: ``docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md`` §5 (Stage B).
 
 Pre-flight:
 

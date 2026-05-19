@@ -1686,7 +1686,7 @@ vllm / openai_compat / anthropic 延后 v0.3；工时由 v0.1 的「+4 天」修
 - 影响 P2.1 升级路径：现 `LocalModelRegistry._load()` 改一行（`ModelSpec.model_validate`
   → 反查 `spec_class.model_validate`），新增 `BackendRegistry`；不重写代码
 
-**新增伴生文档**：`docs/ModelNet/EXTENSION_GUIDE.md` —— 二开者 cookbook，
+**新增伴生文档**：`docs/ModelNet/architecture/EXTENSION_GUIDE.md` —— 二开者 cookbook，
 覆盖 5 种典型扩展场景的最小可工作示例（响应/token aggregator、runner、
 backend、纯 trace 消费）+ 测试脚手架 + i18n checklist。本规范是设计契约，
 该 guide 是操作手册，分工不同。

@@ -10,9 +10,9 @@ this fork ships (`parallel-ensemble`, `token-model-source`,
 * **AI-ModelNet** (Li et al., 2025) — 4 paradigms (SI / PI / S2P / P2S)
   × 13 paths × 3 paper datasets (GSM8K, C-Eval multi-subject,
   HendrycksMATH). Tables 4 / 6-7. Framing in
-  [`docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md`](../../docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md)
+  [`docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md`](../../docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md)
   §6 (direction D) and the staged execution plan in
-  [`docs/ModelNet/PAPER_REPRODUCTION_PLAN.md`](../../docs/ModelNet/PAPER_REPRODUCTION_PLAN.md).
+  [`docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md`](../../docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md).
 
 This directory is **not** part of the long-term docs surface — it is
 research scratch space.
@@ -22,7 +22,7 @@ research scratch space.
 | File | What it does |
 |---|---|
 | `generate_duet_net_dsls.py` | Emits 8 DuetNet workflow-mode DSLs (6 dual + 1 triple + 1 quad) under `docs/ModelNet/examples/workflow_mode/duet_net_*.yml` from a single template. Idempotent. |
-| `generate_paper_dsls.py` | Emits 13 AI-ModelNet paper DSLs (`paper_*.yml`) covering 4 paradigms × 3 paper models {Q=5, D=27, Y=6}. Idempotent. SI/S2P/P2S use the standard `llm` node; PI uses `parallel-ensemble` (`sum_score`); S2P uses the `majority_vote` response-aggregator strategy. |
+| `generate_paper_dsls.py` | Emits 13 AI-ModelNet paper DSLs (`paper_*.yml`) covering 4 paradigms × 3 model roles {Q=5, D=22, Y=6}. Idempotent. SI uses standard `llm` chains; PI/S2P/P2S use `parallel-ensemble` (`sum_score`) for every paper parallel stage. |
 | `duet_net_eval.py` | Calls Dify's `/v1/workflows/run` API for each (workflow × dataset × item) and records accuracy / token count / latency. Drives both reproductions; the script does not care what is inside each workflow — it only sees the API contract. |
 | `eval.example.yaml` | Sample config for the DuetNet 8-DSL reproduction. |
 | `eval.paper.example.yaml` | Sample config for the AI-ModelNet paper reproduction (13 paths × paper datasets). |
@@ -65,14 +65,14 @@ research scratch space.
 
 ## AI-ModelNet paper reproduction recipe
 
-> Read [`UNDERGRAD_RESEARCH_PLAYBOOK.md`](../../docs/ModelNet/UNDERGRAD_RESEARCH_PLAYBOOK.md)
-> §6 (direction D) and [`PAPER_REPRODUCTION_PLAN.md`](../../docs/ModelNet/PAPER_REPRODUCTION_PLAN.md)
+> Read [`UNDERGRAD_RESEARCH_PLAYBOOK.md`](../../docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md)
+> §6 (direction D) and [`PAPER_REPRODUCTION_PLAN.md`](../../docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md)
 > first — together they motivate the model picks, dataset picks, and
 > the Stage A → Stage B execution order this section assumes.
 
 1. **Bring up 3 llama.cpp endpoints** for the paper models:
    - **Q** → alias `5`: Qwen2.5-7B-Instruct (`qwen25-7b-instruct-q5km`)
-   - **D** → alias `27`: DeepSeek-R1-Distill-Qwen-7B (`deepseek-r1-distill-qwen-7b-q4`)
+   - **D** → alias `22`: Qwen3-8B-BF16 (`qwen3-8b-bf16`, reachable thinking-model stand-in for the unavailable DeepSeek endpoint)
    - **Y** → alias `6`: GLM-4-9B-Chat (`glm-4-9b-chat-q4k`, replacing the unavailable Yi-1.5-9B per `PAPER_REPRODUCTION_PLAN.md` §2)
 
    The PI paradigm reads aliases directly from `model_net.yaml`. SI / S2P / P2S use Dify's standard `llm` node, which does **not** read `model_net.yaml`. Pre-configure those 3 endpoints once: Dify Web → Settings → Model Provider → install OpenAI-Compatible API plugin → add 3 entries pointing at the same llama.cpp URLs.

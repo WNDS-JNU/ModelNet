@@ -826,9 +826,9 @@ Dify 前端的扁平 lookup 完全忽略。
 
 ## 参考
 
-- 设计契约：`docs/ModelNet/EXTENSIBILITY_SPEC.md`（v0.2.2）
-- Capability 语义对齐：`docs/ModelNet/BACKEND_CAPABILITIES.md`（P2.2.4 落地）
-- 算法参考：`docs/ModelNet/PN.py`
+- 设计契约：`docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md`（v0.2.2）
+- Capability 语义对齐：`docs/ModelNet/architecture/BACKEND_CAPABILITIES.md`（P2.2.4 落地）
+- 算法参考：`docs/ModelNet/research/references/PN.py`
 - yaml schema 示例：`api/configs/model_net.yaml.example`（P2.2 落地）
 - 现有内置参考实现：
   - Aggregator: `aggregators/response/majority_vote.py`、`aggregators/token/sum_score.py`

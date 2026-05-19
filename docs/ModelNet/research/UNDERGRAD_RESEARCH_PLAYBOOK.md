@@ -669,12 +669,12 @@ uv run --project api python dev/modelnet/duet_net_eval.py \
 
 | 想了解 | 读这个 |
 |---|---|
-| 平台架构总图 | `docs/ModelNet/EXTENSIBILITY_SPEC.md` |
-| Phase 历史决策 | `docs/ModelNet/DEVELOPMENT_PLAN_v3.md` |
+| 平台架构总图 | `docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md` |
+| Phase 历史决策 | `docs/ModelNet/history/DEVELOPMENT_PLAN_v3.md` |
 | Capability 语义陷阱 | `api/core/workflow/nodes/parallel_ensemble/spi/capability.py` 的 docstring |
-| 怎么写新节点 | `docs/ModelNet/EXTENSION_GUIDE.md` |
-| AI-ModelNet 论文复现具体步骤 | `docs/ModelNet/PAPER_REPRODUCTION_PLAN.md` |
-| token 级算法原型（PN.py） | `docs/ModelNet/PN.py` |
+| 怎么写新节点 | `docs/ModelNet/architecture/EXTENSION_GUIDE.md` |
+| AI-ModelNet 论文复现具体步骤 | `docs/ModelNet/research/research/PAPER_REPRODUCTION_PLAN.md` |
+| token 级算法原型（PN.py） | `docs/ModelNet/research/references/PN.py` |
 
 ---
 
