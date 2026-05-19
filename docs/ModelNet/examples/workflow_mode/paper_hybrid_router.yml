@@ -1,5 +1,6 @@
 app:
-  description: AI-ModelNet 混合推理总入口。必填输入 `path` 选择六条 S2P/P2S token 级融合路径之一，`question` 会被路由到对应分支。
+  description: AI-ModelNet 混合推理总入口。必填输入 `path` 选择六条 S2P/P2S token 级融合路径之一；工作流会加载本地 C-Eval JSONL，逐样本循环运行
+    所选路径并输出 accuracy、correct_count 和逐样本 results。
   icon: 🎼
   icon_background: '#DCE5FF'
   mode: workflow
@@ -27,10 +28,10 @@ workflow:
       enabled: false
   graph:
     edges:
-    - id: start_node-source-to-route_path
+    - id: start_node-source-to-sample_loader
       source: start_node
       sourceHandle: source
-      target: route_path
+      target: sample_loader
       targetHandle: target
       type: custom
       zIndex: 0
@@ -38,444 +39,555 @@ workflow:
         isInIteration: false
         isInLoop: false
         sourceType: start
+        targetType: data-loader
+    - id: sample_loader-source-to-sample_iteration
+      source: sample_loader
+      sourceHandle: source
+      target: sample_iteration
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: data-loader
+        targetType: iteration
+    - id: sample_iteration_start-source-to-prepare_sample
+      source: sample_iteration_start
+      sourceHandle: source
+      target: prepare_sample
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: iteration-start
+        targetType: code
+        iteration_id: sample_iteration
+    - id: prepare_sample-source-to-route_path
+      source: prepare_sample
+      sourceHandle: source
+      target: route_path
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
         targetType: if-else
+        iteration_id: sample_iteration
     - id: route_path-paper_s2p_Q_DY-to-paper_s2p_Q_DY__llm_Q_serial
       source: route_path
       sourceHandle: paper_s2p_Q_DY
       target: paper_s2p_Q_DY__llm_Q_serial
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: llm
+        iteration_id: sample_iteration
     - id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_D_par
       source: paper_s2p_Q_DY__llm_Q_serial
       sourceHandle: source
       target: paper_s2p_Q_DY__token_D_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_Y_par
       source: paper_s2p_Q_DY__llm_Q_serial
       sourceHandle: source
       target: paper_s2p_Q_DY__token_Y_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_s2p_Q_DY__token_D_par-source-to-paper_s2p_Q_DY__aggregator
       source: paper_s2p_Q_DY__token_D_par
       sourceHandle: source
       target: paper_s2p_Q_DY__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_s2p_Q_DY__token_Y_par-source-to-paper_s2p_Q_DY__aggregator
       source: paper_s2p_Q_DY__token_Y_par
       sourceHandle: source
       target: paper_s2p_Q_DY__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-    - id: paper_s2p_Q_DY__aggregator-source-to-paper_s2p_Q_DY__end
+        iteration_id: sample_iteration
+    - id: paper_s2p_Q_DY__aggregator-source-to-answer_aggregator
       source: paper_s2p_Q_DY__aggregator
       sourceHandle: source
-      target: paper_s2p_Q_DY__end
+      target: answer_aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
-        targetType: end
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
     - id: route_path-paper_s2p_D_QY-to-paper_s2p_D_QY__llm_D_serial
       source: route_path
       sourceHandle: paper_s2p_D_QY
       target: paper_s2p_D_QY__llm_D_serial
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: llm
+        iteration_id: sample_iteration
     - id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Q_par
       source: paper_s2p_D_QY__llm_D_serial
       sourceHandle: source
       target: paper_s2p_D_QY__token_Q_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Y_par
       source: paper_s2p_D_QY__llm_D_serial
       sourceHandle: source
       target: paper_s2p_D_QY__token_Y_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_s2p_D_QY__token_Q_par-source-to-paper_s2p_D_QY__aggregator
       source: paper_s2p_D_QY__token_Q_par
       sourceHandle: source
       target: paper_s2p_D_QY__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_s2p_D_QY__token_Y_par-source-to-paper_s2p_D_QY__aggregator
       source: paper_s2p_D_QY__token_Y_par
       sourceHandle: source
       target: paper_s2p_D_QY__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-    - id: paper_s2p_D_QY__aggregator-source-to-paper_s2p_D_QY__end
+        iteration_id: sample_iteration
+    - id: paper_s2p_D_QY__aggregator-source-to-answer_aggregator
       source: paper_s2p_D_QY__aggregator
       sourceHandle: source
-      target: paper_s2p_D_QY__end
+      target: answer_aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
-        targetType: end
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
     - id: route_path-paper_s2p_Y_QD-to-paper_s2p_Y_QD__llm_Y_serial
       source: route_path
       sourceHandle: paper_s2p_Y_QD
       target: paper_s2p_Y_QD__llm_Y_serial
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: llm
+        iteration_id: sample_iteration
     - id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_Q_par
       source: paper_s2p_Y_QD__llm_Y_serial
       sourceHandle: source
       target: paper_s2p_Y_QD__token_Q_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_D_par
       source: paper_s2p_Y_QD__llm_Y_serial
       sourceHandle: source
       target: paper_s2p_Y_QD__token_D_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_s2p_Y_QD__token_Q_par-source-to-paper_s2p_Y_QD__aggregator
       source: paper_s2p_Y_QD__token_Q_par
       sourceHandle: source
       target: paper_s2p_Y_QD__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_s2p_Y_QD__token_D_par-source-to-paper_s2p_Y_QD__aggregator
       source: paper_s2p_Y_QD__token_D_par
       sourceHandle: source
       target: paper_s2p_Y_QD__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
-    - id: paper_s2p_Y_QD__aggregator-source-to-paper_s2p_Y_QD__end
+        iteration_id: sample_iteration
+    - id: paper_s2p_Y_QD__aggregator-source-to-answer_aggregator
       source: paper_s2p_Y_QD__aggregator
       sourceHandle: source
-      target: paper_s2p_Y_QD__end
+      target: answer_aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
-        targetType: end
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
     - id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_Q_par
       source: route_path
       sourceHandle: paper_p2s_QD_Y
       target: paper_p2s_QD_Y__token_Q_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_D_par
       source: route_path
       sourceHandle: paper_p2s_QD_Y
       target: paper_p2s_QD_Y__token_D_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_p2s_QD_Y__token_Q_par-source-to-paper_p2s_QD_Y__aggregator
       source: paper_p2s_QD_Y__token_Q_par
       sourceHandle: source
       target: paper_p2s_QD_Y__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_p2s_QD_Y__token_D_par-source-to-paper_p2s_QD_Y__aggregator
       source: paper_p2s_QD_Y__token_D_par
       sourceHandle: source
       target: paper_p2s_QD_Y__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_p2s_QD_Y__aggregator-source-to-paper_p2s_QD_Y__llm_Y_serial
       source: paper_p2s_QD_Y__aggregator
       sourceHandle: source
       target: paper_p2s_QD_Y__llm_Y_serial
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
         targetType: llm
-    - id: paper_p2s_QD_Y__llm_Y_serial-source-to-paper_p2s_QD_Y__end
+        iteration_id: sample_iteration
+    - id: paper_p2s_QD_Y__llm_Y_serial-source-to-answer_aggregator
       source: paper_p2s_QD_Y__llm_Y_serial
       sourceHandle: source
-      target: paper_p2s_QD_Y__end
+      target: answer_aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
-        targetType: end
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
     - id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Q_par
       source: route_path
       sourceHandle: paper_p2s_QY_D
       target: paper_p2s_QY_D__token_Q_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Y_par
       source: route_path
       sourceHandle: paper_p2s_QY_D
       target: paper_p2s_QY_D__token_Y_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_p2s_QY_D__token_Q_par-source-to-paper_p2s_QY_D__aggregator
       source: paper_p2s_QY_D__token_Q_par
       sourceHandle: source
       target: paper_p2s_QY_D__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_p2s_QY_D__token_Y_par-source-to-paper_p2s_QY_D__aggregator
       source: paper_p2s_QY_D__token_Y_par
       sourceHandle: source
       target: paper_p2s_QY_D__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_p2s_QY_D__aggregator-source-to-paper_p2s_QY_D__llm_D_serial
       source: paper_p2s_QY_D__aggregator
       sourceHandle: source
       target: paper_p2s_QY_D__llm_D_serial
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
         targetType: llm
-    - id: paper_p2s_QY_D__llm_D_serial-source-to-paper_p2s_QY_D__end
+        iteration_id: sample_iteration
+    - id: paper_p2s_QY_D__llm_D_serial-source-to-answer_aggregator
       source: paper_p2s_QY_D__llm_D_serial
       sourceHandle: source
-      target: paper_p2s_QY_D__end
+      target: answer_aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: llm
-        targetType: end
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
     - id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_D_par
       source: route_path
       sourceHandle: paper_p2s_DY_Q
       target: paper_p2s_DY_Q__token_D_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_Y_par
       source: route_path
       sourceHandle: paper_p2s_DY_Q
       target: paper_p2s_DY_Q__token_Y_par
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: if-else
         targetType: token-model-source
+        iteration_id: sample_iteration
     - id: paper_p2s_DY_Q__token_D_par-source-to-paper_p2s_DY_Q__aggregator
       source: paper_p2s_DY_Q__token_D_par
       sourceHandle: source
       target: paper_p2s_DY_Q__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_p2s_DY_Q__token_Y_par-source-to-paper_p2s_DY_Q__aggregator
       source: paper_p2s_DY_Q__token_Y_par
       sourceHandle: source
       target: paper_p2s_DY_Q__aggregator
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: token-model-source
         targetType: parallel-ensemble
+        iteration_id: sample_iteration
     - id: paper_p2s_DY_Q__aggregator-source-to-paper_p2s_DY_Q__llm_Q_serial
       source: paper_p2s_DY_Q__aggregator
       sourceHandle: source
       target: paper_p2s_DY_Q__llm_Q_serial
       targetHandle: target
       type: custom
-      zIndex: 0
+      zIndex: 1002
       data:
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
         targetType: llm
-    - id: paper_p2s_DY_Q__llm_Q_serial-source-to-paper_p2s_DY_Q__end
+        iteration_id: sample_iteration
+    - id: paper_p2s_DY_Q__llm_Q_serial-source-to-answer_aggregator
       source: paper_p2s_DY_Q__llm_Q_serial
       sourceHandle: source
-      target: paper_p2s_DY_Q__end
+      target: answer_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: llm
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
+    - id: answer_aggregator-source-to-evaluate_answer
+      source: answer_aggregator
+      sourceHandle: source
+      target: evaluate_answer
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: variable-aggregator
+        targetType: code
+        iteration_id: sample_iteration
+    - id: sample_iteration-source-to-summarize_results
+      source: sample_iteration
+      sourceHandle: source
+      target: summarize_results
       targetHandle: target
       type: custom
       zIndex: 0
       data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
+        sourceType: iteration
+        targetType: code
+    - id: summarize_results-source-to-end_node
+      source: summarize_results
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+      data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
         targetType: end
     nodes:
     - id: start_node
       type: custom
       data:
-        desc: 选择实验路径并输入待推理问题。
+        desc: 选择一条混合推理路径；问题由数据集加载节点提供。
         selected: false
         title: 开始
         type: start
@@ -492,23 +604,198 @@ workflow:
           required: true
           type: select
           variable: path
-        - label: 问题
-          max_length: 4096
-          options: []
-          required: true
-          type: paragraph
-          variable: question
-      height: 112
+      height: 90
       position:
         x: 30
-        y: 1180
+        y: 1100
       positionAbsolute:
         x: 30
-        y: 1180
+        y: 1100
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+    - id: sample_loader
+      type: custom
+      data:
+        desc: 从本地 C-Eval JSONL 文件可复现抽样，输出 items、questions、answers 和数据集元数据；后续 Iteration 会逐条样本运行所选混合路径。
+        loader_name: jsonl_file
+        loader_config:
+          path: /home/duxianghe/dify/dev/modelnet/datasets/c_eval.jsonl
+          dataset_name: C-Eval
+          split: validation-sample
+          encoding: utf-8
+          id_key: id
+          question_key: question
+          answer_key: answer
+          metadata_keys:
+          - subject
+          - extractor
+        limit: 100
+        offset: 0
+        seed: 42
+        selected: false
+        shuffle: true
+        title: 数据集加载：C-Eval 抽样
+        type: data-loader
+      height: 142
+      position:
+        x: 334
+        y: 1084
+      positionAbsolute:
+        x: 334
+        y: 1084
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+    - id: sample_iteration
+      type: custom
+      data:
+        desc: 样本级 Iteration。每轮处理一条 data-loader item；每条样本内部通过 path 路由到六条 S2P/P2S 混合路径之一，并收集评测结果。
+        error_handle_mode: terminated
+        flatten_output: true
+        height: 2260
+        is_parallel: false
+        iterator_input_type: array[object]
+        iterator_selector:
+        - sample_loader
+        - items
+        output_selector:
+        - evaluate_answer
+        - result
+        output_type: array[object]
+        parallel_nums: 1
+        selected: false
+        start_node_id: sample_iteration_start
+        title: 迭代：逐样本运行所选混合路径
+        type: iteration
+        width: 2520
+      height: 2260
+      position:
+        x: 638
+        y: 80
+      positionAbsolute:
+        x: 638
+        y: 80
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 2520
+      zIndex: 1
+    - id: sample_iteration_start
+      type: custom-iteration-start
+      data:
+        desc: 样本级迭代起点。
+        isInIteration: true
+        selected: false
+        title: ''
+        type: iteration-start
+      draggable: false
+      height: 48
+      parentId: sample_iteration
+      position:
+        x: 32
+        y: 1110
+      positionAbsolute:
+        x: 670
+        y: 1190
+      selectable: false
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 44
+      zIndex: 1002
+    - id: prepare_sample
+      type: custom
+      data:
+        code: |
+          def main(item: dict, dataset: str, split: str, loader_metadata: dict) -> dict:
+              item = item or {}
+              data = item.get("data") or {}
+              metadata = item.get("metadata") or {}
+              question = item.get("question") or data.get("question") or ""
+              answer = item.get("answer") or data.get("answer") or ""
+              sample_id = item.get("id") or data.get("id") or ""
+              subject = metadata.get("subject") or data.get("subject") or ""
+              extractor = metadata.get("extractor") or data.get("extractor") or "last_abcd"
+              return {
+                  "prompt": str(question),
+                  "sample_id": str(sample_id),
+                  "gold_answer": str(answer),
+                  "subject": str(subject),
+                  "extractor": str(extractor),
+                  "dataset": dataset or "",
+                  "split": split or "",
+                  "source_path": (loader_metadata or {}).get("path", ""),
+                  "sample_metadata": metadata,
+              }
+        code_language: python3
+        desc: 整理当前迭代样本，生成 prompt、gold answer 和评测元数据。
+        outputs:
+          prompt:
+            children: null
+            type: string
+          sample_id:
+            children: null
+            type: string
+          gold_answer:
+            children: null
+            type: string
+          subject:
+            children: null
+            type: string
+          extractor:
+            children: null
+            type: string
+          dataset:
+            children: null
+            type: string
+          split:
+            children: null
+            type: string
+          source_path:
+            children: null
+            type: string
+          sample_metadata:
+            children: null
+            type: object
+        selected: false
+        title: 样本整理：生成 prompt
+        type: code
+        variables:
+        - value_selector:
+          - sample_iteration
+          - item
+          variable: item
+        - value_selector:
+          - sample_loader
+          - dataset
+          variable: dataset
+        - value_selector:
+          - sample_loader
+          - split
+          variable: split
+        - value_selector:
+          - sample_loader
+          - metadata
+          variable: loader_metadata
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 112
+        y: 1058
+      positionAbsolute:
+        x: 750
+        y: 1138
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: route_path
       type: custom
       data:
@@ -587,22 +874,25 @@ workflow:
             - path
             comparison_operator: is
             value: paper_p2s_DY_Q
-        isInIteration: false
+        isInIteration: true
         isInLoop: false
         selected: false
         title: 路由：实验路径
         type: if-else
+        iteration_id: sample_iteration
       height: 250
       position:
         x: 334
-        y: 1180
+        y: 1068
       positionAbsolute:
-        x: 334
-        y: 1180
+        x: 972
+        y: 1148
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Q_DY__llm_Q_serial
       type: custom
       data:
@@ -631,24 +921,29 @@ workflow:
           text: 你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。
         - id: fb68696e-42a1-52d7-aba9-6b54b5ea9b63
           role: user
-          text: '{{#start_node.question#}}'
+          text: '{{#prepare_sample.prompt#}}'
         selected: false
         title: S2P：Q 串行 → [D, Y] 并行：Q 串行草稿
         type: llm
         variables: []
         vision:
           enabled: false
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 90
       position:
         x: 638
         y: 156
       positionAbsolute:
-        x: 638
-        y: 156
+        x: 1276
+        y: 236
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Q_DY__token_D_par
       type: custom
       data:
@@ -657,7 +952,7 @@ workflow:
         model_alias: '22'
         prompt_template: |-
           问题：
-          {{#start_node.question#}}
+          {{#prepare_sample.prompt#}}
 
           第一阶段语义草稿：
           {{#paper_s2p_Q_DY__llm_Q_serial.text#}}
@@ -670,17 +965,22 @@ workflow:
         selected: false
         title: S2P：Q 串行 → [D, Y] 并行：D 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 942
         y: 80
       positionAbsolute:
-        x: 942
-        y: 80
+        x: 1580
+        y: 160
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Q_DY__token_Y_par
       type: custom
       data:
@@ -689,7 +989,7 @@ workflow:
         model_alias: '6'
         prompt_template: |-
           问题：
-          {{#start_node.question#}}
+          {{#prepare_sample.prompt#}}
 
           第一阶段语义草稿：
           {{#paper_s2p_Q_DY__llm_Q_serial.text#}}
@@ -702,17 +1002,22 @@ workflow:
         selected: false
         title: S2P：Q 串行 → [D, Y] 并行：Y 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 942
         y: 232
       positionAbsolute:
-        x: 942
-        y: 232
+        x: 1580
+        y: 312
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Q_DY__aggregator
       type: custom
       data:
@@ -748,41 +1053,22 @@ workflow:
         selected: false
         title: S2P：Q 串行 → [D, Y] 并行：token 级并行融合
         type: parallel-ensemble
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 200
       position:
         x: 1246
         y: 156
       positionAbsolute:
-        x: 1246
-        y: 156
+        x: 1884
+        y: 236
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
-    - id: paper_s2p_Q_DY__end
-      type: custom
-      data:
-        desc: 输出 S2P：Q 串行 → [D, Y] 并行 的最终答案。
-        outputs:
-        - value_selector:
-          - paper_s2p_Q_DY__aggregator
-          - text
-          value_type: string
-          variable: answer
-        selected: false
-        title: 结束：S2P：Q 串行 → [D, Y] 并行
-        type: end
-      height: 90
-      position:
-        x: 1550
-        y: 156
-      positionAbsolute:
-        x: 1550
-        y: 156
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_D_QY__llm_D_serial
       type: custom
       data:
@@ -811,24 +1097,29 @@ workflow:
           text: 你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。
         - id: 80e956a0-a62c-5115-a9c2-82db082e2127
           role: user
-          text: '{{#start_node.question#}}'
+          text: '{{#prepare_sample.prompt#}}'
         selected: false
         title: S2P：D 串行 → [Q, Y] 并行：D 串行草稿
         type: llm
         variables: []
         vision:
           enabled: false
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 90
       position:
         x: 638
-        y: 516
+        y: 496
       positionAbsolute:
-        x: 638
-        y: 516
+        x: 1276
+        y: 576
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_D_QY__token_Q_par
       type: custom
       data:
@@ -837,7 +1128,7 @@ workflow:
         model_alias: '5'
         prompt_template: |-
           问题：
-          {{#start_node.question#}}
+          {{#prepare_sample.prompt#}}
 
           第一阶段语义草稿：
           {{#paper_s2p_D_QY__llm_D_serial.text#}}
@@ -850,17 +1141,22 @@ workflow:
         selected: false
         title: S2P：D 串行 → [Q, Y] 并行：Q 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 942
-        y: 440
+        y: 420
       positionAbsolute:
-        x: 942
-        y: 440
+        x: 1580
+        y: 500
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_D_QY__token_Y_par
       type: custom
       data:
@@ -869,7 +1165,7 @@ workflow:
         model_alias: '6'
         prompt_template: |-
           问题：
-          {{#start_node.question#}}
+          {{#prepare_sample.prompt#}}
 
           第一阶段语义草稿：
           {{#paper_s2p_D_QY__llm_D_serial.text#}}
@@ -882,17 +1178,22 @@ workflow:
         selected: false
         title: S2P：D 串行 → [Q, Y] 并行：Y 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 942
-        y: 592
+        y: 572
       positionAbsolute:
-        x: 942
-        y: 592
+        x: 1580
+        y: 652
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_D_QY__aggregator
       type: custom
       data:
@@ -928,41 +1229,22 @@ workflow:
         selected: false
         title: S2P：D 串行 → [Q, Y] 并行：token 级并行融合
         type: parallel-ensemble
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 200
       position:
         x: 1246
-        y: 516
+        y: 496
       positionAbsolute:
-        x: 1246
-        y: 516
+        x: 1884
+        y: 576
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
-    - id: paper_s2p_D_QY__end
-      type: custom
-      data:
-        desc: 输出 S2P：D 串行 → [Q, Y] 并行 的最终答案。
-        outputs:
-        - value_selector:
-          - paper_s2p_D_QY__aggregator
-          - text
-          value_type: string
-          variable: answer
-        selected: false
-        title: 结束：S2P：D 串行 → [Q, Y] 并行
-        type: end
-      height: 90
-      position:
-        x: 1550
-        y: 516
-      positionAbsolute:
-        x: 1550
-        y: 516
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Y_QD__llm_Y_serial
       type: custom
       data:
@@ -991,24 +1273,29 @@ workflow:
           text: 你是严谨的问题求解助手。请阅读问题，逐步推理，并在回答末尾给出最终答案。
         - id: 512578bc-29f3-5947-a0ce-b71a35bd43a2
           role: user
-          text: '{{#start_node.question#}}'
+          text: '{{#prepare_sample.prompt#}}'
         selected: false
         title: S2P：Y 串行 → [Q, D] 并行：Y 串行草稿
         type: llm
         variables: []
         vision:
           enabled: false
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 90
       position:
         x: 638
-        y: 876
+        y: 836
       positionAbsolute:
-        x: 638
-        y: 876
+        x: 1276
+        y: 916
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Y_QD__token_Q_par
       type: custom
       data:
@@ -1017,7 +1304,7 @@ workflow:
         model_alias: '5'
         prompt_template: |-
           问题：
-          {{#start_node.question#}}
+          {{#prepare_sample.prompt#}}
 
           第一阶段语义草稿：
           {{#paper_s2p_Y_QD__llm_Y_serial.text#}}
@@ -1030,17 +1317,22 @@ workflow:
         selected: false
         title: S2P：Y 串行 → [Q, D] 并行：Q 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 942
-        y: 800
+        y: 760
       positionAbsolute:
-        x: 942
-        y: 800
+        x: 1580
+        y: 840
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Y_QD__token_D_par
       type: custom
       data:
@@ -1049,7 +1341,7 @@ workflow:
         model_alias: '22'
         prompt_template: |-
           问题：
-          {{#start_node.question#}}
+          {{#prepare_sample.prompt#}}
 
           第一阶段语义草稿：
           {{#paper_s2p_Y_QD__llm_Y_serial.text#}}
@@ -1062,17 +1354,22 @@ workflow:
         selected: false
         title: S2P：Y 串行 → [Q, D] 并行：D 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 942
-        y: 952
+        y: 912
       positionAbsolute:
-        x: 942
-        y: 952
+        x: 1580
+        y: 992
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Y_QD__aggregator
       type: custom
       data:
@@ -1108,48 +1405,29 @@ workflow:
         selected: false
         title: S2P：Y 串行 → [Q, D] 并行：token 级并行融合
         type: parallel-ensemble
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 200
       position:
         x: 1246
-        y: 876
+        y: 836
       positionAbsolute:
-        x: 1246
-        y: 876
+        x: 1884
+        y: 916
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
-    - id: paper_s2p_Y_QD__end
-      type: custom
-      data:
-        desc: 输出 S2P：Y 串行 → [Q, D] 并行 的最终答案。
-        outputs:
-        - value_selector:
-          - paper_s2p_Y_QD__aggregator
-          - text
-          value_type: string
-          variable: answer
-        selected: false
-        title: 结束：S2P：Y 串行 → [Q, D] 并行
-        type: end
-      height: 90
-      position:
-        x: 1550
-        y: 876
-      positionAbsolute:
-        x: 1550
-        y: 876
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QD_Y__token_Q_par
       type: custom
       data:
         desc: P2S：[Q, D] 并行 → Y 综合 并行源：Qwen2.5-7B-Instruct 参与 token 级融合。
         extra: {}
         model_alias: '5'
-        prompt_template: '{{#start_node.question#}}'
+        prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
           temperature: 0.7
@@ -1157,24 +1435,29 @@ workflow:
         selected: false
         title: P2S：[Q, D] 并行 → Y 综合：Q 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 638
-        y: 1160
+        y: 1100
       positionAbsolute:
-        x: 638
-        y: 1160
+        x: 1276
+        y: 1180
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QD_Y__token_D_par
       type: custom
       data:
         desc: P2S：[Q, D] 并行 → Y 综合 并行源：Qwen3-8B-BF16（D 角色替代模型） 参与 token 级融合。
         extra: {}
         model_alias: '22'
-        prompt_template: '{{#start_node.question#}}'
+        prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
           temperature: 0.7
@@ -1182,17 +1465,22 @@ workflow:
         selected: false
         title: P2S：[Q, D] 并行 → Y 综合：D 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 638
-        y: 1312
+        y: 1252
       positionAbsolute:
-        x: 638
-        y: 1312
+        x: 1276
+        y: 1332
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QD_Y__aggregator
       type: custom
       data:
@@ -1228,17 +1516,22 @@ workflow:
         selected: false
         title: P2S：[Q, D] 并行 → Y 综合：token 级并行融合
         type: parallel-ensemble
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 200
       position:
         x: 942
-        y: 1236
+        y: 1176
       positionAbsolute:
-        x: 942
-        y: 1236
+        x: 1580
+        y: 1256
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QD_Y__llm_Y_serial
       type: custom
       data:
@@ -1269,7 +1562,7 @@ workflow:
           role: user
           text: |-
             问题：
-            {{#start_node.question#}}
+            {{#prepare_sample.prompt#}}
 
             token 级并行融合得到的候选答案：
             {{#paper_p2s_QD_Y__aggregator.text#}}
@@ -1281,48 +1574,29 @@ workflow:
         variables: []
         vision:
           enabled: false
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 90
       position:
         x: 1246
-        y: 1236
+        y: 1176
       positionAbsolute:
-        x: 1246
-        y: 1236
+        x: 1884
+        y: 1256
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
-    - id: paper_p2s_QD_Y__end
-      type: custom
-      data:
-        desc: 输出 P2S：[Q, D] 并行 → Y 综合 的最终答案。
-        outputs:
-        - value_selector:
-          - paper_p2s_QD_Y__llm_Y_serial
-          - text
-          value_type: string
-          variable: answer
-        selected: false
-        title: 结束：P2S：[Q, D] 并行 → Y 综合
-        type: end
-      height: 90
-      position:
-        x: 1550
-        y: 1236
-      positionAbsolute:
-        x: 1550
-        y: 1236
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QY_D__token_Q_par
       type: custom
       data:
         desc: P2S：[Q, Y] 并行 → D 综合 并行源：Qwen2.5-7B-Instruct 参与 token 级融合。
         extra: {}
         model_alias: '5'
-        prompt_template: '{{#start_node.question#}}'
+        prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
           temperature: 0.7
@@ -1330,24 +1604,29 @@ workflow:
         selected: false
         title: P2S：[Q, Y] 并行 → D 综合：Q 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 638
-        y: 1520
+        y: 1440
       positionAbsolute:
-        x: 638
+        x: 1276
         y: 1520
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QY_D__token_Y_par
       type: custom
       data:
         desc: P2S：[Q, Y] 并行 → D 综合 并行源：GLM-4-9B-Chat 参与 token 级融合。
         extra: {}
         model_alias: '6'
-        prompt_template: '{{#start_node.question#}}'
+        prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
           temperature: 0.7
@@ -1355,17 +1634,22 @@ workflow:
         selected: false
         title: P2S：[Q, Y] 并行 → D 综合：Y 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 638
-        y: 1672
+        y: 1592
       positionAbsolute:
-        x: 638
+        x: 1276
         y: 1672
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QY_D__aggregator
       type: custom
       data:
@@ -1401,17 +1685,22 @@ workflow:
         selected: false
         title: P2S：[Q, Y] 并行 → D 综合：token 级并行融合
         type: parallel-ensemble
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 200
       position:
         x: 942
-        y: 1596
+        y: 1516
       positionAbsolute:
-        x: 942
+        x: 1580
         y: 1596
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QY_D__llm_D_serial
       type: custom
       data:
@@ -1442,7 +1731,7 @@ workflow:
           role: user
           text: |-
             问题：
-            {{#start_node.question#}}
+            {{#prepare_sample.prompt#}}
 
             token 级并行融合得到的候选答案：
             {{#paper_p2s_QY_D__aggregator.text#}}
@@ -1454,48 +1743,29 @@ workflow:
         variables: []
         vision:
           enabled: false
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 90
       position:
         x: 1246
-        y: 1596
+        y: 1516
       positionAbsolute:
-        x: 1246
+        x: 1884
         y: 1596
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
-    - id: paper_p2s_QY_D__end
-      type: custom
-      data:
-        desc: 输出 P2S：[Q, Y] 并行 → D 综合 的最终答案。
-        outputs:
-        - value_selector:
-          - paper_p2s_QY_D__llm_D_serial
-          - text
-          value_type: string
-          variable: answer
-        selected: false
-        title: 结束：P2S：[Q, Y] 并行 → D 综合
-        type: end
-      height: 90
-      position:
-        x: 1550
-        y: 1596
-      positionAbsolute:
-        x: 1550
-        y: 1596
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_DY_Q__token_D_par
       type: custom
       data:
         desc: P2S：[D, Y] 并行 → Q 综合 并行源：Qwen3-8B-BF16（D 角色替代模型） 参与 token 级融合。
         extra: {}
         model_alias: '22'
-        prompt_template: '{{#start_node.question#}}'
+        prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
           temperature: 0.7
@@ -1503,24 +1773,29 @@ workflow:
         selected: false
         title: P2S：[D, Y] 并行 → Q 综合：D 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 638
-        y: 1880
+        y: 1780
       positionAbsolute:
-        x: 638
-        y: 1880
+        x: 1276
+        y: 1860
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_DY_Q__token_Y_par
       type: custom
       data:
         desc: P2S：[D, Y] 并行 → Q 综合 并行源：GLM-4-9B-Chat 参与 token 级融合。
         extra: {}
         model_alias: '6'
-        prompt_template: '{{#start_node.question#}}'
+        prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
           temperature: 0.7
@@ -1528,17 +1803,22 @@ workflow:
         selected: false
         title: P2S：[D, Y] 并行 → Q 综合：Y 并行源
         type: token-model-source
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 130
       position:
         x: 638
-        y: 2032
+        y: 1932
       positionAbsolute:
-        x: 638
-        y: 2032
+        x: 1276
+        y: 2012
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_DY_Q__aggregator
       type: custom
       data:
@@ -1574,17 +1854,22 @@ workflow:
         selected: false
         title: P2S：[D, Y] 并行 → Q 综合：token 级并行融合
         type: parallel-ensemble
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 200
       position:
         x: 942
-        y: 1956
+        y: 1856
       positionAbsolute:
-        x: 942
-        y: 1956
+        x: 1580
+        y: 1936
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_DY_Q__llm_Q_serial
       type: custom
       data:
@@ -1615,7 +1900,7 @@ workflow:
           role: user
           text: |-
             问题：
-            {{#start_node.question#}}
+            {{#prepare_sample.prompt#}}
 
             token 级并行融合得到的候选答案：
             {{#paper_p2s_DY_Q__aggregator.text#}}
@@ -1627,37 +1912,368 @@ workflow:
         variables: []
         vision:
           enabled: false
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
       height: 90
       position:
         x: 1246
-        y: 1956
+        y: 1856
       positionAbsolute:
-        x: 1246
-        y: 1956
+        x: 1884
+        y: 1936
       selected: false
       sourcePosition: right
       targetPosition: left
       width: 244
-    - id: paper_p2s_DY_Q__end
+      parentId: sample_iteration
+      zIndex: 1002
+    - id: answer_aggregator
       type: custom
       data:
-        desc: 输出 P2S：[D, Y] 并行 → Q 综合 的最终答案。
+        advanced_settings:
+          group_enabled: false
+          groups:
+          - groupId: 39353ab3-8db5-54f5-a2e5-7b4e9728190d
+            group_name: answer
+            output_type: string
+            variables: &id001
+            - - paper_s2p_Q_DY__aggregator
+              - text
+            - - paper_s2p_D_QY__aggregator
+              - text
+            - - paper_s2p_Y_QD__aggregator
+              - text
+            - - paper_p2s_QD_Y__llm_Y_serial
+              - text
+            - - paper_p2s_QY_D__llm_D_serial
+              - text
+            - - paper_p2s_DY_Q__llm_Q_serial
+              - text
+        desc: 汇合六条 path 分支，选择本次实际执行分支的最终答案文本。
+        output_type: string
+        selected: false
+        title: 答案汇合：选择实际分支输出
+        type: variable-aggregator
+        variables: *id001
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 129
+      position:
+        x: 1854
+        y: 1094
+      positionAbsolute:
+        x: 2492
+        y: 1174
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
+    - id: evaluate_answer
+      type: custom
+      data:
+        code: |
+          import re
+
+
+          def _last_abcd(text: str) -> str:
+              cleaned = (text or "").upper()
+              matches = re.findall(r"(?<![A-Z])([ABCD])(?![A-Z])", cleaned)
+              if matches:
+                  return matches[-1]
+              for char in reversed(cleaned):
+                  if char in {"A", "B", "C", "D"}:
+                      return char
+              return ""
+
+
+          def _last_bool(text: str) -> str:
+              cleaned = (text or "").strip().lower()
+              matches = re.findall(r"\b(true|false|yes|no)\b", cleaned)
+              if not matches:
+                  return ""
+              value = matches[-1]
+              if value == "yes":
+                  return "true"
+              if value == "no":
+                  return "false"
+              return value
+
+
+          def _last_number(text: str) -> str:
+              matches = re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", text or "")
+              if not matches:
+                  return ""
+              return matches[-1].replace(",", "")
+
+
+          def _boxed_or_number(text: str) -> str:
+              matches = re.findall(r"\\boxed\{([^{}]+)\}", text or "")
+              if matches:
+                  return matches[-1].strip()
+              return _last_number(text)
+
+
+          def _normalize(text: str, extractor: str) -> str:
+              strategy = (extractor or "").strip().lower()
+              if strategy == "last_bool":
+                  return _last_bool(text)
+              if strategy in {"last_number", "gsm8k_number"}:
+                  return _last_number(text)
+              if strategy in {"math_boxed", "boxed"}:
+                  return _boxed_or_number(text)
+              return _last_abcd(text)
+
+
+          def main(
+              raw_answer: str,
+              gold_answer: str,
+              extractor: str,
+              sample_id: str,
+              dataset: str,
+              split: str,
+              subject: str,
+              source_path: str,
+              path: str,
+          ) -> dict:
+              prediction = _normalize(raw_answer or "", extractor or "last_abcd")
+              normalized_gold = _normalize(gold_answer or "", extractor or "last_abcd")
+              is_correct = bool(prediction) and prediction == normalized_gold
+              result = {
+                  "sample_id": sample_id or "",
+                  "dataset": dataset or "",
+                  "split": split or "",
+                  "subject": subject or "",
+                  "path": path or "",
+                  "extractor": extractor or "last_abcd",
+                  "source_path": source_path or "",
+                  "gold_answer": gold_answer or "",
+                  "normalized_gold": normalized_gold,
+                  "prediction": prediction,
+                  "is_correct": is_correct,
+                  "raw_answer": raw_answer or "",
+              }
+              return {
+                  "raw_answer": result["raw_answer"],
+                  "prediction": prediction,
+                  "normalized_gold": normalized_gold,
+                  "is_correct": is_correct,
+                  "result": result,
+              }
+        code_language: python3
+        desc: 从最终文本中抽取预测答案，与 gold answer 对比，并输出当前样本评测对象。
+        outputs:
+          is_correct:
+            children: null
+            type: boolean
+          normalized_gold:
+            children: null
+            type: string
+          prediction:
+            children: null
+            type: string
+          raw_answer:
+            children: null
+            type: string
+          result:
+            children: null
+            type: object
+        selected: false
+        title: 评测：抽取并对比答案
+        type: code
+        variables:
+        - value_selector:
+          - answer_aggregator
+          - output
+          variable: raw_answer
+        - value_selector:
+          - prepare_sample
+          - gold_answer
+          variable: gold_answer
+        - value_selector:
+          - prepare_sample
+          - extractor
+          variable: extractor
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - dataset
+          variable: dataset
+        - value_selector:
+          - prepare_sample
+          - split
+          variable: split
+        - value_selector:
+          - prepare_sample
+          - subject
+          variable: subject
+        - value_selector:
+          - prepare_sample
+          - source_path
+          variable: source_path
+        - value_selector:
+          - start_node
+          - path
+          variable: path
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 2158
+        y: 1066
+      positionAbsolute:
+        x: 2796
+        y: 1146
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
+    - id: summarize_results
+      type: custom
+      data:
+        code: |
+          def main(results: list, dataset_total: int, loaded_count: int, next_offset: int) -> dict:
+              rows = results or []
+              total_evaluated = len(rows)
+              correct_count = 0
+              for row in rows:
+                  if isinstance(row, dict) and row.get("is_correct"):
+                      correct_count += 1
+              accuracy = correct_count / total_evaluated if total_evaluated else 0.0
+              return {
+                  "total_evaluated": total_evaluated,
+                  "correct_count": correct_count,
+                  "accuracy": accuracy,
+                  "dataset_total": dataset_total or 0,
+                  "loaded_count": loaded_count or total_evaluated,
+                  "next_offset": next_offset or 0,
+              }
+        code_language: python3
+        desc: 汇总本轮样本评测结果，计算正确数、评测数和准确率。
+        outputs:
+          accuracy:
+            children: null
+            type: number
+          correct_count:
+            children: null
+            type: number
+          dataset_total:
+            children: null
+            type: number
+          loaded_count:
+            children: null
+            type: number
+          next_offset:
+            children: null
+            type: number
+          total_evaluated:
+            children: null
+            type: number
+        selected: false
+        title: 汇总：计算本轮准确率
+        type: code
+        variables:
+        - value_selector:
+          - sample_iteration
+          - output
+          variable: results
+        - value_selector:
+          - sample_loader
+          - total
+          variable: dataset_total
+        - value_selector:
+          - sample_loader
+          - count
+          variable: loaded_count
+        - value_selector:
+          - sample_loader
+          - next_offset
+          variable: next_offset
+      height: 154
+      position:
+        x: 3462
+        y: 1100
+      positionAbsolute:
+        x: 3462
+        y: 1100
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+    - id: end_node
+      type: custom
+      data:
+        desc: 输出本轮逐样本结果、正确数、评测数和准确率。
         outputs:
         - value_selector:
-          - paper_p2s_DY_Q__llm_Q_serial
-          - text
+          - start_node
+          - path
           value_type: string
-          variable: answer
+          variable: path
+        - value_selector:
+          - sample_loader
+          - dataset
+          value_type: string
+          variable: dataset
+        - value_selector:
+          - sample_loader
+          - split
+          value_type: string
+          variable: split
+        - value_selector:
+          - sample_iteration
+          - output
+          value_type: array[object]
+          variable: results
+        - value_selector:
+          - summarize_results
+          - total_evaluated
+          value_type: number
+          variable: total_evaluated
+        - value_selector:
+          - summarize_results
+          - correct_count
+          value_type: number
+          variable: correct_count
+        - value_selector:
+          - summarize_results
+          - accuracy
+          value_type: number
+          variable: accuracy
+        - value_selector:
+          - summarize_results
+          - dataset_total
+          value_type: number
+          variable: dataset_total
+        - value_selector:
+          - summarize_results
+          - loaded_count
+          value_type: number
+          variable: loaded_count
+        - value_selector:
+          - summarize_results
+          - next_offset
+          value_type: number
+          variable: next_offset
         selected: false
-        title: 结束：P2S：[D, Y] 并行 → Q 综合
+        title: 结束：输出本轮实验结果
         type: end
-      height: 90
+      height: 190
       position:
-        x: 1550
-        y: 1956
+        x: 3766
+        y: 1100
       positionAbsolute:
-        x: 1550
-        y: 1956
+        x: 3766
+        y: 1100
       selected: false
       sourcePosition: right
       targetPosition: left

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generate AI-ModelNet paper-reproduction workflow DSLs.
 
-Emits one AI-ModelNet hybrid router workflow-mode DSL. The router selects
-among the 6 S2P / P2S token-level fusion paths at runtime via a required
-``path`` input. The paper-model roles are {Q=Qwen2.5-7B,
+Emits one AI-ModelNet hybrid router workflow-mode DSL. The workflow loads a
+local benchmark JSONL file, iterates over the loaded samples, and routes each
+sample through one of the 6 S2P / P2S token-level fusion paths selected by the
+required ``path`` input. The paper-model roles are {Q=Qwen2.5-7B,
 D=Qwen3-8B thinking-model substitute, Y=GLM-4-9B-Chat}. The file is written to
 ``docs/ModelNet/examples/workflow_mode/paper_hybrid_router.yml``.
 Idempotent — overwrites the router file and removes stale ``paper_*.yml``
@@ -53,6 +54,17 @@ LLM_MODE = "chat"
 LLM_TEMPERATURE = 0.0
 LLM_MAX_TOKENS = 512
 
+DEFAULT_DATASET_PATH = "/home/duxianghe/dify/dev/modelnet/datasets/c_eval.jsonl"
+DEFAULT_DATASET_NAME = "C-Eval"
+DEFAULT_DATASET_SPLIT = "validation-sample"
+DEFAULT_DATASET_LIMIT = 100
+DEFAULT_DATASET_SEED = 42
+
+ITERATION_ID = "sample_iteration"
+ITERATION_START_ID = "sample_iteration_start"
+ITERATION_X = 638
+ITERATION_Y = 80
+
 
 # ── Paper model registry ──────────────────────────────────────────────
 
@@ -93,19 +105,20 @@ SYS_SYNTHESIZE = (
 )
 
 USR_LEAF = "{{#start_node.question#}}"
+USR_SAMPLE = "{{#prepare_sample.prompt#}}"
 _USR_REFINE_TPL = (
-    "问题：\n{{{{#start_node.question#}}}}\n\n"
+    "问题：\n{question}\n\n"
     "上一阶段模型给出的候选答案：\n{{{{#{prev_node}.text#}}}}\n\n"
     "请给出你自己的最终答案："
 )
 _USR_SYNTHESIZE_TPL = (
-    "问题：\n{{{{#start_node.question#}}}}\n\n"
+    "问题：\n{question}\n\n"
     "token 级并行融合得到的候选答案：\n{{{{#{aggregator}.text#}}}}\n\n"
     "请给出核验后的统一最终答案："
 )
 
 _USR_S2P_PARALLEL_TPL = (
-    "问题：\n{{{{#start_node.question#}}}}\n\n"
+    "问题：\n{question}\n\n"
     "第一阶段语义草稿：\n{{{{#{serial_node}.text#}}}}\n\n"
     "请基于该草稿继续推理或修正，并在回答末尾给出最终答案。"
 )
@@ -125,16 +138,16 @@ def _path_label(path_name: str) -> str:
     return PATH_LABELS.get(path_name, path_name)
 
 
-def _refine_user(prev_node: str) -> str:
-    return _USR_REFINE_TPL.format(prev_node=prev_node)
+def _refine_user(prev_node: str, *, question: str = USR_LEAF) -> str:
+    return _USR_REFINE_TPL.format(prev_node=prev_node, question=question)
 
 
-def _synthesize_user(aggregator: str) -> str:
-    return _USR_SYNTHESIZE_TPL.format(aggregator=aggregator)
+def _synthesize_user(aggregator: str, *, question: str = USR_LEAF) -> str:
+    return _USR_SYNTHESIZE_TPL.format(aggregator=aggregator, question=question)
 
 
-def _s2p_parallel_prompt(serial_node: str) -> str:
-    return _USR_S2P_PARALLEL_TPL.format(serial_node=serial_node)
+def _s2p_parallel_prompt(serial_node: str, *, question: str = USR_LEAF) -> str:
+    return _USR_S2P_PARALLEL_TPL.format(serial_node=serial_node, question=question)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -154,7 +167,13 @@ def _stack_y(index: int, total: int, anchor: int = 252, spacing: int = 152) -> i
 # ── Node builders ────────────────────────────────────────────────────
 
 
-def _start_node(y: int = 252, *, path_options: list[str] | None = None) -> dict:
+def _start_node(
+    y: int = 252,
+    *,
+    path_options: list[str] | None = None,
+    include_question: bool = True,
+    desc: str | None = None,
+) -> dict:
     variables: list[dict] = []
     if path_options:
         variables.append(
@@ -167,29 +186,460 @@ def _start_node(y: int = 252, *, path_options: list[str] | None = None) -> dict:
                 "variable": "path",
             }
         )
-    variables.append(
-        {
-            "label": "问题",
-            "max_length": 4096,
-            "options": [],
-            "required": True,
-            "type": "paragraph",
-            "variable": "question",
-        }
-    )
+    if include_question:
+        variables.append(
+            {
+                "label": "问题",
+                "max_length": 4096,
+                "options": [],
+                "required": True,
+                "type": "paragraph",
+                "variable": "question",
+            }
+        )
+    height = 74 if not variables else 90 + max(0, len(variables) - 1) * 22
     return {
         "id": "start_node",
         "type": "custom",
         "data": {
-            "desc": "选择实验路径并输入待推理问题。",
+            "desc": desc or "选择实验路径并输入待推理问题。",
             "selected": False,
             "title": "开始",
             "type": "start",
             "variables": variables,
         },
-        "height": 112 if path_options else 90,
+        "height": height,
         "position": {"x": 30, "y": y},
         "positionAbsolute": {"x": 30, "y": y},
+        "selected": False,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "width": 244,
+    }
+
+
+def _data_loader_node(x: int, y: int) -> dict:
+    return {
+        "id": "sample_loader",
+        "type": "custom",
+        "data": {
+            "desc": (
+                "从本地 C-Eval JSONL 文件可复现抽样，输出 items、questions、answers "
+                "和数据集元数据；后续 Iteration 会逐条样本运行所选混合路径。"
+            ),
+            "loader_name": "jsonl_file",
+            "loader_config": {
+                "path": DEFAULT_DATASET_PATH,
+                "dataset_name": DEFAULT_DATASET_NAME,
+                "split": DEFAULT_DATASET_SPLIT,
+                "encoding": "utf-8",
+                "id_key": "id",
+                "question_key": "question",
+                "answer_key": "answer",
+                "metadata_keys": ["subject", "extractor"],
+            },
+            "limit": DEFAULT_DATASET_LIMIT,
+            "offset": 0,
+            "seed": DEFAULT_DATASET_SEED,
+            "selected": False,
+            "shuffle": True,
+            "title": "数据集加载：C-Eval 抽样",
+            "type": "data-loader",
+        },
+        "height": 142,
+        "position": {"x": x, "y": y},
+        "positionAbsolute": {"x": x, "y": y},
+        "selected": False,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "width": 244,
+    }
+
+
+def _iteration_node(x: int, y: int, *, width: int = 2520, height: int = 2260) -> dict:
+    return {
+        "id": ITERATION_ID,
+        "type": "custom",
+        "data": {
+            "desc": (
+                "样本级 Iteration。每轮处理一条 data-loader item；每条样本内部通过 "
+                "path 路由到六条 S2P/P2S 混合路径之一，并收集评测结果。"
+            ),
+            "error_handle_mode": "terminated",
+            "flatten_output": True,
+            "height": height,
+            "is_parallel": False,
+            "iterator_input_type": "array[object]",
+            "iterator_selector": ["sample_loader", "items"],
+            "output_selector": ["evaluate_answer", "result"],
+            "output_type": "array[object]",
+            "parallel_nums": 1,
+            "selected": False,
+            "start_node_id": ITERATION_START_ID,
+            "title": "迭代：逐样本运行所选混合路径",
+            "type": "iteration",
+            "width": width,
+        },
+        "height": height,
+        "position": {"x": x, "y": y},
+        "positionAbsolute": {"x": x, "y": y},
+        "selected": False,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "width": width,
+        "zIndex": 1,
+    }
+
+
+def _iteration_child(node: dict) -> dict:
+    node["parentId"] = ITERATION_ID
+    node["zIndex"] = 1002
+    node["positionAbsolute"] = {
+        "x": ITERATION_X + node["position"]["x"],
+        "y": ITERATION_Y + node["position"]["y"],
+    }
+    data = node.setdefault("data", {})
+    data["isInIteration"] = True
+    data["isInLoop"] = False
+    data["iteration_id"] = ITERATION_ID
+    return node
+
+
+def _iteration_start_node(x: int = 32, y: int = 1110) -> dict:
+    return {
+        "id": ITERATION_START_ID,
+        "type": "custom-iteration-start",
+        "data": {
+            "desc": "样本级迭代起点。",
+            "isInIteration": True,
+            "selected": False,
+            "title": "",
+            "type": "iteration-start",
+        },
+        "draggable": False,
+        "height": 48,
+        "parentId": ITERATION_ID,
+        "position": {"x": x, "y": y},
+        "positionAbsolute": {"x": ITERATION_X + x, "y": ITERATION_Y + y},
+        "selectable": False,
+        "selected": False,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "width": 44,
+        "zIndex": 1002,
+    }
+
+
+def _prepare_sample_node(x: int = 112, y: int = 1058) -> dict:
+    return _iteration_child(
+        {
+            "id": "prepare_sample",
+            "type": "custom",
+            "data": {
+                "code": (
+                    "def main(item: dict, dataset: str, split: str, loader_metadata: dict) -> dict:\n"
+                    "    item = item or {}\n"
+                    "    data = item.get(\"data\") or {}\n"
+                    "    metadata = item.get(\"metadata\") or {}\n"
+                    "    question = item.get(\"question\") or data.get(\"question\") or \"\"\n"
+                    "    answer = item.get(\"answer\") or data.get(\"answer\") or \"\"\n"
+                    "    sample_id = item.get(\"id\") or data.get(\"id\") or \"\"\n"
+                    "    subject = metadata.get(\"subject\") or data.get(\"subject\") or \"\"\n"
+                    "    extractor = metadata.get(\"extractor\") or data.get(\"extractor\") or \"last_abcd\"\n"
+                    "    return {\n"
+                    "        \"prompt\": str(question),\n"
+                    "        \"sample_id\": str(sample_id),\n"
+                    "        \"gold_answer\": str(answer),\n"
+                    "        \"subject\": str(subject),\n"
+                    "        \"extractor\": str(extractor),\n"
+                    "        \"dataset\": dataset or \"\",\n"
+                    "        \"split\": split or \"\",\n"
+                    "        \"source_path\": (loader_metadata or {}).get(\"path\", \"\"),\n"
+                    "        \"sample_metadata\": metadata,\n"
+                    "    }\n"
+                ),
+                "code_language": "python3",
+                "desc": "整理当前迭代样本，生成 prompt、gold answer 和评测元数据。",
+                "outputs": {
+                    "prompt": {"children": None, "type": "string"},
+                    "sample_id": {"children": None, "type": "string"},
+                    "gold_answer": {"children": None, "type": "string"},
+                    "subject": {"children": None, "type": "string"},
+                    "extractor": {"children": None, "type": "string"},
+                    "dataset": {"children": None, "type": "string"},
+                    "split": {"children": None, "type": "string"},
+                    "source_path": {"children": None, "type": "string"},
+                    "sample_metadata": {"children": None, "type": "object"},
+                },
+                "selected": False,
+                "title": "样本整理：生成 prompt",
+                "type": "code",
+                "variables": [
+                    {"value_selector": [ITERATION_ID, "item"], "variable": "item"},
+                    {"value_selector": ["sample_loader", "dataset"], "variable": "dataset"},
+                    {"value_selector": ["sample_loader", "split"], "variable": "split"},
+                    {"value_selector": ["sample_loader", "metadata"], "variable": "loader_metadata"},
+                ],
+            },
+            "height": 154,
+            "position": {"x": x, "y": y},
+            "positionAbsolute": {"x": x, "y": y},
+            "selected": False,
+            "sourcePosition": "right",
+            "targetPosition": "left",
+            "width": 244,
+        }
+    )
+
+
+def _answer_aggregator_node(selectors: list[list[str]], x: int = 1854, y: int = 1094) -> dict:
+    return _iteration_child(
+        {
+            "id": "answer_aggregator",
+            "type": "custom",
+            "data": {
+                "advanced_settings": {
+                    "group_enabled": False,
+                    "groups": [
+                        {
+                            "groupId": _uid("answer_aggregator", "group"),
+                            "group_name": "answer",
+                            "output_type": "string",
+                            "variables": selectors,
+                        }
+                    ],
+                },
+                "desc": "汇合六条 path 分支，选择本次实际执行分支的最终答案文本。",
+                "output_type": "string",
+                "selected": False,
+                "title": "答案汇合：选择实际分支输出",
+                "type": "variable-aggregator",
+                "variables": selectors,
+            },
+            "height": 129,
+            "position": {"x": x, "y": y},
+            "positionAbsolute": {"x": x, "y": y},
+            "selected": False,
+            "sourcePosition": "right",
+            "targetPosition": "left",
+            "width": 244,
+        }
+    )
+
+
+def _evaluate_answer_node(x: int = 2158, y: int = 1066) -> dict:
+    code = r'''import re
+
+
+def _last_abcd(text: str) -> str:
+    cleaned = (text or "").upper()
+    matches = re.findall(r"(?<![A-Z])([ABCD])(?![A-Z])", cleaned)
+    if matches:
+        return matches[-1]
+    for char in reversed(cleaned):
+        if char in {"A", "B", "C", "D"}:
+            return char
+    return ""
+
+
+def _last_bool(text: str) -> str:
+    cleaned = (text or "").strip().lower()
+    matches = re.findall(r"\b(true|false|yes|no)\b", cleaned)
+    if not matches:
+        return ""
+    value = matches[-1]
+    if value == "yes":
+        return "true"
+    if value == "no":
+        return "false"
+    return value
+
+
+def _last_number(text: str) -> str:
+    matches = re.findall(r"[-+]?\d[\d,]*(?:\.\d+)?", text or "")
+    if not matches:
+        return ""
+    return matches[-1].replace(",", "")
+
+
+def _boxed_or_number(text: str) -> str:
+    matches = re.findall(r"\\boxed\{([^{}]+)\}", text or "")
+    if matches:
+        return matches[-1].strip()
+    return _last_number(text)
+
+
+def _normalize(text: str, extractor: str) -> str:
+    strategy = (extractor or "").strip().lower()
+    if strategy == "last_bool":
+        return _last_bool(text)
+    if strategy in {"last_number", "gsm8k_number"}:
+        return _last_number(text)
+    if strategy in {"math_boxed", "boxed"}:
+        return _boxed_or_number(text)
+    return _last_abcd(text)
+
+
+def main(
+    raw_answer: str,
+    gold_answer: str,
+    extractor: str,
+    sample_id: str,
+    dataset: str,
+    split: str,
+    subject: str,
+    source_path: str,
+    path: str,
+) -> dict:
+    prediction = _normalize(raw_answer or "", extractor or "last_abcd")
+    normalized_gold = _normalize(gold_answer or "", extractor or "last_abcd")
+    is_correct = bool(prediction) and prediction == normalized_gold
+    result = {
+        "sample_id": sample_id or "",
+        "dataset": dataset or "",
+        "split": split or "",
+        "subject": subject or "",
+        "path": path or "",
+        "extractor": extractor or "last_abcd",
+        "source_path": source_path or "",
+        "gold_answer": gold_answer or "",
+        "normalized_gold": normalized_gold,
+        "prediction": prediction,
+        "is_correct": is_correct,
+        "raw_answer": raw_answer or "",
+    }
+    return {
+        "raw_answer": result["raw_answer"],
+        "prediction": prediction,
+        "normalized_gold": normalized_gold,
+        "is_correct": is_correct,
+        "result": result,
+    }
+'''
+    return _iteration_child(
+        {
+            "id": "evaluate_answer",
+            "type": "custom",
+            "data": {
+                "code": code,
+                "code_language": "python3",
+                "desc": "从最终文本中抽取预测答案，与 gold answer 对比，并输出当前样本评测对象。",
+                "outputs": {
+                    "is_correct": {"children": None, "type": "boolean"},
+                    "normalized_gold": {"children": None, "type": "string"},
+                    "prediction": {"children": None, "type": "string"},
+                    "raw_answer": {"children": None, "type": "string"},
+                    "result": {"children": None, "type": "object"},
+                },
+                "selected": False,
+                "title": "评测：抽取并对比答案",
+                "type": "code",
+                "variables": [
+                    {"value_selector": ["answer_aggregator", "output"], "variable": "raw_answer"},
+                    {"value_selector": ["prepare_sample", "gold_answer"], "variable": "gold_answer"},
+                    {"value_selector": ["prepare_sample", "extractor"], "variable": "extractor"},
+                    {"value_selector": ["prepare_sample", "sample_id"], "variable": "sample_id"},
+                    {"value_selector": ["prepare_sample", "dataset"], "variable": "dataset"},
+                    {"value_selector": ["prepare_sample", "split"], "variable": "split"},
+                    {"value_selector": ["prepare_sample", "subject"], "variable": "subject"},
+                    {"value_selector": ["prepare_sample", "source_path"], "variable": "source_path"},
+                    {"value_selector": ["start_node", "path"], "variable": "path"},
+                ],
+            },
+            "height": 154,
+            "position": {"x": x, "y": y},
+            "positionAbsolute": {"x": x, "y": y},
+            "selected": False,
+            "sourcePosition": "right",
+            "targetPosition": "left",
+            "width": 244,
+        }
+    )
+
+
+def _summarize_results_node(x: int = 3462, y: int = 1100) -> dict:
+    code = (
+        "def main(results: list, dataset_total: int, loaded_count: int, next_offset: int) -> dict:\n"
+        "    rows = results or []\n"
+        "    total_evaluated = len(rows)\n"
+        "    correct_count = 0\n"
+        "    for row in rows:\n"
+        "        if isinstance(row, dict) and row.get(\"is_correct\"):\n"
+        "            correct_count += 1\n"
+        "    accuracy = correct_count / total_evaluated if total_evaluated else 0.0\n"
+        "    return {\n"
+        "        \"total_evaluated\": total_evaluated,\n"
+        "        \"correct_count\": correct_count,\n"
+        "        \"accuracy\": accuracy,\n"
+        "        \"dataset_total\": dataset_total or 0,\n"
+        "        \"loaded_count\": loaded_count or total_evaluated,\n"
+        "        \"next_offset\": next_offset or 0,\n"
+        "    }\n"
+    )
+    return {
+        "id": "summarize_results",
+        "type": "custom",
+        "data": {
+            "code": code,
+            "code_language": "python3",
+            "desc": "汇总本轮样本评测结果，计算正确数、评测数和准确率。",
+            "outputs": {
+                "accuracy": {"children": None, "type": "number"},
+                "correct_count": {"children": None, "type": "number"},
+                "dataset_total": {"children": None, "type": "number"},
+                "loaded_count": {"children": None, "type": "number"},
+                "next_offset": {"children": None, "type": "number"},
+                "total_evaluated": {"children": None, "type": "number"},
+            },
+            "selected": False,
+            "title": "汇总：计算本轮准确率",
+            "type": "code",
+            "variables": [
+                {"value_selector": [ITERATION_ID, "output"], "variable": "results"},
+                {"value_selector": ["sample_loader", "total"], "variable": "dataset_total"},
+                {"value_selector": ["sample_loader", "count"], "variable": "loaded_count"},
+                {"value_selector": ["sample_loader", "next_offset"], "variable": "next_offset"},
+            ],
+        },
+        "height": 154,
+        "position": {"x": x, "y": y},
+        "positionAbsolute": {"x": x, "y": y},
+        "selected": False,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "width": 244,
+    }
+
+
+def _experiment_end_node(x: int = 3766, y: int = 1100) -> dict:
+    outputs = [
+        (["start_node", "path"], "string", "path"),
+        (["sample_loader", "dataset"], "string", "dataset"),
+        (["sample_loader", "split"], "string", "split"),
+        ([ITERATION_ID, "output"], "array[object]", "results"),
+        (["summarize_results", "total_evaluated"], "number", "total_evaluated"),
+        (["summarize_results", "correct_count"], "number", "correct_count"),
+        (["summarize_results", "accuracy"], "number", "accuracy"),
+        (["summarize_results", "dataset_total"], "number", "dataset_total"),
+        (["summarize_results", "loaded_count"], "number", "loaded_count"),
+        (["summarize_results", "next_offset"], "number", "next_offset"),
+    ]
+    return {
+        "id": "end_node",
+        "type": "custom",
+        "data": {
+            "desc": "输出本轮逐样本结果、正确数、评测数和准确率。",
+            "outputs": [
+                {"value_selector": selector, "value_type": value_type, "variable": variable}
+                for selector, value_type, variable in outputs
+            ],
+            "selected": False,
+            "title": "结束：输出本轮实验结果",
+            "type": "end",
+        },
+        "height": 190,
+        "position": {"x": x, "y": y},
+        "positionAbsolute": {"x": x, "y": y},
         "selected": False,
         "sourcePosition": "right",
         "targetPosition": "left",
@@ -390,7 +840,16 @@ def _edge(
     dst_type: str,
     source_handle: str = "source",
     target_handle: str = "target",
+    is_in_iteration: bool = False,
 ) -> dict:
+    data = {
+        "isInIteration": is_in_iteration,
+        "isInLoop": False,
+        "sourceType": src_type,
+        "targetType": dst_type,
+    }
+    if is_in_iteration:
+        data["iteration_id"] = ITERATION_ID
     return {
         "id": f"{src}-{source_handle}-to-{dst}",
         "source": src,
@@ -398,13 +857,8 @@ def _edge(
         "target": dst,
         "targetHandle": target_handle,
         "type": "custom",
-        "zIndex": 0,
-        "data": {
-            "isInIteration": False,
-            "isInLoop": False,
-            "sourceType": src_type,
-            "targetType": dst_type,
-        },
+        "zIndex": 1002 if is_in_iteration else 0,
+        "data": data,
     }
 
 
@@ -882,20 +1336,219 @@ def _add_p2s_router_branch(
     edges.append(_edge(src=serial_id, dst=end_id, src_type="llm", dst_type="end"))
 
 
+def _add_s2p_iteration_branch(
+    *,
+    path_name: str,
+    serial: PaperModel,
+    parallel: list[PaperModel],
+    provider: str,
+    base_y: int,
+    nodes: list[dict],
+    edges: list[dict],
+) -> tuple[str, str]:
+    serial_id = f"{path_name}__llm_{serial.letter}_serial"
+    path_label = _path_label(path_name)
+    serial_node = _llm_node(
+        node_id=serial_id,
+        title=f"{path_label}：{serial.letter} 串行草稿",
+        desc=f"{path_label} 第一阶段：由 {serial.description} 生成语义草稿。",
+        model_name=serial.model_name,
+        provider=provider,
+        system=SYS_LEAF,
+        user=USR_SAMPLE,
+        x=638,
+        y=base_y + 76,
+    )
+    nodes.append(_iteration_child(serial_node))
+    edges.append(
+        _edge(
+            src="route_path",
+            dst=serial_id,
+            src_type="if-else",
+            dst_type="llm",
+            source_handle=path_name,
+            is_in_iteration=True,
+        )
+    )
+
+    token_ids: list[str] = []
+    for i, m in enumerate(parallel):
+        node_id = f"{path_name}__token_{m.letter}_par"
+        token_node = _token_source_node(
+            model=m,
+            x=942,
+            y=base_y + i * 152,
+            node_id=node_id,
+            title=f"{path_label}：{m.letter} 并行源",
+            desc=(
+                f"{path_label} 并行源：{m.description} 接收第一阶段语义草稿，"
+                "参与 token 级融合。"
+            ),
+            prompt_template=_s2p_parallel_prompt(serial_id, question=USR_SAMPLE),
+        )
+        nodes.append(_iteration_child(token_node))
+        edges.append(
+            _edge(
+                src=serial_id,
+                dst=node_id,
+                src_type="llm",
+                dst_type="token-model-source",
+                is_in_iteration=True,
+            )
+        )
+        token_ids.append(node_id)
+
+    aggregator_id = f"{path_name}__aggregator"
+    aggregator_node = _ensemble_node(
+        parallel,
+        x=1246,
+        y=base_y + 76,
+        node_id=aggregator_id,
+        title=f"{path_label}：token 级并行融合",
+        desc=f"{path_label} 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。",
+        token_node_ids=token_ids,
+    )
+    nodes.append(_iteration_child(aggregator_node))
+    for token_id in token_ids:
+        edges.append(
+            _edge(
+                src=token_id,
+                dst=aggregator_id,
+                src_type="token-model-source",
+                dst_type="parallel-ensemble",
+                is_in_iteration=True,
+            )
+        )
+    return aggregator_id, "parallel-ensemble"
+
+
+def _add_p2s_iteration_branch(
+    *,
+    path_name: str,
+    parallel: list[PaperModel],
+    serial: PaperModel,
+    provider: str,
+    base_y: int,
+    nodes: list[dict],
+    edges: list[dict],
+) -> tuple[str, str]:
+    token_ids: list[str] = []
+    path_label = _path_label(path_name)
+    for i, m in enumerate(parallel):
+        node_id = f"{path_name}__token_{m.letter}_par"
+        token_node = _token_source_node(
+            model=m,
+            x=638,
+            y=base_y + i * 152,
+            node_id=node_id,
+            title=f"{path_label}：{m.letter} 并行源",
+            desc=f"{path_label} 并行源：{m.description} 参与 token 级融合。",
+            prompt_template=USR_SAMPLE,
+        )
+        nodes.append(_iteration_child(token_node))
+        edges.append(
+            _edge(
+                src="route_path",
+                dst=node_id,
+                src_type="if-else",
+                dst_type="token-model-source",
+                source_handle=path_name,
+                is_in_iteration=True,
+            )
+        )
+        token_ids.append(node_id)
+
+    aggregator_id = f"{path_name}__aggregator"
+    aggregator_node = _ensemble_node(
+        parallel,
+        x=942,
+        y=base_y + 76,
+        node_id=aggregator_id,
+        title=f"{path_label}：token 级并行融合",
+        desc=f"{path_label} 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。",
+        token_node_ids=token_ids,
+    )
+    nodes.append(_iteration_child(aggregator_node))
+    for token_id in token_ids:
+        edges.append(
+            _edge(
+                src=token_id,
+                dst=aggregator_id,
+                src_type="token-model-source",
+                dst_type="parallel-ensemble",
+                is_in_iteration=True,
+            )
+        )
+
+    serial_id = f"{path_name}__llm_{serial.letter}_serial"
+    serial_node = _llm_node(
+        node_id=serial_id,
+        title=f"{path_label}：{serial.letter} 串行综合",
+        desc=f"{path_label} 第二阶段：由 {serial.description} 综合融合后的中间答案。",
+        model_name=serial.model_name,
+        provider=provider,
+        system=SYS_SYNTHESIZE,
+        user=_synthesize_user(aggregator_id, question=USR_SAMPLE),
+        x=1246,
+        y=base_y + 76,
+    )
+    nodes.append(_iteration_child(serial_node))
+    edges.append(
+        _edge(
+            src=aggregator_id,
+            dst=serial_id,
+            src_type="parallel-ensemble",
+            dst_type="llm",
+            is_in_iteration=True,
+        )
+    )
+    return serial_id, "llm"
+
+
 def build_hybrid_router(provider: str) -> dict:
-    """One workflow DSL that routes to any S2P/P2S hybrid path."""
+    """One workflow DSL that runs one dataset-backed hybrid-path experiment."""
     specs = hybrid_specs()
     path_names = [name for name, *_ in specs]
-    nodes: list[dict] = [_start_node(y=1180, path_options=path_names), _route_node(path_names)]
-    edges: list[dict] = [_edge(src="start_node", dst="route_path", src_type="start", dst_type="if-else")]
+    nodes: list[dict] = [
+        _start_node(
+            y=1100,
+            path_options=path_names,
+            include_question=False,
+            desc="选择一条混合推理路径；问题由数据集加载节点提供。",
+        ),
+        _data_loader_node(x=334, y=1084),
+        _iteration_node(x=ITERATION_X, y=ITERATION_Y),
+        _iteration_start_node(),
+        _prepare_sample_node(),
+        _iteration_child(_route_node(path_names, x=334, y=1068)),
+    ]
+    edges: list[dict] = [
+        _edge(src="start_node", dst="sample_loader", src_type="start", dst_type="data-loader"),
+        _edge(src="sample_loader", dst=ITERATION_ID, src_type="data-loader", dst_type="iteration"),
+        _edge(
+            src=ITERATION_START_ID,
+            dst="prepare_sample",
+            src_type="iteration-start",
+            dst_type="code",
+            is_in_iteration=True,
+        ),
+        _edge(
+            src="prepare_sample",
+            dst="route_path",
+            src_type="code",
+            dst_type="if-else",
+            is_in_iteration=True,
+        ),
+    ]
 
+    final_selectors: list[list[str]] = []
     for i, spec in enumerate(specs):
         path_name = spec[0]
         kind = spec[1]
-        base_y = 80 + i * 360
+        base_y = 80 + i * 340
         if kind == "s2p":
             _, _, serial, parallel = spec
-            _add_s2p_router_branch(
+            final_node_id, final_node_type = _add_s2p_iteration_branch(
                 path_name=path_name,
                 serial=serial,
                 parallel=parallel,
@@ -906,7 +1559,7 @@ def build_hybrid_router(provider: str) -> dict:
             )
         else:
             _, _, parallel, serial = spec
-            _add_p2s_router_branch(
+            final_node_id, final_node_type = _add_p2s_iteration_branch(
                 path_name=path_name,
                 parallel=parallel,
                 serial=serial,
@@ -915,12 +1568,45 @@ def build_hybrid_router(provider: str) -> dict:
                 nodes=nodes,
                 edges=edges,
             )
+        final_selectors.append([final_node_id, "text"])
+        edges.append(
+            _edge(
+                src=final_node_id,
+                dst="answer_aggregator",
+                src_type=final_node_type,
+                dst_type="variable-aggregator",
+                is_in_iteration=True,
+            )
+        )
+
+    nodes.extend(
+        [
+            _answer_aggregator_node(final_selectors),
+            _evaluate_answer_node(),
+            _summarize_results_node(),
+            _experiment_end_node(),
+        ]
+    )
+    edges.extend(
+        [
+            _edge(
+                src="answer_aggregator",
+                dst="evaluate_answer",
+                src_type="variable-aggregator",
+                dst_type="code",
+                is_in_iteration=True,
+            ),
+            _edge(src=ITERATION_ID, dst="summarize_results", src_type="iteration", dst_type="code"),
+            _edge(src="summarize_results", dst="end_node", src_type="code", dst_type="end"),
+        ]
+    )
 
     return _wrap(
         name="AI-ModelNet 混合路径总入口 (workflow)",
         desc=(
             "AI-ModelNet 混合推理总入口。必填输入 `path` 选择六条 S2P/P2S "
-            "token 级融合路径之一，`question` 会被路由到对应分支。"
+            "token 级融合路径之一；工作流会加载本地 C-Eval JSONL，逐样本循环运行 "
+            "所选路径并输出 accuracy、correct_count 和逐样本 results。"
         ),
         nodes=nodes,
         edges=edges,
