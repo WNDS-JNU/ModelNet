@@ -189,10 +189,9 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
     // ``null`` = registered mode (skip). When set, replay the
     // server-side ``_inline_spec_shape`` + per-backend invariants so
     // the panel red-lines pre-save: the backend's pydantic class
-    // would otherwise surface a 422 the user cannot trace. Today
-    // ``llama_cpp`` is the only registered backend, so checks below
-    // mirror ``LlamaCppSpec`` (entities at api/core/workflow/nodes/
-    // parallel_ensemble/backends/llama_cpp.py).
+    // would otherwise surface a 422 the user cannot trace. Checks below
+    // mirror the built-in backend specs under
+    // api/core/workflow/nodes/parallel_ensemble/backends/.
     const inlineSpec = payload?.inline_spec
     if (!errorMessage && inlineSpec !== undefined && inlineSpec !== null) {
       if (typeof inlineSpec !== 'object' || Array.isArray(inlineSpec)) {
@@ -219,15 +218,19 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
           defaultValue: 'Model name is required for a custom model.',
         })
       }
-      else if (inlineSpec.backend === 'llama_cpp') {
+      else if (
+        inlineSpec.backend === 'llama_cpp'
+        || inlineSpec.backend === 'vllm'
+        || inlineSpec.backend === 'vllm_chat'
+      ) {
         if (typeof inlineSpec.model_url !== 'string' || inlineSpec.model_url.trim().length === 0) {
           errorMessage = t(`${i18nPrefix}.errorMsg.inlineSpecModelUrlRequired`, {
             ns: 'workflow',
-            defaultValue: 'Model URL is required for llama.cpp.',
+            defaultValue: 'Model URL is required for the selected backend.',
           })
         }
         else if (!isWellFormedUrl(inlineSpec.model_url)) {
-          // ``LlamaCppSpec.model_url`` is typed as pydantic
+          // Built-in backend ``model_url`` fields are typed as pydantic
           // ``AnyUrl`` server-side — it must parse as a URL with a
           // scheme. Catch the obvious "looks like a path / hostname
           // with no scheme" mistake here so the panel red-lines
@@ -239,20 +242,31 @@ const nodeDefault: NodeDefault<TokenModelSourceNodeType> = {
         }
         else if (typeof inlineSpec.EOS !== 'string' || inlineSpec.EOS.length === 0) {
           // ``EOS`` is ``min_length=1`` server-side; matches the
-          // ``LlamaCppSpec.EOS`` invariant.
+          // built-in backend specs.
           errorMessage = t(`${i18nPrefix}.errorMsg.inlineSpecEosRequired`, {
             ns: 'workflow',
-            defaultValue: 'EOS token is required for llama.cpp.',
+            defaultValue: 'EOS token is required for the selected backend.',
           })
         }
         else if (
-          inlineSpec.type !== undefined
+          inlineSpec.backend === 'llama_cpp'
+          && inlineSpec.type !== undefined
           && inlineSpec.type !== 'normal'
           && inlineSpec.type !== 'think'
         ) {
           errorMessage = t(`${i18nPrefix}.errorMsg.inlineSpecTypeInvalid`, {
             ns: 'workflow',
             defaultValue: 'Model type must be "normal" or "think".',
+          })
+        }
+        else if (
+          (inlineSpec.backend === 'vllm' || inlineSpec.backend === 'vllm_chat')
+          && inlineSpec.type !== undefined
+          && inlineSpec.type !== 'normal'
+        ) {
+          errorMessage = t(`${i18nPrefix}.errorMsg.inlineSpecTypeInvalid`, {
+            ns: 'workflow',
+            defaultValue: 'vLLM model type must be "normal".',
           })
         }
       }

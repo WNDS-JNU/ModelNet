@@ -39,10 +39,9 @@ export type ModelInvocationSpec = {
 // open (``[key: string]: unknown``) so a third-party backend adding
 // a new ``BaseSpec`` subclass server-side does not force a frontend
 // type extension — the per-backend pydantic class on the parallel-
-// ensemble side is the authoritative schema. Today only ``llama_cpp``
-// is registered, so the rendered fields are tuned for it; future
-// backends will surface their fields through a backend-aware form
-// switch.
+// ensemble side is the authoritative schema. The built-in form covers
+// the built-in backends; third-party backend fields can still ride on
+// the open tail and be validated server-side.
 export type InlineModelSpec = {
   backend: string
   model_name: string
@@ -99,13 +98,12 @@ export const DEFAULT_SAMPLING_PARAMS: SamplingParams = {
 }
 
 // Default shape for a fresh "Custom model" tab. ``backend`` defaults to
-// ``llama_cpp`` because that is the only built-in backend today; the
-// dropdown still lets the user pick a different one if more backends
-// register. ``EOS`` is required by ``LlamaCppSpec`` server-side and
-// has no canonical default — leaving it empty surfaces the panel
-// red-line before save. ``model_url`` is pre-seeded with the lab's
-// in-house llama.cpp host so a fresh node renders something usable
-// and the user only needs to type the port.
+// ``llama_cpp`` for backward compatibility with existing ModelNet
+// setups. ``EOS`` is required by all built-in token backends and has no
+// canonical default — leaving it empty surfaces the panel red-line before
+// save. ``model_url`` is pre-seeded with the lab's in-house llama.cpp host
+// so a fresh node renders something usable and the user only needs to type
+// the port.
 export const DEFAULT_INLINE_SPEC: InlineModelSpec = {
   backend: 'llama_cpp',
   model_name: '',

@@ -84,6 +84,44 @@ describe('token-model-source/inline-spec-form', () => {
       expect(screen.getByText(/inlineSpec\.backends\.llamaCpp/)).toBeInTheDocument()
     })
 
+    it('offers vLLM backends and clears llama.cpp-only fields when selected', () => {
+      const { onChange } = renderForm({
+        value: buildValue({
+          backend: 'llama_cpp',
+          type: 'think',
+          stop_think: '</think>',
+          model_arch: 'llama',
+          expose_raw_logits: true,
+        }),
+      })
+
+      const trigger = screen.getByText(/inlineSpec\.backends\.llamaCpp/).closest('button') as HTMLButtonElement
+      fireEvent.click(trigger)
+      const vllmChatLabel = screen
+        .getAllByText(/inlineSpec\.backends\.vllmChat/)
+        .find(el => el.closest('[role="menuitem"]'))
+      expect(vllmChatLabel).toBeDefined()
+      fireEvent.click(vllmChatLabel!.closest('[role="menuitem"]') as HTMLElement)
+
+      expect(onChange).toHaveBeenLastCalledWith({
+        backend: 'vllm_chat',
+        type: 'normal',
+        stop_think: null,
+        model_arch: undefined,
+        expose_raw_logits: false,
+      })
+    })
+
+    it('hides llama.cpp-only fields for vllm_chat', () => {
+      renderForm({ value: buildValue({ backend: 'vllm_chat' }) })
+
+      expect(screen.getByText(/inlineSpec\.backends\.vllmChat/)).toBeInTheDocument()
+      expect(screen.queryByText(/inlineSpec\.modelArch/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/inlineSpec\.type\.label/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/inlineSpec\.exposeRawLogits/)).not.toBeInTheDocument()
+      expect(screen.getByText(/inlineSpec\.backend\.vllmHint/)).toBeInTheDocument()
+    })
+
     it('omits stop_think when type=normal', () => {
       renderForm({ value: buildValue({ type: 'normal' }) })
       // Each Field's label text contains its i18n key; absence of the

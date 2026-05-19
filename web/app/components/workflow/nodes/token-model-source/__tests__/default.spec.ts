@@ -310,10 +310,40 @@ describe('token-model-source/default.checkValid', () => {
       EOS: '<|eot_id|>',
       type: 'normal' as const,
     }
+    const goodVllmInline = {
+      backend: 'vllm',
+      model_name: 'tencent/Hunyuan-7B-Instruct-AWQ-Int4',
+      model_url: 'https://inference.cluster.aimodelnetwork.cn/tencent/Hunyuan-7B-Instruct-AWQ-Int4',
+      EOS: '<|eos|>',
+      type: 'normal' as const,
+    }
+    const goodVllmChatInline = {
+      backend: 'vllm_chat',
+      model_name: 'Intel/Qwen3.5-4B-int4-AutoRound',
+      model_url: 'https://inference.cluster.aimodelnetwork.cn/Intel/Qwen3.5-4B-int4-AutoRound',
+      EOS: '<|im_end|>',
+      type: 'normal' as const,
+    }
 
     it('accepts a fully populated llama_cpp inline spec', () => {
       const result = nodeDefault.checkValid(
         buildPayload({ inline_spec: goodLlamaInline }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('accepts a fully populated raw vllm inline spec', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ inline_spec: goodVllmInline }),
+        t,
+      )
+      expect(result.isValid).toBe(true)
+    })
+
+    it('accepts a fully populated vllm_chat inline spec', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({ inline_spec: goodVllmChatInline }),
         t,
       )
       expect(result.isValid).toBe(true)
@@ -381,10 +411,30 @@ describe('token-model-source/default.checkValid', () => {
       expect(result.errorMessage).toContain('inlineSpecModelUrlRequired')
     })
 
+    it('rejects vllm inline spec missing model_url', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: { ...goodVllmInline, model_url: '' },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecModelUrlRequired')
+    })
+
     it('rejects llama_cpp inline spec missing EOS', () => {
       const result = nodeDefault.checkValid(
         buildPayload({
           inline_spec: { ...goodLlamaInline, EOS: '' },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecEosRequired')
+    })
+
+    it('rejects vllm_chat inline spec missing EOS', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: { ...goodVllmChatInline, EOS: '' },
         }),
         t,
       )
@@ -397,6 +447,19 @@ describe('token-model-source/default.checkValid', () => {
           inline_spec: {
             ...goodLlamaInline,
             type: 'reasoning' as unknown as 'normal' | 'think',
+          },
+        }),
+        t,
+      )
+      expect(result.errorMessage).toContain('inlineSpecTypeInvalid')
+    })
+
+    it('rejects think type on vllm inline spec', () => {
+      const result = nodeDefault.checkValid(
+        buildPayload({
+          inline_spec: {
+            ...goodVllmInline,
+            type: 'think',
           },
         }),
         t,

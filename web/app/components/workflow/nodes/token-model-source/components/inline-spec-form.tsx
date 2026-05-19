@@ -1,13 +1,8 @@
 'use client'
-// Form for the "Custom model" mode (inline_spec). Backend-specific
-// fields below are tuned for ``llama_cpp`` because that is the only
-// registered backend today. Adding a second backend means: (1)
-// register it server-side (api/core/workflow/nodes/parallel_ensemble/
-// backends/), (2) extend ``KNOWN_BACKENDS`` here, and (3) branch the
-// fields render on ``backend`` if the spec class needs different
-// inputs. The server-side ``BackendRegistry.get_spec_class(...)``
-// validates the payload either way, so a typo'd backend name fails
-// loudly at run time even without a frontend edit.
+// Form for the "Custom model" mode (inline_spec). The fields below
+// mirror the built-in parallel-ensemble backends; the server-side
+// ``BackendRegistry.get_spec_class(...)`` remains authoritative and
+// validates the payload again at run time.
 import type { ChangeEvent, FC } from 'react'
 import type { InlineModelSpec } from '../types'
 import { Button } from '@langgenius/dify-ui/button'
@@ -28,14 +23,16 @@ import { post } from '@/service/base'
 
 const i18nPrefix = 'nodes.tokenModelSource.inlineSpec'
 
-// Backends registered server-side today. Kept as a static list because
-// only ``llama_cpp`` is implemented; a /backends endpoint would be a
-// premature abstraction with one entry. Each row carries a label
-// override path so the dropdown can show a friendlier name than the
-// raw registry key without the user noticing the gap.
+// Built-in backends registered server-side today. Kept as a static list
+// until a backend-metadata endpoint exists. Each row carries a label key
+// so the dropdown can show a friendlier name than the raw registry key.
 const KNOWN_BACKENDS: ReadonlyArray<{ id: string, labelKey: string }> = [
   { id: 'llama_cpp', labelKey: `${i18nPrefix}.backends.llamaCpp` },
+  { id: 'vllm', labelKey: `${i18nPrefix}.backends.vllm` },
+  { id: 'vllm_chat', labelKey: `${i18nPrefix}.backends.vllmChat` },
 ]
+
+const BUILTIN_COMPLETION_BACKENDS = new Set(['llama_cpp', 'vllm', 'vllm_chat'])
 
 // Match a ``scheme://host`` prefix without any port / path / query /
 // fragment trailing it. Constrained to the chars URL schemes and
@@ -243,7 +240,14 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
 
   const handleBackendPick = useCallback(
     (id: string) => {
-      onChange({ backend: id })
+      const patch: Partial<InlineModelSpec> = { backend: id }
+      if (id === 'vllm' || id === 'vllm_chat') {
+        patch.type = 'normal'
+        patch.stop_think = null
+        patch.model_arch = undefined
+        patch.expose_raw_logits = false
+      }
+      onChange(patch)
       setBackendOpen(false)
     },
     [onChange],
@@ -268,6 +272,8 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
   // the readonly-array case (TS treats ``a[0]`` as ``T | undefined``).
   const selectedBackend
     = KNOWN_BACKENDS.find(b => b.id === value.backend) ?? KNOWN_BACKENDS[0]!
+  const isLlamaCpp = value.backend === 'llama_cpp'
+  const isBuiltInCompletionBackend = BUILTIN_COMPLETION_BACKENDS.has(value.backend)
 
   return (
     <div className="space-y-3">
@@ -348,15 +354,13 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
             and auto-fills ``model_name`` from the first entry. The
             probe preserves any path prefix before ``/v1`` because
             hosted routers can scope one model per URL path. The wire
-            still carries one
-            ``model_url`` string so ``LlamaCppSpec.model_url: AnyUrl``
-            stays the canonical schema; the split is purely a UX
+            still carries one ``model_url`` string so the backend
+            ``model_url: AnyUrl`` field stays the canonical schema; the
+            split is purely a UX
             upgrade over a single text box. Round-tripping via
             parse/joinModelUrl preserves a user-typed path / query
-            string when present. The probe runs in the browser so the
-            user's llama.cpp server must allow CORS — typical setups
-            do. ``Field`` accepts only one child, so wrap the row +
-            probe-button block in a single outer div. */}
+            string when present. ``Field`` accepts only one child, so
+            wrap the row + probe-button block in a single outer div. */}
         <div>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -461,78 +465,82 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
         />
       </Field>
 
-      <Field
-        title={t(`${i18nPrefix}.modelArch.label`, { ns: 'workflow' })}
-        tooltip={t(`${i18nPrefix}.modelArch.tooltip`, { ns: 'workflow' })}
-      >
-        <Input
-          value={value.model_arch ?? ''}
-          onChange={handleText('model_arch')}
-          disabled={readonly}
-          placeholder={t(`${i18nPrefix}.modelArch.placeholder`, {
-            ns: 'workflow',
-            defaultValue: 'llama',
-          })}
-        />
-      </Field>
-
-      <Field
-        title={t(`${i18nPrefix}.type.label`, { ns: 'workflow' })}
-        tooltip={t(`${i18nPrefix}.type.tooltip`, { ns: 'workflow' })}
-      >
-        <DropdownMenu open={typeOpen} onOpenChange={setTypeOpen}>
-          <DropdownMenuTrigger
+      {isLlamaCpp && (
+        <Field
+          title={t(`${i18nPrefix}.modelArch.label`, { ns: 'workflow' })}
+          tooltip={t(`${i18nPrefix}.modelArch.tooltip`, { ns: 'workflow' })}
+        >
+          <Input
+            value={value.model_arch ?? ''}
+            onChange={handleText('model_arch')}
             disabled={readonly}
-            className={cn(
-              'flex w-full items-center justify-between rounded-lg bg-components-input-bg-normal px-3 py-2',
-              readonly
-                ? 'cursor-not-allowed bg-components-input-bg-disabled!'
-                : 'cursor-pointer hover:bg-state-base-hover-alt',
-              typeOpen && 'bg-state-base-hover-alt',
-            )}
-          >
-            <span className="truncate system-sm-regular text-components-input-text-filled">
-              {t(`${i18nPrefix}.type.${value.type ?? 'normal'}`, {
-                ns: 'workflow',
-                defaultValue: value.type ?? 'normal',
-              })}
-            </span>
-            <span
-              aria-hidden
-              className={cn(
-                'i-ri-arrow-down-s-line h-4 w-4 text-text-quaternary',
-                typeOpen && 'text-text-secondary',
-              )}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent placement="bottom-start" sideOffset={4}>
-            <DropdownMenuItem onClick={() => handleTypePick('normal')}>
-              <span className="grow px-1 system-sm-medium text-text-secondary">
-                {t(`${i18nPrefix}.type.normal`, {
-                  ns: 'workflow',
-                  defaultValue: 'normal',
-                })}
-              </span>
-              {value.type === 'normal' && (
-                <span aria-hidden className="i-ri-check-line h-4 w-4 text-text-accent" />
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleTypePick('think')}>
-              <span className="grow px-1 system-sm-medium text-text-secondary">
-                {t(`${i18nPrefix}.type.think`, {
-                  ns: 'workflow',
-                  defaultValue: 'think',
-                })}
-              </span>
-              {value.type === 'think' && (
-                <span aria-hidden className="i-ri-check-line h-4 w-4 text-text-accent" />
-              )}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </Field>
+            placeholder={t(`${i18nPrefix}.modelArch.placeholder`, {
+              ns: 'workflow',
+              defaultValue: 'llama',
+            })}
+          />
+        </Field>
+      )}
 
-      {value.type === 'think' && (
+      {isLlamaCpp && (
+        <Field
+          title={t(`${i18nPrefix}.type.label`, { ns: 'workflow' })}
+          tooltip={t(`${i18nPrefix}.type.tooltip`, { ns: 'workflow' })}
+        >
+          <DropdownMenu open={typeOpen} onOpenChange={setTypeOpen}>
+            <DropdownMenuTrigger
+              disabled={readonly}
+              className={cn(
+                'flex w-full items-center justify-between rounded-lg bg-components-input-bg-normal px-3 py-2',
+                readonly
+                  ? 'cursor-not-allowed bg-components-input-bg-disabled!'
+                  : 'cursor-pointer hover:bg-state-base-hover-alt',
+                typeOpen && 'bg-state-base-hover-alt',
+              )}
+            >
+              <span className="truncate system-sm-regular text-components-input-text-filled">
+                {t(`${i18nPrefix}.type.${value.type ?? 'normal'}`, {
+                  ns: 'workflow',
+                  defaultValue: value.type ?? 'normal',
+                })}
+              </span>
+              <span
+                aria-hidden
+                className={cn(
+                  'i-ri-arrow-down-s-line h-4 w-4 text-text-quaternary',
+                  typeOpen && 'text-text-secondary',
+                )}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent placement="bottom-start" sideOffset={4}>
+              <DropdownMenuItem onClick={() => handleTypePick('normal')}>
+                <span className="grow px-1 system-sm-medium text-text-secondary">
+                  {t(`${i18nPrefix}.type.normal`, {
+                    ns: 'workflow',
+                    defaultValue: 'normal',
+                  })}
+                </span>
+                {value.type === 'normal' && (
+                  <span aria-hidden className="i-ri-check-line h-4 w-4 text-text-accent" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleTypePick('think')}>
+                <span className="grow px-1 system-sm-medium text-text-secondary">
+                  {t(`${i18nPrefix}.type.think`, {
+                    ns: 'workflow',
+                    defaultValue: 'think',
+                  })}
+                </span>
+                {value.type === 'think' && (
+                  <span aria-hidden className="i-ri-check-line h-4 w-4 text-text-accent" />
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Field>
+      )}
+
+      {isLlamaCpp && value.type === 'think' && (
         <Field
           title={t(`${i18nPrefix}.stopThink.label`, { ns: 'workflow' })}
           tooltip={t(`${i18nPrefix}.stopThink.tooltip`, { ns: 'workflow' })}
@@ -549,17 +557,29 @@ const InlineSpecForm: FC<Props> = ({ readonly, value, onChange }) => {
         </Field>
       )}
 
-      <Field
-        title={t(`${i18nPrefix}.exposeRawLogits.label`, { ns: 'workflow' })}
-        tooltip={t(`${i18nPrefix}.exposeRawLogits.tooltip`, { ns: 'workflow' })}
-      >
-        <Switch
-          checked={!!value.expose_raw_logits}
-          onCheckedChange={(next: boolean) => onChange({ expose_raw_logits: next })}
-          size="md"
-          disabled={readonly}
-        />
-      </Field>
+      {isLlamaCpp && (
+        <Field
+          title={t(`${i18nPrefix}.exposeRawLogits.label`, { ns: 'workflow' })}
+          tooltip={t(`${i18nPrefix}.exposeRawLogits.tooltip`, { ns: 'workflow' })}
+        >
+          <Switch
+            checked={!!value.expose_raw_logits}
+            onCheckedChange={(next: boolean) => onChange({ expose_raw_logits: next })}
+            size="md"
+            disabled={readonly}
+          />
+        </Field>
+      )}
+
+      {isBuiltInCompletionBackend && !isLlamaCpp && (
+        <div className="system-xs-regular text-text-tertiary">
+          {t(`${i18nPrefix}.backend.vllmHint`, {
+            ns: 'workflow',
+            defaultValue:
+              'vLLM backends use OpenAI-compatible endpoints. Use vllm for raw /v1/completions and vllm_chat for /v1/chat/completions.',
+          })}
+        </div>
+      )}
 
       <Field
         title={t(`${i18nPrefix}.requestTimeout.label`, { ns: 'workflow' })}
