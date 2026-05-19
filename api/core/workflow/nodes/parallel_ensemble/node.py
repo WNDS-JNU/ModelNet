@@ -95,11 +95,15 @@ shows every offence on the first pass instead of one per save.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
+import os
 import time
+import uuid
 from collections.abc import Generator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import ValidationError
@@ -155,6 +159,13 @@ pass-through dict skip it. We validate the wire shape here (instead of
 re-parsing through the source-side pydantic model) because the spec
 crosses node boundaries via ``VariablePool`` serialization, which
 flattens it to a dict regardless of the producing node's schema."""
+
+
+def _trace_artifact_dir() -> Path:
+    root = os.environ.get("PARALLEL_ENSEMBLE_TRACE_DIR")
+    if root:
+        return Path(root)
+    return Path.cwd() / "storage" / "parallel_ensemble_traces"
 
 
 class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
@@ -1151,6 +1162,11 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
         }
         process_data: dict[str, Any] = {}
 
+        trace_artifact_path = self._persist_trace_artifact(trace_data)
+        outputs["trace_artifact_path"] = trace_artifact_path
+        outputs["trace_summary"] = trace_data.get("summary", {})
+        process_data["ensemble_trace_artifact_path"] = trace_artifact_path
+
         cfg_diagnostics = self.node_data.ensemble.diagnostics
         if cfg_diagnostics.storage == "inline":
             outputs["trace"] = trace_data
@@ -1162,6 +1178,25 @@ class ParallelEnsembleNode(Node[ParallelEnsembleNodeData]):
 
         status = self._derive_status(trace_data, backends_count=len(backends))
         return outputs, process_data, status
+
+    def _persist_trace_artifact(self, trace_data: EnsembleTrace) -> str:
+        """Persist the full ensemble trace as JSON for offline analysis.
+
+        Large token-level traces are too deep and too large for Dify's
+        workflow variable pool, especially when token candidates and
+        raw logits are enabled. The node therefore always writes the
+        complete trace to a local JSON artifact and returns a shallow
+        path in outputs/process_data.
+        """
+        trace_dir = _trace_artifact_dir()
+        trace_dir.mkdir(parents=True, exist_ok=True)
+        execution_id = str(getattr(self, "_node_execution_id", "") or uuid.uuid4())
+        path = trace_dir / f"{execution_id}.json"
+        tmp_path = trace_dir / f"{execution_id}.json.tmp"
+        with tmp_path.open("w", encoding="utf-8") as fh:
+            json.dump(trace_data, fh, ensure_ascii=False)
+        tmp_path.replace(path)
+        return str(path)
 
     @staticmethod
     def _derive_status(

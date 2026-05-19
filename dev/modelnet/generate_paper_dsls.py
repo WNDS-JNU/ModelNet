@@ -41,6 +41,7 @@ Run::
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import uuid
 from dataclasses import dataclass
@@ -75,17 +76,19 @@ class PaperModel:
     model_alias: str    # PI / token-model-source — matches model_net.yaml id
     model_name: str     # standard llm node — matches Dify provider entity name
     description: str
+    stop: tuple[str, ...]
 
     @property
     def title(self) -> str:
         return f"{self.letter} ({self.description})"
 
 
-Q = PaperModel("Q", "5", "qwen25-7b-instruct-q5km", "Qwen2.5-7B-Instruct")
-D = PaperModel("D", "22", "qwen3-8b-bf16", "Qwen3-8B-BF16（D 角色替代模型）")
-Y = PaperModel("Y", "6", "glm-4-9b-chat-q4k", "GLM-4-9B-Chat")
+Q = PaperModel("Q", "5", "qwen25-7b-instruct-q5km", "Qwen2.5-7B-Instruct", ("<|im_end|>",))
+D = PaperModel("D", "22", "qwen3-8b-bf16", "Qwen3-8B-BF16（D 角色替代模型）", ("<|im_end|>",))
+Y = PaperModel("Y", "6", "glm-4-9b-chat-q4k", "GLM-4-9B-Chat", ("<|endoftext|>",))
 
 PAPER_MODELS: list[PaperModel] = [Q, D, Y]
+STOP_BY_MODEL_NAME = {model.model_name: model.stop for model in PAPER_MODELS}
 
 
 # ── Prompt templates ─────────────────────────────────────────────────
@@ -427,6 +430,115 @@ def _answer_aggregator_node(selectors: list[list[str]], x: int = 1854, y: int = 
     )
 
 
+def _trace_aggregator_node(selectors: list[list[str]], x: int = 1854, y: int = 1248) -> dict:
+    return _iteration_child(
+        {
+            "id": "trace_aggregator",
+            "type": "custom",
+            "data": {
+                "advanced_settings": {
+                    "group_enabled": False,
+                    "groups": [
+                        {
+                            "groupId": _uid("trace_aggregator", "group"),
+                            "group_name": "trace",
+                            "output_type": "object",
+                            "variables": selectors,
+                        }
+                    ],
+                },
+                "desc": "Collect the trace object emitted by the selected path.",
+                "output_type": "object",
+                "selected": False,
+                "title": "Trace merge: selected path",
+                "type": "variable-aggregator",
+                "variables": selectors,
+            },
+            "height": 129,
+            "position": {"x": x, "y": y},
+            "positionAbsolute": {"x": x, "y": y},
+            "selected": False,
+            "sourcePosition": "right",
+            "targetPosition": "left",
+            "width": 244,
+        }
+    )
+
+
+def _path_trace_node(
+    *,
+    node_id: str,
+    path_name: str,
+    kind: str,
+    serial: PaperModel,
+    parallel: list[PaperModel],
+    first_stage_selector: list[str],
+    fusion_selector: list[str],
+    final_selector: list[str],
+    ensemble_trace_path_selector: list[str],
+    ensemble_trace_summary_selector: list[str],
+    x: int,
+    y: int,
+) -> dict:
+    code = f'''def main(
+    sample_id: str,
+    question: str,
+    first_stage_text: str,
+    fusion_answer: str,
+    final_answer: str,
+    ensemble_trace_path: str,
+    ensemble_trace_summary: dict,
+) -> dict:
+    trace = {{
+        "sample_id": sample_id or "",
+        "path": "{path_name}",
+        "kind": "{kind}",
+        "serial_model": "{serial.letter}",
+        "parallel_models": {json.dumps([m.letter for m in parallel], ensure_ascii=False)},
+        "question": question or "",
+        "stage_outputs": {{
+            "first_stage": first_stage_text or "",
+            "token_fusion": fusion_answer or "",
+            "final_answer": final_answer or "",
+            "ensemble_trace_path": ensemble_trace_path or "",
+            "ensemble_trace_summary": ensemble_trace_summary or {{}},
+        }},
+    }}
+    return {{"trace": trace}}
+'''
+    return _iteration_child(
+        {
+            "id": node_id,
+            "type": "custom",
+            "data": {
+                "code": code,
+                "code_language": "python3",
+                "desc": "Save selected path intermediate outputs for later analysis.",
+                "outputs": {"trace": {"children": None, "type": "object"}},
+                "selected": False,
+                "title": f"Trace: {path_name}",
+                "type": "code",
+                "variables": [
+                    {"value_selector": ["prepare_sample", "sample_id"], "variable": "sample_id"},
+                    {"value_selector": ["prepare_sample", "prompt"], "variable": "question"},
+                    {"value_selector": first_stage_selector, "variable": "first_stage_text"},
+                    {"value_selector": fusion_selector, "variable": "fusion_answer"},
+                    {"value_selector": final_selector, "variable": "final_answer"},
+                    {"value_selector": ensemble_trace_path_selector, "variable": "ensemble_trace_path"},
+                    {"value_selector": ensemble_trace_summary_selector, "variable": "ensemble_trace_summary"},
+                ],
+            },
+            "height": 154,
+            "position": {"x": x, "y": y},
+            "positionAbsolute": {"x": x, "y": y},
+            "selected": False,
+            "sourcePosition": "right",
+            "targetPosition": "left",
+            "width": 244,
+        }
+    )
+
+
 def _evaluate_answer_node(x: int = 2158, y: int = 1066) -> dict:
     code = r'''import re
 
@@ -490,6 +602,7 @@ def main(
     subject: str,
     source_path: str,
     path: str,
+    trace: dict,
 ) -> dict:
     prediction = _normalize(raw_answer or "", extractor or "last_abcd")
     normalized_gold = _normalize(gold_answer or "", extractor or "last_abcd")
@@ -507,12 +620,14 @@ def main(
         "prediction": prediction,
         "is_correct": is_correct,
         "raw_answer": raw_answer or "",
+        "trace": trace or {},
     }
     return {
         "raw_answer": result["raw_answer"],
         "prediction": prediction,
         "normalized_gold": normalized_gold,
         "is_correct": is_correct,
+        "trace": result["trace"],
         "result": result,
     }
 '''
@@ -530,6 +645,7 @@ def main(
                     "prediction": {"children": None, "type": "string"},
                     "raw_answer": {"children": None, "type": "string"},
                     "result": {"children": None, "type": "object"},
+                    "trace": {"children": None, "type": "object"},
                 },
                 "selected": False,
                 "title": "评测：抽取并对比答案",
@@ -544,6 +660,7 @@ def main(
                     {"value_selector": ["prepare_sample", "subject"], "variable": "subject"},
                     {"value_selector": ["prepare_sample", "source_path"], "variable": "source_path"},
                     {"value_selector": ["start_node", "path"], "variable": "path"},
+                    {"value_selector": ["trace_aggregator", "output"], "variable": "trace"},
                 ],
             },
             "height": 154,
@@ -701,13 +818,13 @@ def _llm_node(
             "context": {"enabled": False, "variable_selector": []},
             "desc": desc,
             "memory": {
-                "query_prompt_template": "{{#sys.query#}}",
                 "role_prefix": {"assistant": "", "user": ""},
                 "window": {"enabled": False, "size": 50},
             },
             "model": {
                 "completion_params": {
                     "max_tokens": LLM_MAX_TOKENS,
+                    "stop": list(STOP_BY_MODEL_NAME.get(model_name, ())),
                     "temperature": LLM_TEMPERATURE,
                 },
                 "mode": LLM_MODE,
@@ -759,6 +876,7 @@ def _token_source_node(
             "prompt_template": prompt_template,
             "sampling_params": {
                 "max_tokens": LLM_MAX_TOKENS,
+                "stop": list(model.stop),
                 "temperature": 0.7,
                 "top_k": 10,
             },
@@ -797,13 +915,16 @@ def _ensemble_node(
                 "top-k 候选 token 的并集上做概率求和投票。"
             ),
             "ensemble": {
-                "aggregator_config": {"seed": None, "tau_p": 1.0, "use_weights": False},
+                "aggregator_config": {"skip_empty_voters": True, "use_weights": False},
                 "aggregator_name": "sum_score",
                 "diagnostics": {
                     "include_aggregator_reasoning": True,
+                    "include_logits": True,
+                    "include_model_outputs": True,
                     "include_per_backend_errors": True,
                     "include_response_timings": True,
-                    "include_token_candidates": False,
+                    "include_think_trace": True,
+                    "include_token_candidates": True,
                     "max_trace_tokens": 2000,
                     "storage": "metadata",
                 },
@@ -1345,7 +1466,7 @@ def _add_s2p_iteration_branch(
     base_y: int,
     nodes: list[dict],
     edges: list[dict],
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     serial_id = f"{path_name}__llm_{serial.letter}_serial"
     path_label = _path_label(path_name)
     serial_node = _llm_node(
@@ -1419,7 +1540,33 @@ def _add_s2p_iteration_branch(
                 is_in_iteration=True,
             )
         )
-    return aggregator_id, "parallel-ensemble"
+    trace_id = f"{path_name}__trace"
+    nodes.append(
+        _path_trace_node(
+            node_id=trace_id,
+            path_name=path_name,
+            kind="s2p",
+            serial=serial,
+            parallel=parallel,
+            first_stage_selector=[serial_id, "text"],
+            fusion_selector=[aggregator_id, "text"],
+            final_selector=[aggregator_id, "text"],
+            ensemble_trace_path_selector=[aggregator_id, "trace_artifact_path"],
+            ensemble_trace_summary_selector=[aggregator_id, "trace_summary"],
+            x=1550,
+            y=base_y + 76,
+        )
+    )
+    edges.append(
+        _edge(
+            src=aggregator_id,
+            dst=trace_id,
+            src_type="parallel-ensemble",
+            dst_type="code",
+            is_in_iteration=True,
+        )
+    )
+    return aggregator_id, "parallel-ensemble", trace_id
 
 
 def _add_p2s_iteration_branch(
@@ -1431,7 +1578,7 @@ def _add_p2s_iteration_branch(
     base_y: int,
     nodes: list[dict],
     edges: list[dict],
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     token_ids: list[str] = []
     path_label = _path_label(path_name)
     for i, m in enumerate(parallel):
@@ -1502,7 +1649,33 @@ def _add_p2s_iteration_branch(
             is_in_iteration=True,
         )
     )
-    return serial_id, "llm"
+    trace_id = f"{path_name}__trace"
+    nodes.append(
+        _path_trace_node(
+            node_id=trace_id,
+            path_name=path_name,
+            kind="p2s",
+            serial=serial,
+            parallel=parallel,
+            first_stage_selector=[aggregator_id, "text"],
+            fusion_selector=[aggregator_id, "text"],
+            final_selector=[serial_id, "text"],
+            ensemble_trace_path_selector=[aggregator_id, "trace_artifact_path"],
+            ensemble_trace_summary_selector=[aggregator_id, "trace_summary"],
+            x=1550,
+            y=base_y + 76,
+        )
+    )
+    edges.append(
+        _edge(
+            src=serial_id,
+            dst=trace_id,
+            src_type="llm",
+            dst_type="code",
+            is_in_iteration=True,
+        )
+    )
+    return serial_id, "llm", trace_id
 
 
 def build_hybrid_router(provider: str) -> dict:
@@ -1542,13 +1715,14 @@ def build_hybrid_router(provider: str) -> dict:
     ]
 
     final_selectors: list[list[str]] = []
+    trace_selectors: list[list[str]] = []
     for i, spec in enumerate(specs):
         path_name = spec[0]
         kind = spec[1]
         base_y = 80 + i * 340
         if kind == "s2p":
             _, _, serial, parallel = spec
-            final_node_id, final_node_type = _add_s2p_iteration_branch(
+            final_node_id, final_node_type, trace_node_id = _add_s2p_iteration_branch(
                 path_name=path_name,
                 serial=serial,
                 parallel=parallel,
@@ -1559,7 +1733,7 @@ def build_hybrid_router(provider: str) -> dict:
             )
         else:
             _, _, parallel, serial = spec
-            final_node_id, final_node_type = _add_p2s_iteration_branch(
+            final_node_id, final_node_type, trace_node_id = _add_p2s_iteration_branch(
                 path_name=path_name,
                 parallel=parallel,
                 serial=serial,
@@ -1569,6 +1743,7 @@ def build_hybrid_router(provider: str) -> dict:
                 edges=edges,
             )
         final_selectors.append([final_node_id, "text"])
+        trace_selectors.append([trace_node_id, "trace"])
         edges.append(
             _edge(
                 src=final_node_id,
@@ -1578,10 +1753,20 @@ def build_hybrid_router(provider: str) -> dict:
                 is_in_iteration=True,
             )
         )
+        edges.append(
+            _edge(
+                src=trace_node_id,
+                dst="trace_aggregator",
+                src_type="code",
+                dst_type="variable-aggregator",
+                is_in_iteration=True,
+            )
+        )
 
     nodes.extend(
         [
             _answer_aggregator_node(final_selectors),
+            _trace_aggregator_node(trace_selectors),
             _evaluate_answer_node(),
             _summarize_results_node(),
             _experiment_end_node(),
@@ -1591,6 +1776,13 @@ def build_hybrid_router(provider: str) -> dict:
         [
             _edge(
                 src="answer_aggregator",
+                dst="evaluate_answer",
+                src_type="variable-aggregator",
+                dst_type="code",
+                is_in_iteration=True,
+            ),
+            _edge(
+                src="trace_aggregator",
                 dst="evaluate_answer",
                 src_type="variable-aggregator",
                 dst_type="code",

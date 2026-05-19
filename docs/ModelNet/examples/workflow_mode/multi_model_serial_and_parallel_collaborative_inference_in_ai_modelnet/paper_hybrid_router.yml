@@ -143,6 +143,19 @@ workflow:
         sourceType: token-model-source
         targetType: parallel-ensemble
         iteration_id: sample_iteration
+    - id: paper_s2p_Q_DY__aggregator-source-to-paper_s2p_Q_DY__trace
+      source: paper_s2p_Q_DY__aggregator
+      sourceHandle: source
+      target: paper_s2p_Q_DY__trace
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: code
+        iteration_id: sample_iteration
     - id: paper_s2p_Q_DY__aggregator-source-to-answer_aggregator
       source: paper_s2p_Q_DY__aggregator
       sourceHandle: source
@@ -154,6 +167,19 @@ workflow:
         isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
+    - id: paper_s2p_Q_DY__trace-source-to-trace_aggregator
+      source: paper_s2p_Q_DY__trace
+      sourceHandle: source
+      target: trace_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
         targetType: variable-aggregator
         iteration_id: sample_iteration
     - id: route_path-paper_s2p_D_QY-to-paper_s2p_D_QY__llm_D_serial
@@ -221,6 +247,19 @@ workflow:
         sourceType: token-model-source
         targetType: parallel-ensemble
         iteration_id: sample_iteration
+    - id: paper_s2p_D_QY__aggregator-source-to-paper_s2p_D_QY__trace
+      source: paper_s2p_D_QY__aggregator
+      sourceHandle: source
+      target: paper_s2p_D_QY__trace
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: code
+        iteration_id: sample_iteration
     - id: paper_s2p_D_QY__aggregator-source-to-answer_aggregator
       source: paper_s2p_D_QY__aggregator
       sourceHandle: source
@@ -232,6 +271,19 @@ workflow:
         isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
+    - id: paper_s2p_D_QY__trace-source-to-trace_aggregator
+      source: paper_s2p_D_QY__trace
+      sourceHandle: source
+      target: trace_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
         targetType: variable-aggregator
         iteration_id: sample_iteration
     - id: route_path-paper_s2p_Y_QD-to-paper_s2p_Y_QD__llm_Y_serial
@@ -299,6 +351,19 @@ workflow:
         sourceType: token-model-source
         targetType: parallel-ensemble
         iteration_id: sample_iteration
+    - id: paper_s2p_Y_QD__aggregator-source-to-paper_s2p_Y_QD__trace
+      source: paper_s2p_Y_QD__aggregator
+      sourceHandle: source
+      target: paper_s2p_Y_QD__trace
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: code
+        iteration_id: sample_iteration
     - id: paper_s2p_Y_QD__aggregator-source-to-answer_aggregator
       source: paper_s2p_Y_QD__aggregator
       sourceHandle: source
@@ -310,6 +375,19 @@ workflow:
         isInIteration: true
         isInLoop: false
         sourceType: parallel-ensemble
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
+    - id: paper_s2p_Y_QD__trace-source-to-trace_aggregator
+      source: paper_s2p_Y_QD__trace
+      sourceHandle: source
+      target: trace_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
         targetType: variable-aggregator
         iteration_id: sample_iteration
     - id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_Q_par
@@ -377,6 +455,19 @@ workflow:
         sourceType: parallel-ensemble
         targetType: llm
         iteration_id: sample_iteration
+    - id: paper_p2s_QD_Y__llm_Y_serial-source-to-paper_p2s_QD_Y__trace
+      source: paper_p2s_QD_Y__llm_Y_serial
+      sourceHandle: source
+      target: paper_p2s_QD_Y__trace
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+        iteration_id: sample_iteration
     - id: paper_p2s_QD_Y__llm_Y_serial-source-to-answer_aggregator
       source: paper_p2s_QD_Y__llm_Y_serial
       sourceHandle: source
@@ -388,6 +479,19 @@ workflow:
         isInIteration: true
         isInLoop: false
         sourceType: llm
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
+    - id: paper_p2s_QD_Y__trace-source-to-trace_aggregator
+      source: paper_p2s_QD_Y__trace
+      sourceHandle: source
+      target: trace_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
         targetType: variable-aggregator
         iteration_id: sample_iteration
     - id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Q_par
@@ -455,6 +559,19 @@ workflow:
         sourceType: parallel-ensemble
         targetType: llm
         iteration_id: sample_iteration
+    - id: paper_p2s_QY_D__llm_D_serial-source-to-paper_p2s_QY_D__trace
+      source: paper_p2s_QY_D__llm_D_serial
+      sourceHandle: source
+      target: paper_p2s_QY_D__trace
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+        iteration_id: sample_iteration
     - id: paper_p2s_QY_D__llm_D_serial-source-to-answer_aggregator
       source: paper_p2s_QY_D__llm_D_serial
       sourceHandle: source
@@ -466,6 +583,19 @@ workflow:
         isInIteration: true
         isInLoop: false
         sourceType: llm
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
+    - id: paper_p2s_QY_D__trace-source-to-trace_aggregator
+      source: paper_p2s_QY_D__trace
+      sourceHandle: source
+      target: trace_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
         targetType: variable-aggregator
         iteration_id: sample_iteration
     - id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_D_par
@@ -533,6 +663,19 @@ workflow:
         sourceType: parallel-ensemble
         targetType: llm
         iteration_id: sample_iteration
+    - id: paper_p2s_DY_Q__llm_Q_serial-source-to-paper_p2s_DY_Q__trace
+      source: paper_p2s_DY_Q__llm_Q_serial
+      sourceHandle: source
+      target: paper_p2s_DY_Q__trace
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+        iteration_id: sample_iteration
     - id: paper_p2s_DY_Q__llm_Q_serial-source-to-answer_aggregator
       source: paper_p2s_DY_Q__llm_Q_serial
       sourceHandle: source
@@ -546,8 +689,34 @@ workflow:
         sourceType: llm
         targetType: variable-aggregator
         iteration_id: sample_iteration
+    - id: paper_p2s_DY_Q__trace-source-to-trace_aggregator
+      source: paper_p2s_DY_Q__trace
+      sourceHandle: source
+      target: trace_aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: code
+        targetType: variable-aggregator
+        iteration_id: sample_iteration
     - id: answer_aggregator-source-to-evaluate_answer
       source: answer_aggregator
+      sourceHandle: source
+      target: evaluate_answer
+      targetHandle: target
+      type: custom
+      zIndex: 1002
+      data:
+        isInIteration: true
+        isInLoop: false
+        sourceType: variable-aggregator
+        targetType: code
+        iteration_id: sample_iteration
+    - id: trace_aggregator-source-to-evaluate_answer
+      source: trace_aggregator
       sourceHandle: source
       target: evaluate_answer
       targetHandle: target
@@ -901,7 +1070,6 @@ workflow:
           variable_selector: []
         desc: S2P：Q 串行 → [D, Y] 并行 第一阶段：由 Qwen2.5-7B-Instruct 生成语义草稿。
         memory:
-          query_prompt_template: '{{#sys.query#}}'
           role_prefix:
             assistant: ''
             user: ''
@@ -911,6 +1079,8 @@ workflow:
         model:
           completion_params:
             max_tokens: 512
+            stop:
+            - <|im_end|>
             temperature: 0.0
           mode: chat
           name: qwen25-7b-instruct-q5km
@@ -960,6 +1130,8 @@ workflow:
           请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -997,6 +1169,8 @@ workflow:
           请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|endoftext|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1024,15 +1198,17 @@ workflow:
         desc: S2P：Q 串行 → [D, Y] 并行 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
-            seed: null
-            tau_p: 1.0
+            skip_empty_voters: true
             use_weights: false
           aggregator_name: sum_score
           diagnostics:
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: true
             include_per_backend_errors: true
             include_response_timings: true
-            include_token_candidates: false
+            include_think_trace: true
+            include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
           runner_config:
@@ -1069,6 +1245,89 @@ workflow:
       width: 244
       parentId: sample_iteration
       zIndex: 1002
+    - id: paper_s2p_Q_DY__trace
+      type: custom
+      data:
+        code: |
+          def main(
+              sample_id: str,
+              question: str,
+              first_stage_text: str,
+              fusion_answer: str,
+              final_answer: str,
+              ensemble_trace_path: str,
+              ensemble_trace_summary: dict,
+          ) -> dict:
+              trace = {
+                  "sample_id": sample_id or "",
+                  "path": "paper_s2p_Q_DY",
+                  "kind": "s2p",
+                  "serial_model": "Q",
+                  "parallel_models": ["D", "Y"],
+                  "question": question or "",
+                  "stage_outputs": {
+                      "first_stage": first_stage_text or "",
+                      "token_fusion": fusion_answer or "",
+                      "final_answer": final_answer or "",
+                      "ensemble_trace_path": ensemble_trace_path or "",
+                      "ensemble_trace_summary": ensemble_trace_summary or {},
+                  },
+              }
+              return {"trace": trace}
+        code_language: python3
+        desc: Save selected path intermediate outputs for later analysis.
+        outputs:
+          trace:
+            children: null
+            type: object
+        selected: false
+        title: 'Trace: paper_s2p_Q_DY'
+        type: code
+        variables:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - prompt
+          variable: question
+        - value_selector:
+          - paper_s2p_Q_DY__llm_Q_serial
+          - text
+          variable: first_stage_text
+        - value_selector:
+          - paper_s2p_Q_DY__aggregator
+          - text
+          variable: fusion_answer
+        - value_selector:
+          - paper_s2p_Q_DY__aggregator
+          - text
+          variable: final_answer
+        - value_selector:
+          - paper_s2p_Q_DY__aggregator
+          - trace_artifact_path
+          variable: ensemble_trace_path
+        - value_selector:
+          - paper_s2p_Q_DY__aggregator
+          - trace_summary
+          variable: ensemble_trace_summary
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 1550
+        y: 156
+      positionAbsolute:
+        x: 2188
+        y: 236
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_D_QY__llm_D_serial
       type: custom
       data:
@@ -1077,7 +1336,6 @@ workflow:
           variable_selector: []
         desc: S2P：D 串行 → [Q, Y] 并行 第一阶段：由 Qwen3-8B-BF16（D 角色替代模型） 生成语义草稿。
         memory:
-          query_prompt_template: '{{#sys.query#}}'
           role_prefix:
             assistant: ''
             user: ''
@@ -1087,6 +1345,8 @@ workflow:
         model:
           completion_params:
             max_tokens: 512
+            stop:
+            - <|im_end|>
             temperature: 0.0
           mode: chat
           name: qwen3-8b-bf16
@@ -1136,6 +1396,8 @@ workflow:
           请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1173,6 +1435,8 @@ workflow:
           请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|endoftext|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1200,15 +1464,17 @@ workflow:
         desc: S2P：D 串行 → [Q, Y] 并行 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
-            seed: null
-            tau_p: 1.0
+            skip_empty_voters: true
             use_weights: false
           aggregator_name: sum_score
           diagnostics:
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: true
             include_per_backend_errors: true
             include_response_timings: true
-            include_token_candidates: false
+            include_think_trace: true
+            include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
           runner_config:
@@ -1245,6 +1511,89 @@ workflow:
       width: 244
       parentId: sample_iteration
       zIndex: 1002
+    - id: paper_s2p_D_QY__trace
+      type: custom
+      data:
+        code: |
+          def main(
+              sample_id: str,
+              question: str,
+              first_stage_text: str,
+              fusion_answer: str,
+              final_answer: str,
+              ensemble_trace_path: str,
+              ensemble_trace_summary: dict,
+          ) -> dict:
+              trace = {
+                  "sample_id": sample_id or "",
+                  "path": "paper_s2p_D_QY",
+                  "kind": "s2p",
+                  "serial_model": "D",
+                  "parallel_models": ["Q", "Y"],
+                  "question": question or "",
+                  "stage_outputs": {
+                      "first_stage": first_stage_text or "",
+                      "token_fusion": fusion_answer or "",
+                      "final_answer": final_answer or "",
+                      "ensemble_trace_path": ensemble_trace_path or "",
+                      "ensemble_trace_summary": ensemble_trace_summary or {},
+                  },
+              }
+              return {"trace": trace}
+        code_language: python3
+        desc: Save selected path intermediate outputs for later analysis.
+        outputs:
+          trace:
+            children: null
+            type: object
+        selected: false
+        title: 'Trace: paper_s2p_D_QY'
+        type: code
+        variables:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - prompt
+          variable: question
+        - value_selector:
+          - paper_s2p_D_QY__llm_D_serial
+          - text
+          variable: first_stage_text
+        - value_selector:
+          - paper_s2p_D_QY__aggregator
+          - text
+          variable: fusion_answer
+        - value_selector:
+          - paper_s2p_D_QY__aggregator
+          - text
+          variable: final_answer
+        - value_selector:
+          - paper_s2p_D_QY__aggregator
+          - trace_artifact_path
+          variable: ensemble_trace_path
+        - value_selector:
+          - paper_s2p_D_QY__aggregator
+          - trace_summary
+          variable: ensemble_trace_summary
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 1550
+        y: 496
+      positionAbsolute:
+        x: 2188
+        y: 576
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_s2p_Y_QD__llm_Y_serial
       type: custom
       data:
@@ -1253,7 +1602,6 @@ workflow:
           variable_selector: []
         desc: S2P：Y 串行 → [Q, D] 并行 第一阶段：由 GLM-4-9B-Chat 生成语义草稿。
         memory:
-          query_prompt_template: '{{#sys.query#}}'
           role_prefix:
             assistant: ''
             user: ''
@@ -1263,6 +1611,8 @@ workflow:
         model:
           completion_params:
             max_tokens: 512
+            stop:
+            - <|endoftext|>
             temperature: 0.0
           mode: chat
           name: glm-4-9b-chat-q4k
@@ -1312,6 +1662,8 @@ workflow:
           请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1349,6 +1701,8 @@ workflow:
           请基于该草稿继续推理或修正，并在回答末尾给出最终答案。
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1376,15 +1730,17 @@ workflow:
         desc: S2P：Y 串行 → [Q, D] 并行 的 S2P 第二阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
-            seed: null
-            tau_p: 1.0
+            skip_empty_voters: true
             use_weights: false
           aggregator_name: sum_score
           diagnostics:
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: true
             include_per_backend_errors: true
             include_response_timings: true
-            include_token_candidates: false
+            include_think_trace: true
+            include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
           runner_config:
@@ -1421,6 +1777,89 @@ workflow:
       width: 244
       parentId: sample_iteration
       zIndex: 1002
+    - id: paper_s2p_Y_QD__trace
+      type: custom
+      data:
+        code: |
+          def main(
+              sample_id: str,
+              question: str,
+              first_stage_text: str,
+              fusion_answer: str,
+              final_answer: str,
+              ensemble_trace_path: str,
+              ensemble_trace_summary: dict,
+          ) -> dict:
+              trace = {
+                  "sample_id": sample_id or "",
+                  "path": "paper_s2p_Y_QD",
+                  "kind": "s2p",
+                  "serial_model": "Y",
+                  "parallel_models": ["Q", "D"],
+                  "question": question or "",
+                  "stage_outputs": {
+                      "first_stage": first_stage_text or "",
+                      "token_fusion": fusion_answer or "",
+                      "final_answer": final_answer or "",
+                      "ensemble_trace_path": ensemble_trace_path or "",
+                      "ensemble_trace_summary": ensemble_trace_summary or {},
+                  },
+              }
+              return {"trace": trace}
+        code_language: python3
+        desc: Save selected path intermediate outputs for later analysis.
+        outputs:
+          trace:
+            children: null
+            type: object
+        selected: false
+        title: 'Trace: paper_s2p_Y_QD'
+        type: code
+        variables:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - prompt
+          variable: question
+        - value_selector:
+          - paper_s2p_Y_QD__llm_Y_serial
+          - text
+          variable: first_stage_text
+        - value_selector:
+          - paper_s2p_Y_QD__aggregator
+          - text
+          variable: fusion_answer
+        - value_selector:
+          - paper_s2p_Y_QD__aggregator
+          - text
+          variable: final_answer
+        - value_selector:
+          - paper_s2p_Y_QD__aggregator
+          - trace_artifact_path
+          variable: ensemble_trace_path
+        - value_selector:
+          - paper_s2p_Y_QD__aggregator
+          - trace_summary
+          variable: ensemble_trace_summary
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 1550
+        y: 836
+      positionAbsolute:
+        x: 2188
+        y: 916
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QD_Y__token_Q_par
       type: custom
       data:
@@ -1430,6 +1869,8 @@ workflow:
         prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1460,6 +1901,8 @@ workflow:
         prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1487,15 +1930,17 @@ workflow:
         desc: P2S：[Q, D] 并行 → Y 综合 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
-            seed: null
-            tau_p: 1.0
+            skip_empty_voters: true
             use_weights: false
           aggregator_name: sum_score
           diagnostics:
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: true
             include_per_backend_errors: true
             include_response_timings: true
-            include_token_candidates: false
+            include_think_trace: true
+            include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
           runner_config:
@@ -1540,7 +1985,6 @@ workflow:
           variable_selector: []
         desc: P2S：[Q, D] 并行 → Y 综合 第二阶段：由 GLM-4-9B-Chat 综合融合后的中间答案。
         memory:
-          query_prompt_template: '{{#sys.query#}}'
           role_prefix:
             assistant: ''
             user: ''
@@ -1550,6 +1994,8 @@ workflow:
         model:
           completion_params:
             max_tokens: 512
+            stop:
+            - <|endoftext|>
             temperature: 0.0
           mode: chat
           name: glm-4-9b-chat-q4k
@@ -1590,6 +2036,89 @@ workflow:
       width: 244
       parentId: sample_iteration
       zIndex: 1002
+    - id: paper_p2s_QD_Y__trace
+      type: custom
+      data:
+        code: |
+          def main(
+              sample_id: str,
+              question: str,
+              first_stage_text: str,
+              fusion_answer: str,
+              final_answer: str,
+              ensemble_trace_path: str,
+              ensemble_trace_summary: dict,
+          ) -> dict:
+              trace = {
+                  "sample_id": sample_id or "",
+                  "path": "paper_p2s_QD_Y",
+                  "kind": "p2s",
+                  "serial_model": "Y",
+                  "parallel_models": ["Q", "D"],
+                  "question": question or "",
+                  "stage_outputs": {
+                      "first_stage": first_stage_text or "",
+                      "token_fusion": fusion_answer or "",
+                      "final_answer": final_answer or "",
+                      "ensemble_trace_path": ensemble_trace_path or "",
+                      "ensemble_trace_summary": ensemble_trace_summary or {},
+                  },
+              }
+              return {"trace": trace}
+        code_language: python3
+        desc: Save selected path intermediate outputs for later analysis.
+        outputs:
+          trace:
+            children: null
+            type: object
+        selected: false
+        title: 'Trace: paper_p2s_QD_Y'
+        type: code
+        variables:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - prompt
+          variable: question
+        - value_selector:
+          - paper_p2s_QD_Y__aggregator
+          - text
+          variable: first_stage_text
+        - value_selector:
+          - paper_p2s_QD_Y__aggregator
+          - text
+          variable: fusion_answer
+        - value_selector:
+          - paper_p2s_QD_Y__llm_Y_serial
+          - text
+          variable: final_answer
+        - value_selector:
+          - paper_p2s_QD_Y__aggregator
+          - trace_artifact_path
+          variable: ensemble_trace_path
+        - value_selector:
+          - paper_p2s_QD_Y__aggregator
+          - trace_summary
+          variable: ensemble_trace_summary
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 1550
+        y: 1176
+      positionAbsolute:
+        x: 2188
+        y: 1256
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_QY_D__token_Q_par
       type: custom
       data:
@@ -1599,6 +2128,8 @@ workflow:
         prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1629,6 +2160,8 @@ workflow:
         prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|endoftext|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1656,15 +2189,17 @@ workflow:
         desc: P2S：[Q, Y] 并行 → D 综合 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
-            seed: null
-            tau_p: 1.0
+            skip_empty_voters: true
             use_weights: false
           aggregator_name: sum_score
           diagnostics:
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: true
             include_per_backend_errors: true
             include_response_timings: true
-            include_token_candidates: false
+            include_think_trace: true
+            include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
           runner_config:
@@ -1709,7 +2244,6 @@ workflow:
           variable_selector: []
         desc: P2S：[Q, Y] 并行 → D 综合 第二阶段：由 Qwen3-8B-BF16（D 角色替代模型） 综合融合后的中间答案。
         memory:
-          query_prompt_template: '{{#sys.query#}}'
           role_prefix:
             assistant: ''
             user: ''
@@ -1719,6 +2253,8 @@ workflow:
         model:
           completion_params:
             max_tokens: 512
+            stop:
+            - <|im_end|>
             temperature: 0.0
           mode: chat
           name: qwen3-8b-bf16
@@ -1759,6 +2295,89 @@ workflow:
       width: 244
       parentId: sample_iteration
       zIndex: 1002
+    - id: paper_p2s_QY_D__trace
+      type: custom
+      data:
+        code: |
+          def main(
+              sample_id: str,
+              question: str,
+              first_stage_text: str,
+              fusion_answer: str,
+              final_answer: str,
+              ensemble_trace_path: str,
+              ensemble_trace_summary: dict,
+          ) -> dict:
+              trace = {
+                  "sample_id": sample_id or "",
+                  "path": "paper_p2s_QY_D",
+                  "kind": "p2s",
+                  "serial_model": "D",
+                  "parallel_models": ["Q", "Y"],
+                  "question": question or "",
+                  "stage_outputs": {
+                      "first_stage": first_stage_text or "",
+                      "token_fusion": fusion_answer or "",
+                      "final_answer": final_answer or "",
+                      "ensemble_trace_path": ensemble_trace_path or "",
+                      "ensemble_trace_summary": ensemble_trace_summary or {},
+                  },
+              }
+              return {"trace": trace}
+        code_language: python3
+        desc: Save selected path intermediate outputs for later analysis.
+        outputs:
+          trace:
+            children: null
+            type: object
+        selected: false
+        title: 'Trace: paper_p2s_QY_D'
+        type: code
+        variables:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - prompt
+          variable: question
+        - value_selector:
+          - paper_p2s_QY_D__aggregator
+          - text
+          variable: first_stage_text
+        - value_selector:
+          - paper_p2s_QY_D__aggregator
+          - text
+          variable: fusion_answer
+        - value_selector:
+          - paper_p2s_QY_D__llm_D_serial
+          - text
+          variable: final_answer
+        - value_selector:
+          - paper_p2s_QY_D__aggregator
+          - trace_artifact_path
+          variable: ensemble_trace_path
+        - value_selector:
+          - paper_p2s_QY_D__aggregator
+          - trace_summary
+          variable: ensemble_trace_summary
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 1550
+        y: 1516
+      positionAbsolute:
+        x: 2188
+        y: 1596
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
     - id: paper_p2s_DY_Q__token_D_par
       type: custom
       data:
@@ -1768,6 +2387,8 @@ workflow:
         prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|im_end|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1798,6 +2419,8 @@ workflow:
         prompt_template: '{{#prepare_sample.prompt#}}'
         sampling_params:
           max_tokens: 512
+          stop:
+          - <|endoftext|>
           temperature: 0.7
           top_k: 10
         selected: false
@@ -1825,15 +2448,17 @@ workflow:
         desc: P2S：[D, Y] 并行 → Q 综合 的 P2S 第一阶段，使用 sum_score 做 token 级并行融合。
         ensemble:
           aggregator_config:
-            seed: null
-            tau_p: 1.0
+            skip_empty_voters: true
             use_weights: false
           aggregator_name: sum_score
           diagnostics:
             include_aggregator_reasoning: true
+            include_logits: true
+            include_model_outputs: true
             include_per_backend_errors: true
             include_response_timings: true
-            include_token_candidates: false
+            include_think_trace: true
+            include_token_candidates: true
             max_trace_tokens: 2000
             storage: metadata
           runner_config:
@@ -1878,7 +2503,6 @@ workflow:
           variable_selector: []
         desc: P2S：[D, Y] 并行 → Q 综合 第二阶段：由 Qwen2.5-7B-Instruct 综合融合后的中间答案。
         memory:
-          query_prompt_template: '{{#sys.query#}}'
           role_prefix:
             assistant: ''
             user: ''
@@ -1888,6 +2512,8 @@ workflow:
         model:
           completion_params:
             max_tokens: 512
+            stop:
+            - <|im_end|>
             temperature: 0.0
           mode: chat
           name: qwen25-7b-instruct-q5km
@@ -1921,6 +2547,89 @@ workflow:
         y: 1856
       positionAbsolute:
         x: 1884
+        y: 1936
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
+    - id: paper_p2s_DY_Q__trace
+      type: custom
+      data:
+        code: |
+          def main(
+              sample_id: str,
+              question: str,
+              first_stage_text: str,
+              fusion_answer: str,
+              final_answer: str,
+              ensemble_trace_path: str,
+              ensemble_trace_summary: dict,
+          ) -> dict:
+              trace = {
+                  "sample_id": sample_id or "",
+                  "path": "paper_p2s_DY_Q",
+                  "kind": "p2s",
+                  "serial_model": "Q",
+                  "parallel_models": ["D", "Y"],
+                  "question": question or "",
+                  "stage_outputs": {
+                      "first_stage": first_stage_text or "",
+                      "token_fusion": fusion_answer or "",
+                      "final_answer": final_answer or "",
+                      "ensemble_trace_path": ensemble_trace_path or "",
+                      "ensemble_trace_summary": ensemble_trace_summary or {},
+                  },
+              }
+              return {"trace": trace}
+        code_language: python3
+        desc: Save selected path intermediate outputs for later analysis.
+        outputs:
+          trace:
+            children: null
+            type: object
+        selected: false
+        title: 'Trace: paper_p2s_DY_Q'
+        type: code
+        variables:
+        - value_selector:
+          - prepare_sample
+          - sample_id
+          variable: sample_id
+        - value_selector:
+          - prepare_sample
+          - prompt
+          variable: question
+        - value_selector:
+          - paper_p2s_DY_Q__aggregator
+          - text
+          variable: first_stage_text
+        - value_selector:
+          - paper_p2s_DY_Q__aggregator
+          - text
+          variable: fusion_answer
+        - value_selector:
+          - paper_p2s_DY_Q__llm_Q_serial
+          - text
+          variable: final_answer
+        - value_selector:
+          - paper_p2s_DY_Q__aggregator
+          - trace_artifact_path
+          variable: ensemble_trace_path
+        - value_selector:
+          - paper_p2s_DY_Q__aggregator
+          - trace_summary
+          variable: ensemble_trace_summary
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 154
+      position:
+        x: 1550
+        y: 1856
+      positionAbsolute:
+        x: 2188
         y: 1936
       selected: false
       sourcePosition: right
@@ -1966,6 +2675,50 @@ workflow:
       positionAbsolute:
         x: 2492
         y: 1174
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      width: 244
+      parentId: sample_iteration
+      zIndex: 1002
+    - id: trace_aggregator
+      type: custom
+      data:
+        advanced_settings:
+          group_enabled: false
+          groups:
+          - groupId: 98df1786-d19c-5a50-8103-57f894b287a4
+            group_name: trace
+            output_type: object
+            variables: &id002
+            - - paper_s2p_Q_DY__trace
+              - trace
+            - - paper_s2p_D_QY__trace
+              - trace
+            - - paper_s2p_Y_QD__trace
+              - trace
+            - - paper_p2s_QD_Y__trace
+              - trace
+            - - paper_p2s_QY_D__trace
+              - trace
+            - - paper_p2s_DY_Q__trace
+              - trace
+        desc: Collect the trace object emitted by the selected path.
+        output_type: object
+        selected: false
+        title: 'Trace merge: selected path'
+        type: variable-aggregator
+        variables: *id002
+        isInIteration: true
+        isInLoop: false
+        iteration_id: sample_iteration
+      height: 129
+      position:
+        x: 1854
+        y: 1248
+      positionAbsolute:
+        x: 2492
+        y: 1328
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -2038,6 +2791,7 @@ workflow:
               subject: str,
               source_path: str,
               path: str,
+              trace: dict,
           ) -> dict:
               prediction = _normalize(raw_answer or "", extractor or "last_abcd")
               normalized_gold = _normalize(gold_answer or "", extractor or "last_abcd")
@@ -2055,12 +2809,14 @@ workflow:
                   "prediction": prediction,
                   "is_correct": is_correct,
                   "raw_answer": raw_answer or "",
+                  "trace": trace or {},
               }
               return {
                   "raw_answer": result["raw_answer"],
                   "prediction": prediction,
                   "normalized_gold": normalized_gold,
                   "is_correct": is_correct,
+                  "trace": result["trace"],
                   "result": result,
               }
         code_language: python3
@@ -2079,6 +2835,9 @@ workflow:
             children: null
             type: string
           result:
+            children: null
+            type: object
+          trace:
             children: null
             type: object
         selected: false
@@ -2121,6 +2880,10 @@ workflow:
           - start_node
           - path
           variable: path
+        - value_selector:
+          - trace_aggregator
+          - output
+          variable: trace
         isInIteration: true
         isInLoop: false
         iteration_id: sample_iteration
