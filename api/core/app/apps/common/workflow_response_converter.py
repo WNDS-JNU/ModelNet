@@ -51,6 +51,7 @@ from core.tools.entities.tool_entities import ToolProviderType
 from core.tools.tool_manager import ToolManager
 from core.trigger.constants import TRIGGER_PLUGIN_NODE_TYPE
 from core.trigger.trigger_manager import TriggerManager
+from core.workflow.artifact_downloads import append_workflow_artifact_file_outputs
 from core.workflow.human_input_forms import load_form_tokens_by_form_id
 from core.workflow.human_input_policy import HumanInputSurface, enrich_human_input_pause_reasons
 from core.workflow.system_variables import SystemVariableKey, system_variables_to_mapping
@@ -265,6 +266,8 @@ class WorkflowResponseConverter:
 
         outputs_mapping = graph_runtime_state.outputs or {}
         encoded_outputs = WorkflowRuntimeTypeConverter().to_json_encodable(outputs_mapping)
+        if self._application_generate_entity.invoke_from == InvokeFrom.WEB_APP and isinstance(self._user, EndUser):
+            encoded_outputs = append_workflow_artifact_file_outputs(outputs=encoded_outputs, workflow_run_id=run_id)
 
         created_by: CreatedByDict | dict[str, object] = {}
         user = self._user
@@ -295,7 +298,7 @@ class WorkflowResponseConverter:
                 created_by=created_by,
                 created_at=int(started_at.timestamp()),
                 finished_at=int(finished_at.timestamp()),
-                files=self.fetch_files_from_node_outputs(outputs_mapping),
+                files=self.fetch_files_from_node_outputs(encoded_outputs),
                 exceptions_count=exceptions_count,
             ),
         )
@@ -446,6 +449,8 @@ class WorkflowResponseConverter:
         elapsed_time = workflow_run.elapsed_time
 
         encoded_outputs = workflow_run.outputs_dict
+        if isinstance(creator_user, EndUser):
+            encoded_outputs = append_workflow_artifact_file_outputs(outputs=encoded_outputs, workflow_run_id=run_id)
         finished_at = workflow_run.finished_at
         assert finished_at is not None
 

@@ -225,6 +225,11 @@ class TestRunnerRegistration:
         with pytest.raises(UnknownRunnerError):
             RunnerRegistry.get("nope")
 
+    def test_builtin_lazy_lookup_after_reset(self, fresh_registries):
+        from core.workflow.nodes.parallel_ensemble.runners.dynamic_collab_route import DynamicCollabRouteRunner
+
+        assert RunnerRegistry.get("dynamic_collab_route") is DynamicCollabRouteRunner
+
     def test_duplicate_rejected(self, fresh_registries):
         register_runner("noop_test")(NoopRunner)
         with pytest.raises(DuplicateRegistrationError):
@@ -262,6 +267,11 @@ class TestAggregatorRegistration:
     def test_unknown_lookup_raises(self, fresh_registries):
         with pytest.raises(UnknownAggregatorError):
             AggregatorRegistry.get("nope")
+
+    def test_builtin_lazy_lookup_after_reset(self, fresh_registries):
+        from core.workflow.nodes.parallel_ensemble.aggregators.route.noop import NoopRouteAggregator
+
+        assert AggregatorRegistry.get("noop_route") is NoopRouteAggregator
 
     def test_decorator_scope_must_match_class(self, fresh_registries):
         with pytest.raises(ValueError, match="disagrees"):

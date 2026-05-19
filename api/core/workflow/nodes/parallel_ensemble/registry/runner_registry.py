@@ -7,6 +7,7 @@ the same thing, even though they often appear together).
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING
 
 from ..exceptions import DuplicateRegistrationError, UnknownRunnerError
@@ -31,7 +32,31 @@ class RunnerRegistry:
         try:
             return cls._runners[name]
         except KeyError as exc:
-            raise UnknownRunnerError(name, list(cls._runners)) from exc
+            cls._load_builtin_runners()
+            try:
+                return cls._runners[name]
+            except KeyError:
+                raise UnknownRunnerError(name, list(cls._runners)) from exc
+
+    @classmethod
+    def _load_builtin_runners(cls) -> None:
+        """Import built-ins if registration side effects have not run yet."""
+        builtins = {
+            "dynamic_collab_route": (
+                "core.workflow.nodes.parallel_ensemble.runners.dynamic_collab_route",
+                "DynamicCollabRouteRunner",
+            ),
+            "token_step": (
+                "core.workflow.nodes.parallel_ensemble.runners.token_step",
+                "TokenStepRunner",
+            ),
+        }
+        for name, (module_name, class_name) in builtins.items():
+            if name in cls._runners:
+                continue
+            module = importlib.import_module(module_name)
+            runner_cls = getattr(module, class_name)
+            cls._runners.setdefault(name, runner_cls)
 
     @classmethod
     def known_runners(cls) -> list[str]:

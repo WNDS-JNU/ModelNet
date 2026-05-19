@@ -7,6 +7,7 @@ decorator on an aggregator and forgetting to pass scope).
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING
 
 from ..exceptions import DuplicateRegistrationError, UnknownAggregatorError
@@ -31,7 +32,39 @@ class AggregatorRegistry:
         try:
             return cls._aggregators[name]
         except KeyError as exc:
-            raise UnknownAggregatorError(name, list(cls._aggregators)) from exc
+            cls._load_builtin_aggregators()
+            try:
+                return cls._aggregators[name]
+            except KeyError:
+                raise UnknownAggregatorError(name, list(cls._aggregators)) from exc
+
+    @classmethod
+    def _load_builtin_aggregators(cls) -> None:
+        """Import built-ins if registration side effects have not run yet."""
+        builtins = {
+            "duet_net": (
+                "core.workflow.nodes.parallel_ensemble.aggregators.token.duet_net",
+                "DuetNetAggregator",
+            ),
+            "max_score": (
+                "core.workflow.nodes.parallel_ensemble.aggregators.token.max_score",
+                "MaxScoreAggregator",
+            ),
+            "noop_route": (
+                "core.workflow.nodes.parallel_ensemble.aggregators.route.noop",
+                "NoopRouteAggregator",
+            ),
+            "sum_score": (
+                "core.workflow.nodes.parallel_ensemble.aggregators.token.sum_score",
+                "SumScoreAggregator",
+            ),
+        }
+        for name, (module_name, class_name) in builtins.items():
+            if name in cls._aggregators:
+                continue
+            module = importlib.import_module(module_name)
+            agg_cls = getattr(module, class_name)
+            cls._aggregators.setdefault(name, agg_cls)
 
     @classmethod
     def by_scope(cls, scope: str) -> list[type[Aggregator]]:

@@ -31,7 +31,6 @@ from ..spi.requirements import Requirement, ValidationIssue
 from ..spi.runner import DoneEvent, EnsembleRunner, RunnerEvent, SourceInput
 from ..spi.trace import ResponseTraceEntry, TraceCollector
 
-
 DEFAULT_JUDGE_PROMPT_TEMPLATE = (
     "这是问题: {question} , 这是回答: {answer} . "
     "请你作为一个通用领域的专家, 告诉我回答是否令你满意. "
@@ -184,7 +183,7 @@ class DynamicCollabRouteRunner(EnsembleRunner[DynamicCollabRouteConfig]):
             config.supplemental_graph_json,
             known_sources=set(source_ids),
         )
-        rng = random.Random(config.seed)
+        rng = random.Random(config.seed)  # noqa: S311 - deterministic experiment routing, not security randomness.
 
         question = sources[initial_source_id]["prompt"]
         route: list[str] = [initial_source_id]
