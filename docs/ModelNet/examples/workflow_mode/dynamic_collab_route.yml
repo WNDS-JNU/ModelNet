@@ -1,0 +1,300 @@
+app:
+  description: Dynamic collaborative routing reproduction using the existing ModelNet registry and parallel-ensemble SPI.
+  icon: "\U0001F500"
+  icon_background: '#DCE5FF'
+  mode: workflow
+  name: Dynamic Collaborative Route
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: token-model-source
+      id: start-to-token-q
+      source: start_node
+      sourceHandle: source
+      target: token_Q
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: token-model-source
+      id: start-to-token-d
+      source: start_node
+      sourceHandle: source
+      target: token_D
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: token-model-source
+      id: start-to-token-y
+      source: start_node
+      sourceHandle: source
+      target: token_Y
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: token-q-to-route
+      source: token_Q
+      sourceHandle: source
+      target: ensemble
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: token-d-to-route
+      source: token_D
+      sourceHandle: source
+      target: ensemble
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: token-y-to-route
+      source: token_Y
+      sourceHandle: source
+      target: ensemble
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: end
+      id: route-to-end
+      source: ensemble
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: User task.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - label: question
+          max_length: 4096
+          options: []
+          required: true
+          type: paragraph
+          variable: question
+      height: 90
+      id: start_node
+      position:
+        x: 30
+        y: 252
+      positionAbsolute:
+        x: 30
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Q source, alias 5 in api/configs/model_net.yaml.
+        extra: {}
+        model_alias: '5'
+        prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.0
+          top_k: 10
+        selected: false
+        title: Token Source Q
+        type: token-model-source
+      height: 130
+      id: token_Q
+      position:
+        x: 334
+        y: 96
+      positionAbsolute:
+        x: 334
+        y: 96
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: D source, alias 27 in api/configs/model_net.yaml.
+        extra: {}
+        model_alias: '27'
+        prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.0
+          top_k: 10
+        selected: false
+        title: Token Source D
+        type: token-model-source
+      height: 130
+      id: token_D
+      position:
+        x: 334
+        y: 252
+      positionAbsolute:
+        x: 334
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Y source, alias 6 in api/configs/model_net.yaml.
+        extra: {}
+        model_alias: '6'
+        prompt_template: '{{#start_node.question#}}'
+        raw_completion: false
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.0
+          top_k: 10
+        selected: false
+        title: Token Source Y
+        type: token-model-source
+      height: 130
+      id: token_Y
+      position:
+        x: 334
+        y: 408
+      positionAbsolute:
+        x: 334
+        y: 408
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Response-level serial route using the paper's consensus rule.
+        ensemble:
+          aggregator_config: {}
+          aggregator_name: noop_route
+          diagnostics:
+            enable_trace_stream: false
+            include_aggregator_reasoning: false
+            include_logits: false
+            include_model_outputs: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_think_trace: false
+            include_token_candidates: false
+            max_trace_tokens: 1000
+            storage: metadata
+          runner_config:
+            collaboration_graph_json: '{"D":["Q","Y"],"Q":["D"],"Y":["Q","D"]}'
+            initial_source_id: D
+            judge_max_tokens: 8
+            max_hops: 3
+            seed: 42
+          runner_name: dynamic_collab_route
+          token_sources:
+          - source_id: Q
+            spec_selector:
+            - token_Q
+            - spec
+            weight: 1.0
+          - source_id: D
+            spec_selector:
+            - token_D
+            - spec
+            weight: 1.0
+          - source_id: Y
+            spec_selector:
+            - token_Y
+            - spec
+            weight: 1.0
+        selected: false
+        title: Dynamic Collaborative Route
+        type: parallel-ensemble
+      height: 220
+      id: ensemble
+      position:
+        x: 638
+        y: 252
+      positionAbsolute:
+        x: 638
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Final answer.
+        outputs:
+        - value_selector:
+          - ensemble
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: End
+        type: end
+      height: 90
+      id: end_node
+      position:
+        x: 942
+        y: 252
+      positionAbsolute:
+        x: 942
+        y: 252
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.8
