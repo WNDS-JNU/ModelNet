@@ -1,9 +1,20 @@
 app:
-  description: 基于现有 ModelNet 注册表和 parallel-ensemble SPI 复现动态协作模型路由方法。
+  description: >-
+    基于现有 ModelNet 注册表和 parallel-ensemble SPI 复现动态协作模型路由方法。
+
+
+    本版本内置 data-loader，从本地 C-Eval JSONL 数据集可复现随机抽取 50 条样本，并用 Iteration
+    逐条运行动态协作路由。
+
+
+    每条样本内部复用 Q/D/Y 三个 token-model-source：先由初始模型 D 生成回答，再按协作关系图让候选模型判断是否认可，出现不认可时由被选中的模型优化回答。
+
+
+    Iteration 外汇总逐样本预测结果，输出 results、correct_count、total_evaluated 和 accuracy，可直接用 DSL 完成一次评测实验。
   icon: "\U0001F500"
   icon_background: '#DCE5FF'
   mode: workflow
-  name: 动态协作路由
+  name: 动态协作路由：数据集评测
   use_icon_as_answer_icon: false
 kind: app
 version: 0.3.1
@@ -27,274 +38,855 @@ workflow:
       enabled: false
   graph:
     edges:
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: start
-        targetType: token-model-source
-      id: start-to-token-q
-      source: start_node
-      sourceHandle: source
-      target: token_Q
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: start
-        targetType: token-model-source
-      id: start-to-token-d
-      source: start_node
-      sourceHandle: source
-      target: token_D
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: start
-        targetType: token-model-source
-      id: start-to-token-y
-      source: start_node
-      sourceHandle: source
-      target: token_Y
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: token-q-to-route
-      source: token_Q
-      sourceHandle: source
-      target: ensemble
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: token-d-to-route
-      source: token_D
-      sourceHandle: source
-      target: ensemble
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: token-model-source
-        targetType: parallel-ensemble
-      id: token-y-to-route
-      source: token_Y
-      sourceHandle: source
-      target: ensemble
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: parallel-ensemble
-        targetType: end
-      id: route-to-end
-      source: ensemble
-      sourceHandle: source
-      target: end_node
-      targetHandle: target
-      type: custom
-      zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: start
+          targetType: data-loader
+        id: start-to-sample-loader
+        source: start_node
+        sourceHandle: source
+        target: sample_loader
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: data-loader
+          targetType: iteration
+        id: sample-loader-to-sample-iteration
+        source: sample_loader
+        sourceHandle: source
+        target: sample_iteration
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: iteration-start
+          targetType: code
+        id: sample-iteration-start-to-prepare-sample
+        source: sample_iteration_start
+        sourceHandle: source
+        target: prepare_sample
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: code
+          targetType: token-model-source
+        id: prepare-sample-to-token-q
+        source: prepare_sample
+        sourceHandle: source
+        target: token_Q
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: code
+          targetType: token-model-source
+        id: prepare-sample-to-token-d
+        source: prepare_sample
+        sourceHandle: source
+        target: token_D
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: code
+          targetType: token-model-source
+        id: prepare-sample-to-token-y
+        source: prepare_sample
+        sourceHandle: source
+        target: token_Y
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: token-model-source
+          targetType: parallel-ensemble
+        id: token-q-to-route
+        source: token_Q
+        sourceHandle: source
+        target: ensemble
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: token-model-source
+          targetType: parallel-ensemble
+        id: token-d-to-route
+        source: token_D
+        sourceHandle: source
+        target: ensemble
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: token-model-source
+          targetType: parallel-ensemble
+        id: token-y-to-route
+        source: token_Y
+        sourceHandle: source
+        target: ensemble
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          sourceType: parallel-ensemble
+          targetType: code
+        id: route-to-evaluate-answer
+        source: ensemble
+        sourceHandle: source
+        target: evaluate_answer
+        targetHandle: target
+        type: custom
+        zIndex: 1002
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: iteration
+          targetType: code
+        id: sample-iteration-to-summarize-results
+        source: sample_iteration
+        sourceHandle: source
+        target: summarize_results
+        targetHandle: target
+        type: custom
+        zIndex: 0
+      - data:
+          isInIteration: false
+          isInLoop: false
+          sourceType: code
+          targetType: end
+        id: summarize-results-to-end
+        source: summarize_results
+        sourceHandle: source
+        target: end_node
+        targetHandle: target
+        type: custom
+        zIndex: 0
     nodes:
-    - data:
-        desc: 用户输入的待回答问题。
+      - data:
+          desc: 工作流入口。本版本默认从数据加载器读取评测样本，因此不需要手动输入单题问题。
+          selected: false
+          title: 开始
+          type: start
+          variables: []
+        height: 74
+        id: start_node
+        position:
+          x: 30
+          'y': 420
+        positionAbsolute:
+          x: 30
+          'y': 420
         selected: false
-        title: 开始
-        type: start
-        variables:
-        - label: 问题
-          max_length: 4096
-          options: []
-          required: true
-          type: paragraph
-          variable: question
-      height: 90
-      id: start_node
-      position:
-        x: 30
-        y: 252
-      positionAbsolute:
-        x: 30
-        y: 252
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 244
-    - data:
-        desc: Q 模型源，对应 api/configs/model_net.yaml 中的别名 5。
-        extra: {}
-        model_alias: '5'
-        prompt_template: '{{#start_node.question#}}'
-        raw_completion: false
-        sampling_params:
-          max_tokens: 512
-          temperature: 0.0
-          top_k: 10
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          desc: 从本地 C-Eval JSONL 文件可复现随机抽取 50 条标准化评测样本，输出 items、questions、answers 和元数据。
+          loader_name: jsonl_file
+          loader_config:
+            path: /home/duxianghe/dify/dev/modelnet/datasets/c_eval.jsonl
+            dataset_name: C-Eval
+            split: validation-sample
+            encoding: utf-8
+            id_key: id
+            question_key: question
+            answer_key: answer
+            metadata_keys:
+              - subject
+              - extractor
+          limit: 50
+          offset: 0
+          seed: 42
+          selected: false
+          shuffle: true
+          title: 数据集加载：抽取 50 条 C-Eval 样本
+          type: data-loader
+        height: 142
+        id: sample_loader
+        position:
+          x: 334
+          'y': 386
+        positionAbsolute:
+          x: 334
+          'y': 386
         selected: false
-        title: Q 模型源
-        type: token-model-source
-      height: 130
-      id: token_Q
-      position:
-        x: 334
-        y: 96
-      positionAbsolute:
-        x: 334
-        y: 96
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 244
-    - data:
-        desc: D 模型源，对应 api/configs/model_net.yaml 中的别名 27。
-        extra: {}
-        model_alias: '27'
-        prompt_template: '{{#start_node.question#}}'
-        raw_completion: false
-        sampling_params:
-          max_tokens: 512
-          temperature: 0.0
-          top_k: 10
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          desc: 样本级 Iteration。每轮处理一条 data-loader item；每条样本内部运行一次动态协作路由。
+          error_handle_mode: terminated
+          flatten_output: true
+          height: 700
+          is_parallel: false
+          iterator_input_type: array[object]
+          iterator_selector:
+            - sample_loader
+            - items
+          output_selector:
+            - evaluate_answer
+            - result
+          output_type: array[object]
+          parallel_nums: 10
+          selected: false
+          start_node_id: sample_iteration_start
+          title: 迭代：逐样本评测
+          type: iteration
+          width: 1230
+        height: 700
+        id: sample_iteration
+        position:
+          x: 638
+          'y': 80
+        positionAbsolute:
+          x: 638
+          'y': 80
         selected: false
-        title: D 模型源
-        type: token-model-source
-      height: 130
-      id: token_D
-      position:
-        x: 334
-        y: 252
-      positionAbsolute:
-        x: 334
-        y: 252
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 244
-    - data:
-        desc: Y 模型源，对应 api/configs/model_net.yaml 中的别名 6。
-        extra: {}
-        model_alias: '6'
-        prompt_template: '{{#start_node.question#}}'
-        raw_completion: false
-        sampling_params:
-          max_tokens: 512
-          temperature: 0.0
-          top_k: 10
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 1230
+        zIndex: 1
+      - data:
+          desc: 样本级迭代起点。
+          isInIteration: true
+          selected: false
+          title: ''
+          type: iteration-start
+        draggable: false
+        height: 48
+        id: sample_iteration_start
+        parentId: sample_iteration
+        position:
+          x: 32
+          'y': 326
+        positionAbsolute:
+          x: 670
+          'y': 406
+        selectable: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom-iteration-start
+        width: 44
+        zIndex: 1002
+      - data:
+          code: |
+            def main(item: dict, dataset: str, split: str, loader_metadata: dict) -> dict:
+                item = item or {}
+                data = item.get("data") or {}
+                metadata = item.get("metadata") or {}
+                question = item.get("question") or data.get("question") or ""
+                answer = item.get("answer") or data.get("answer") or ""
+                sample_id = item.get("id") or data.get("id") or ""
+                subject = metadata.get("subject") or data.get("subject") or ""
+                extractor = metadata.get("extractor") or data.get("extractor") or "last_abcd"
+                return {
+                    "prompt": str(question),
+                    "sample_id": str(sample_id),
+                    "gold_answer": str(answer),
+                    "subject": str(subject),
+                    "extractor": str(extractor),
+                    "dataset": dataset or "",
+                    "split": split or "",
+                    "source_path": (loader_metadata or {}).get("path", ""),
+                    "sample_metadata": metadata,
+                }
+          code_language: python3
+          desc: 整理当前迭代样本，生成 prompt、gold answer 和评测元数据，供三个 token-model-source 复用。
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          outputs:
+            prompt:
+              children: null
+              type: string
+            sample_id:
+              children: null
+              type: string
+            gold_answer:
+              children: null
+              type: string
+            subject:
+              children: null
+              type: string
+            extractor:
+              children: null
+              type: string
+            dataset:
+              children: null
+              type: string
+            split:
+              children: null
+              type: string
+            source_path:
+              children: null
+              type: string
+            sample_metadata:
+              children: null
+              type: object
+          selected: false
+          title: 样本整理：生成 prompt
+          type: code
+          variables:
+            - value_selector:
+                - sample_iteration
+                - item
+              variable: item
+            - value_selector:
+                - sample_loader
+                - dataset
+              variable: dataset
+            - value_selector:
+                - sample_loader
+                - split
+              variable: split
+            - value_selector:
+                - sample_loader
+                - metadata
+              variable: loader_metadata
+        height: 130
+        id: prepare_sample
+        parentId: sample_iteration
+        position:
+          x: 112
+          'y': 286
+        positionAbsolute:
+          x: 750
+          'y': 366
         selected: false
-        title: Y 模型源
-        type: token-model-source
-      height: 130
-      id: token_Y
-      position:
-        x: 334
-        y: 408
-      positionAbsolute:
-        x: 334
-        y: 408
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 244
-    - data:
-        desc: 按论文的一致同意规则执行响应级串联路由。
-        ensemble:
-          aggregator_config: {}
-          aggregator_name: noop_route
-          diagnostics:
-            enable_trace_stream: false
-            include_aggregator_reasoning: false
-            include_logits: false
-            include_model_outputs: true
-            include_per_backend_errors: true
-            include_response_timings: true
-            include_think_trace: false
-            include_token_candidates: false
-            max_trace_tokens: 1000
-            storage: metadata
-          runner_config:
-            collaboration_graph_json: '{"D":["Q","Y"],"Q":["D"],"Y":["Q","D"]}'
-            initial_source_id: D
-            judge_max_tokens: 8
-            max_hops: 3
-            seed: 42
-          runner_name: dynamic_collab_route
-          token_sources:
-          - source_id: Q
-            spec_selector:
-            - token_Q
-            - spec
-            weight: 1.0
-          - source_id: D
-            spec_selector:
-            - token_D
-            - spec
-            weight: 1.0
-          - source_id: Y
-            spec_selector:
-            - token_Y
-            - spec
-            weight: 1.0
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        zIndex: 1002
+      - data:
+          desc: Q 模型源，对应 api/configs/model_net.yaml 中的别名 5，读取当前样本 prompt 并输出 ModelInvocationSpec。
+          extra: {}
+          inline_spec: null
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          model_alias: '5'
+          prompt_template: '{{#prepare_sample.prompt#}}'
+          raw_completion: false
+          sampling_params:
+            max_tokens: 512
+            seed: null
+            stop: []
+            temperature: 0.0
+            top_k: 10
+            top_p: null
+          selected: false
+          title: Q 模型源
+          type: token-model-source
+        height: 130
+        id: token_Q
+        parentId: sample_iteration
+        position:
+          x: 414
+          'y': 110
+        positionAbsolute:
+          x: 1052
+          'y': 190
         selected: false
-        title: 动态协作路由
-        type: parallel-ensemble
-      height: 220
-      id: ensemble
-      position:
-        x: 638
-        y: 252
-      positionAbsolute:
-        x: 638
-        y: 252
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 244
-    - data:
-        desc: 输出最终答案。
-        outputs:
-        - value_selector:
-          - ensemble
-          - text
-          value_type: string
-          variable: answer
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        zIndex: 1002
+      - data:
+          desc: D 模型源，对应 api/configs/model_net.yaml 中的别名 27，作为默认初始回答模型。
+          extra: {}
+          inline_spec: null
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          model_alias: '27'
+          prompt_template: '{{#prepare_sample.prompt#}}'
+          raw_completion: false
+          sampling_params:
+            max_tokens: 512
+            seed: null
+            stop: []
+            temperature: 0.0
+            top_k: 10
+            top_p: null
+          selected: false
+          title: D 模型源
+          type: token-model-source
+        height: 130
+        id: token_D
+        parentId: sample_iteration
+        position:
+          x: 414
+          'y': 286
+        positionAbsolute:
+          x: 1052
+          'y': 366
         selected: false
-        title: 结束
-        type: end
-      height: 90
-      id: end_node
-      position:
-        x: 942
-        y: 252
-      positionAbsolute:
-        x: 942
-        y: 252
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 244
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        zIndex: 1002
+      - data:
+          desc: Y 模型源，对应 api/configs/model_net.yaml 中的别名 6，作为协作判断和优化候选模型。
+          extra: {}
+          inline_spec: null
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          model_alias: '6'
+          prompt_template: '{{#prepare_sample.prompt#}}'
+          raw_completion: false
+          sampling_params:
+            max_tokens: 512
+            seed: null
+            stop: []
+            temperature: 0.0
+            top_k: 10
+            top_p: null
+          selected: false
+          title: Y 模型源
+          type: token-model-source
+        height: 130
+        id: token_Y
+        parentId: sample_iteration
+        position:
+          x: 414
+          'y': 462
+        positionAbsolute:
+          x: 1052
+          'y': 542
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        zIndex: 1002
+      - data:
+          desc: 按论文的一致同意规则执行响应级串联路由：D 初答，Q/Y 判断，不认可时由被选中的协作模型优化。
+          ensemble:
+            aggregator_config: {}
+            aggregator_name: noop_route
+            diagnostics:
+              enable_trace_stream: false
+              include_aggregator_reasoning: false
+              include_logits: false
+              include_model_outputs: true
+              include_per_backend_errors: true
+              include_response_timings: true
+              include_think_trace: false
+              include_token_candidates: false
+              max_trace_tokens: 1000
+              storage: inline
+            runner_config:
+              collaboration_graph_json: '{"D":["Q","Y"],"Q":["D"],"Y":["Q","D"]}'
+              initial_source_id: D
+              judge_max_tokens: 8
+              max_hops: 3
+              seed: 42
+            runner_name: dynamic_collab_route
+            token_sources:
+              - source_id: Q
+                spec_selector:
+                  - token_Q
+                  - spec
+                weight: 1.0
+              - source_id: D
+                spec_selector:
+                  - token_D
+                  - spec
+                weight: 1.0
+              - source_id: Y
+                spec_selector:
+                  - token_Y
+                  - spec
+                weight: 1.0
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+          selected: false
+          title: 动态协作路由
+          type: parallel-ensemble
+        height: 220
+        id: ensemble
+        parentId: sample_iteration
+        position:
+          x: 716
+          'y': 270
+        positionAbsolute:
+          x: 1354
+          'y': 350
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        zIndex: 1002
+      - data:
+          code: |
+            import re
+
+
+            def _last_abcd(text: str) -> str:
+                cleaned = (text or "").upper()
+                matches = re.findall(r"(?<![A-Z])([ABCD])(?![A-Z])", cleaned)
+                if matches:
+                    return matches[-1]
+                for char in reversed(cleaned):
+                    if char in {"A", "B", "C", "D"}:
+                        return char
+                return ""
+
+
+            def _last_bool(text: str) -> str:
+                cleaned = (text or "").strip().lower()
+                matches = re.findall(r"\b(true|false|yes|no)\b", cleaned)
+                if not matches:
+                    return ""
+                value = matches[-1]
+                if value == "yes":
+                    return "true"
+                if value == "no":
+                    return "false"
+                return value
+
+
+            def _normalize(text: str, extractor: str) -> str:
+                strategy = (extractor or "").strip().lower()
+                if strategy == "last_bool":
+                    return _last_bool(text)
+                return _last_abcd(text)
+
+
+            def main(
+                raw_answer: str,
+                gold_answer: str,
+                extractor: str,
+                sample_id: str,
+                dataset: str,
+                split: str,
+                subject: str,
+                source_path: str,
+                route_elapsed_ms: int,
+                route_tokens_count: int,
+                route_trace: dict,
+            ) -> dict:
+                prediction = _normalize(raw_answer or "", extractor or "last_abcd")
+                normalized_gold = _normalize(gold_answer or "", extractor or "last_abcd")
+                is_correct = bool(prediction) and prediction == normalized_gold
+                summary = (route_trace or {}).get("summary") or {}
+                result = {
+                    "sample_id": sample_id or "",
+                    "dataset": dataset or "",
+                    "split": split or "",
+                    "subject": subject or "",
+                    "extractor": extractor or "last_abcd",
+                    "source_path": source_path or "",
+                    "gold_answer": gold_answer or "",
+                    "normalized_gold": normalized_gold,
+                    "prediction": prediction,
+                    "is_correct": is_correct,
+                    "raw_answer": raw_answer or "",
+                    "route_elapsed_ms": route_elapsed_ms or 0,
+                    "route_tokens_count": route_tokens_count or 0,
+                    "route": summary.get("route") or [],
+                    "stopped_by": summary.get("stopped_by") or "",
+                    "hops_count": summary.get("hops_count") or 0,
+                }
+                return {
+                    "raw_answer": result["raw_answer"],
+                    "prediction": prediction,
+                    "normalized_gold": normalized_gold,
+                    "is_correct": is_correct,
+                    "result": result,
+                }
+          code_language: python3
+          desc: 根据样本 extractor 字段从动态协作路由最终回答中抽取预测答案，并输出当前样本评测对象。
+          outputs:
+            is_correct:
+              children: null
+              type: boolean
+            normalized_gold:
+              children: null
+              type: string
+            prediction:
+              children: null
+              type: string
+            raw_answer:
+              children: null
+              type: string
+            result:
+              children: null
+              type: object
+          selected: false
+          title: 评测：抽取并对比答案
+          type: code
+          variables:
+            - value_selector:
+                - ensemble
+                - text
+              variable: raw_answer
+            - value_selector:
+                - prepare_sample
+                - gold_answer
+              variable: gold_answer
+            - value_selector:
+                - prepare_sample
+                - extractor
+              variable: extractor
+            - value_selector:
+                - prepare_sample
+                - sample_id
+              variable: sample_id
+            - value_selector:
+                - prepare_sample
+                - dataset
+              variable: dataset
+            - value_selector:
+                - prepare_sample
+                - split
+              variable: split
+            - value_selector:
+                - prepare_sample
+                - subject
+              variable: subject
+            - value_selector:
+                - prepare_sample
+                - source_path
+              variable: source_path
+            - value_selector:
+                - ensemble
+                - elapsed_ms
+              variable: route_elapsed_ms
+            - value_selector:
+                - ensemble
+                - tokens_count
+              variable: route_tokens_count
+            - value_selector:
+                - ensemble
+                - trace
+              variable: route_trace
+          isInIteration: true
+          isInLoop: false
+          iteration_id: sample_iteration
+        height: 154
+        id: evaluate_answer
+        parentId: sample_iteration
+        position:
+          x: 1018
+          'y': 270
+        positionAbsolute:
+          x: 1656
+          'y': 350
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+        zIndex: 1002
+      - data:
+          code: >
+            def main(results: list, dataset_total: int, loaded_count: int, next_offset: int) ->
+            dict:
+                rows = results or []
+                total_evaluated = len(rows)
+                correct_count = 0
+                total_latency_ms = 0
+                for row in rows:
+                    if isinstance(row, dict):
+                        if row.get("is_correct"):
+                            correct_count += 1
+                        total_latency_ms += int(row.get("route_elapsed_ms") or 0)
+                incorrect_count = total_evaluated - correct_count
+                accuracy = correct_count / total_evaluated if total_evaluated else 0.0
+                avg_latency_ms = total_latency_ms / total_evaluated if total_evaluated else 0.0
+                return {
+                    "total_evaluated": total_evaluated,
+                    "correct_count": correct_count,
+                    "incorrect_count": incorrect_count,
+                    "accuracy": accuracy,
+                    "accuracy_percent": accuracy * 100.0,
+                    "avg_latency_ms": avg_latency_ms,
+                    "dataset_total": dataset_total or 0,
+                    "loaded_count": loaded_count or total_evaluated,
+                    "next_offset": next_offset or 0,
+                }
+          code_language: python3
+          desc: 汇总 50 条样本评测结果，计算正确数、错误数、准确率和平均路由耗时。
+          outputs:
+            accuracy:
+              children: null
+              type: number
+            accuracy_percent:
+              children: null
+              type: number
+            avg_latency_ms:
+              children: null
+              type: number
+            correct_count:
+              children: null
+              type: number
+            dataset_total:
+              children: null
+              type: number
+            incorrect_count:
+              children: null
+              type: number
+            loaded_count:
+              children: null
+              type: number
+            next_offset:
+              children: null
+              type: number
+            total_evaluated:
+              children: null
+              type: number
+          selected: false
+          title: 汇总：计算评测指标
+          type: code
+          variables:
+            - value_selector:
+                - sample_iteration
+                - output
+              variable: results
+            - value_selector:
+                - sample_loader
+                - total
+              variable: dataset_total
+            - value_selector:
+                - sample_loader
+                - count
+              variable: loaded_count
+            - value_selector:
+                - sample_loader
+                - next_offset
+              variable: next_offset
+        height: 154
+        id: summarize_results
+        position:
+          x: 1920
+          'y': 404
+        positionAbsolute:
+          x: 1920
+          'y': 404
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
+      - data:
+          desc: 输出逐样本评测结果、正确数、评测数、准确率和数据集加载元数据。
+          outputs:
+            - value_selector:
+                - sample_loader
+                - dataset
+              value_type: string
+              variable: dataset
+            - value_selector:
+                - sample_loader
+                - split
+              value_type: string
+              variable: split
+            - value_selector:
+                - sample_iteration
+                - output
+              value_type: array[object]
+              variable: results
+            - value_selector:
+                - summarize_results
+                - total_evaluated
+              value_type: number
+              variable: total_evaluated
+            - value_selector:
+                - summarize_results
+                - correct_count
+              value_type: number
+              variable: correct_count
+            - value_selector:
+                - summarize_results
+                - incorrect_count
+              value_type: number
+              variable: incorrect_count
+            - value_selector:
+                - summarize_results
+                - accuracy
+              value_type: number
+              variable: accuracy
+            - value_selector:
+                - summarize_results
+                - accuracy_percent
+              value_type: number
+              variable: accuracy_percent
+            - value_selector:
+                - summarize_results
+                - avg_latency_ms
+              value_type: number
+              variable: avg_latency_ms
+            - value_selector:
+                - summarize_results
+                - dataset_total
+              value_type: number
+              variable: dataset_total
+            - value_selector:
+                - summarize_results
+                - loaded_count
+              value_type: number
+              variable: loaded_count
+            - value_selector:
+                - summarize_results
+                - next_offset
+              value_type: number
+              variable: next_offset
+          selected: false
+          title: 结束：输出评测结果
+          type: end
+        height: 220
+        id: end_node
+        position:
+          x: 2224
+          'y': 404
+        positionAbsolute:
+          x: 2224
+          'y': 404
+        selected: false
+        sourcePosition: right
+        targetPosition: left
+        type: custom
+        width: 244
     viewport:
-      x: 0
-      y: 0
-      zoom: 0.8
+      x: -120
+      'y': 20
+      zoom: 0.58
