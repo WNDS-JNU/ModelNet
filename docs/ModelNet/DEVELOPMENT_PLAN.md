@@ -74,7 +74,7 @@
 
 **目标**：澄清 graphon 内部协议的剩余未知项。Review 已闭环掉事件协议（Issue 2）；剩下的主要是节点类型与注册机制。
 
-**Phase 0 状态（2026-04-18）**：✅ **全部完成**。Spike 报告 `docs/ModelNet/SPIKE_GRAPHON.md`；四项探针全绿；本章节 §4.1 的 Q1/Q3/Q4/Q5 均已闭环；§8 风险登记 R1 → closed、R10 → mitigated。
+**Phase 0 状态（2026-04-18）**：✅ **全部完成**。Graphon spike 结论已并入 `docs/ModelNet/TASKS.md` 的 Phase 0 段落；四项探针全绿；本章节 §4.1 的 Q1/Q3/Q4/Q5 均已闭环；§8 风险登记 R1 → closed、R10 → mitigated。
 
 ### 4.1 已验证的接口
 
@@ -87,7 +87,7 @@
 | Q5 | 前后端 schema 一致性 | ✅ 已闭环 | `BaseNodeData.type: NodeType = str`（`graphon/entities/base_node_data.py:142`），前端 `BlockEnum` 是字符串枚举（`types.ts:28`）。序列化到 JSON 是普通字符串，Pydantic 直接接受，无需 validator |
 
 ### 4.2 Spike 产出
-`docs/ModelNet/SPIKE_GRAPHON.md`（2026-04-18 产出），包含 Q1/Q3/Q4/Q5 证据、graphon 关键文件行号索引、对本计划的回溯动作清单，以及 `self.id == self._node_id` 的误述更正。
+原 `docs/ModelNet/SPIKE_GRAPHON.md`（2026-04-18 产出）已清理；保留结论见 `docs/ModelNet/TASKS.md` 的 Phase 0 段落，包含 Q1/Q3/Q4/Q5 证据、graphon 关键文件行号索引、对本计划的回溯动作清单，以及 `self.id == self._node_id` 的误述更正。
 
 ### 4.3 重要更正：`self.id` 并非 execution id
 
@@ -548,7 +548,7 @@ from .spi.trace import DiagnosticsConfig    # 见 §6.7 / EXTENSIBILITY_SPEC §7
 class ParallelEnsembleConfig(BaseModel):
     """嵌套业务配置；用 extra="forbid" 锁死（顶层 NodeData 须保 allow 兼容
     BaseNodeData 的 selected/params/paramSchemas/datasource_label）。
-    DSL 偷塞 model_url 等敏感字段 → 在此层 forbid 拒。详见 SPIKE_GRAPHON §4.3。"""
+    DSL 偷塞 model_url 等敏感字段 → 在此层 forbid 拒。详见 TASKS.md Phase 0 与 EXTENSIBILITY_SPEC §4.4。"""
     model_config = ConfigDict(extra="forbid")
 
     question_variable: list[str] = Field(min_length=2)
