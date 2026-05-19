@@ -1,14 +1,16 @@
 """Backend implementations registered into ``BackendRegistry``.
 
-v0.2 ships only ``llama_cpp``. P2.9 will wire ``pkgutil.walk_packages``
-over this directory so importing the package triggers every
-``@register_backend`` decorator side-effect; for the P2.1.5 SPI freeze
-window we explicitly import the module that owns ``LlamaCppSpec`` so
-``ModelRegistry._load`` can dispatch ``backend: llama_cpp`` entries.
+P2.9 will wire ``pkgutil.walk_packages`` over this directory so
+importing the package triggers every ``@register_backend`` decorator
+side-effect; for the current SPI freeze window we explicitly import
+the modules that own built-in spec classes so ``ModelRegistry._load``
+can dispatch built-in ``backend`` entries.
 """
 
 from __future__ import annotations
 
 from . import llama_cpp as llama_cpp
+from . import vllm as vllm
+from . import vllm_chat as vllm_chat
 
-__all__: list[str] = ["llama_cpp"]
+__all__: list[str] = ["llama_cpp", "vllm", "vllm_chat"]

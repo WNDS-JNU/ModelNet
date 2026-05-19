@@ -5,9 +5,9 @@
 # overridable via the MODEL_NET_REGISTRY_PATH env var (see
 # api/configs/feature/__init__.py).
 #
-# Each entry is one self-hosted llama.cpp endpoint. The aliases below
-# (`id`) are what workflow DSLs reference; the URL stays server-side
-# and is never returned by the console aliases endpoint (ADR-3).
+# Each entry is one server-side model endpoint. The aliases below (`id`)
+# are what workflow DSLs reference; the URL stays server-side and is
+# never returned by the console aliases endpoint (ADR-3).
 #
 # Schema is enforced by parallel_ensemble.backends.llama_cpp.LlamaCppSpec
 # with extra="forbid", so unknown keys reject the file at boot.
@@ -25,6 +25,22 @@
 #                   "<|None|>" for non-think entries (ignored).
 #   weight          float > 0, default 1.0; used by token-step aggregator.
 #   request_timeout_ms  int > 0, default 30000.
+#
+# Field reference (vllm backend):
+#   backend         "vllm" required — raw /v1/completions fallback.
+#   model_name      str, required; sent as the OpenAI-compatible model.
+#   model_url       full base URL of the vLLM server (no trailing slash).
+#   EOS             end-of-stream token string.
+#   type            "normal" only.
+#
+# Field reference (vllm_chat backend):
+#   backend         "vllm_chat" required — /v1/chat/completions path.
+#   model_name      str, required; sent as the OpenAI-compatible model.
+#   model_url       full base URL of the vLLM server (no trailing slash).
+#   EOS             end-of-stream token string.
+#   type            "normal" only.
+#   This backend supports messages_template through a local prompt envelope;
+#   it does not call a server-side /apply-template endpoint.
 
 models:
   - id: "0"
@@ -54,3 +70,17 @@ models:
     type: normal
     stop_think: "<|None|>"
     weight: 1.5
+
+  - id: "vllm-raw-hunyuan"
+    backend: vllm
+    model_name: tencent/Hunyuan-7B-Instruct-AWQ-Int4
+    model_url: https://inference.cluster.aimodelnetwork.cn/tencent/Hunyuan-7B-Instruct-AWQ-Int4
+    EOS: "<|eos|>"
+    type: normal
+
+  - id: "vllm-chat-qwen"
+    backend: vllm_chat
+    model_name: Intel/Qwen3.5-4B-int4-AutoRound
+    model_url: https://inference.cluster.aimodelnetwork.cn/Intel/Qwen3.5-4B-int4-AutoRound
+    EOS: "<|im_end|>"
+    type: normal

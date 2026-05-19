@@ -3,7 +3,7 @@
 The SPI surface is frozen by P2.1.5; see ``spi/`` and ``registry/``.
 P2.9 will turn the side-effect imports below into ``pkgutil.walk_packages``
 auto-discovery, but for now the explicit imports keep test/setup ordering
-deterministic: ``backends/`` registers ``llama_cpp`` before any code
+deterministic: ``backends/`` registers built-in backends before any code
 calls ``ModelRegistry.instance()``.
 """
 
@@ -12,9 +12,9 @@ from __future__ import annotations
 PARALLEL_ENSEMBLE_NODE_TYPE = "parallel-ensemble"
 
 # Side-effect imports — populate the three registries so ``ModelRegistry``
-# can dispatch ``backend: llama_cpp`` yaml entries without callers
+# can dispatch built-in ``backend`` yaml entries without callers
 # remembering to import the backend module first. Order matters:
-# backends/ must register ``LlamaCppSpec`` before ``ModelRegistry._load``
+# backends/ must register spec classes before ``ModelRegistry._load``
 # can resolve a yaml entry's backend string. Runners / aggregators land
 # alongside in P2.5 / P2.6.
 #

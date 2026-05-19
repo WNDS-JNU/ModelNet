@@ -1760,6 +1760,110 @@ class TestChatModeIntegration:
         for sid in ("s0", "s1"):
             assert captured["sources"][sid]["prompt"] == "hi"
 
+    def test_vllm_prompt_template_uses_raw_prompt(self):
+        # vLLM hotfix path: vLLM deliberately does not advertise
+        # CHAT_TEMPLATE, so prompt_template sources must stay in raw
+        # completion mode and never become the SPI default
+        # ``"user: ..."`` scaffold.
+        from core.workflow.nodes.parallel_ensemble.backends.vllm import (
+            VllmBackend,
+            VllmSpec,
+        )
+
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1", prompt="raw prompt 1"))
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2", prompt="raw prompt 2"))
+        specs = {
+            "m1": VllmSpec(
+                id="m1",
+                backend="vllm",
+                model_name="m1",
+                model_url="http://vllm.test:8000",
+                EOS="<|eos|>",
+            ),
+            "m2": VllmSpec(
+                id="m2",
+                backend="vllm",
+                model_name="m2",
+                model_url="http://vllm.test:8001",
+                EOS="<|eos|>",
+            ),
+        }
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"vllm": VllmBackend},
+            specs=specs,
+        )
+        list(node._run())
+
+        assert captured["sources"]["s0"]["prompt"] == "raw prompt 1"
+        assert captured["sources"]["s1"]["prompt"] == "raw prompt 2"
+        assert all(
+            Capability.CHAT_TEMPLATE not in captured["backends"][sid].instance_capabilities
+            for sid in ("s0", "s1")
+        )
+
+    def test_vllm_chat_prompt_template_auto_wraps_to_chat_envelope(self):
+        # vllm_chat is the semantic chat path: prompt_template sources
+        # are auto-wrapped into structured chat messages and encoded into
+        # the backend's private runner prompt envelope.
+        from core.workflow.nodes.parallel_ensemble.backends.vllm_chat import (
+            VllmChatBackend,
+            VllmChatSpec,
+            decode_vllm_chat_prompt,
+        )
+
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(["src_0", "spec"], _make_spec_dict(model_alias="m1", prompt="raw prompt 1"))
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2", prompt="raw prompt 2"))
+        specs = {
+            "m1": VllmChatSpec(
+                id="m1",
+                backend="vllm_chat",
+                model_name="m1",
+                model_url="http://vllm.test:8000",
+                EOS="<|eos|>",
+            ),
+            "m2": VllmChatSpec(
+                id="m2",
+                backend="vllm_chat",
+                model_name="m2",
+                model_url="http://vllm.test:8001",
+                EOS="<|eos|>",
+            ),
+        }
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"vllm_chat": VllmChatBackend},
+            specs=specs,
+        )
+        list(node._run())
+
+        s0_messages, s0_prefix = decode_vllm_chat_prompt(captured["sources"]["s0"]["prompt"])
+        s1_messages, s1_prefix = decode_vllm_chat_prompt(captured["sources"]["s1"]["prompt"])
+        assert s0_messages == [{"role": "user", "content": "raw prompt 1"}]
+        assert s1_messages == [{"role": "user", "content": "raw prompt 2"}]
+        assert s0_prefix == ""
+        assert s1_prefix == ""
+        assert all(
+            Capability.CHAT_TEMPLATE in captured["backends"][sid].instance_capabilities
+            for sid in ("s0", "s1")
+        )
+
     def test_auto_wrap_skipped_for_empty_prompt(self):
         # Empty prompt + chat backend → auto-wrapping ``""`` would
         # produce a useless ``user: ""`` chat turn. Skip the wrap
@@ -1895,6 +1999,120 @@ class TestChatModeIntegration:
         assert any("messages_template (chat mode)" in m and "s0" in m for m in messages)
         # The chat-template gate must NOT fire for s1 (raw mode).
         assert all("s1" not in m for m in messages)
+
+    def test_messages_template_with_vllm_rejected_at_startup(self):
+        # Explicit chat-mode sources need a real backend chat template.
+        # vLLM does not expose one in this hotfix, so the source should
+        # be rejected before any backend call is attempted.
+        from core.workflow.nodes.parallel_ensemble.backends.vllm import (
+            VllmBackend,
+            VllmSpec,
+        )
+
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="",
+                messages=[{"role": "user", "content": "hi"}],
+            ),
+        )
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2"))
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        specs = {
+            "m1": VllmSpec(
+                id="m1",
+                backend="vllm",
+                model_name="m1",
+                model_url="http://vllm.test:8000",
+                EOS="<|eos|>",
+            ),
+            "m2": VllmSpec(
+                id="m2",
+                backend="vllm",
+                model_name="m2",
+                model_url="http://vllm.test:8001",
+                EOS="<|eos|>",
+            ),
+        }
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"vllm": VllmBackend},
+            specs=specs,
+        )
+        with pytest.raises(StructuredValidationError) as exc:
+            list(node._run())
+
+        messages = [issue["message"] for issue in exc.value.issues]
+        assert any("messages_template (chat mode)" in m and "vllm" in m for m in messages)
+        assert all("s1" not in m for m in messages)
+
+    def test_messages_template_with_vllm_chat_passes_validation(self):
+        # The chat-capable vLLM path accepts explicit messages_template
+        # and carries the structured messages through the private prompt
+        # envelope instead of calling a server-side /apply-template.
+        from core.workflow.nodes.parallel_ensemble.backends.vllm_chat import (
+            VllmChatBackend,
+            VllmChatSpec,
+            decode_vllm_chat_prompt,
+        )
+
+        captured: dict[str, Any] = {}
+        runner = self._make_capturing_runner(captured)
+        pool = VariablePool()
+        pool.add(
+            ["src_0", "spec"],
+            _make_spec_dict(
+                model_alias="m1",
+                prompt="",
+                messages=[{"role": "system", "content": "Be terse."}, {"role": "user", "content": "hi"}],
+            ),
+        )
+        pool.add(["src_1", "spec"], _make_spec_dict(model_alias="m2", prompt="hello"))
+        specs = {
+            "m1": VllmChatSpec(
+                id="m1",
+                backend="vllm_chat",
+                model_name="m1",
+                model_url="http://vllm.test:8000",
+                EOS="<|eos|>",
+            ),
+            "m2": VllmChatSpec(
+                id="m2",
+                backend="vllm_chat",
+                model_name="m2",
+                model_url="http://vllm.test:8001",
+                EOS="<|eos|>",
+            ),
+        }
+        node = _make_node(
+            pool=pool,
+            selectors=[["src_0", "spec"], ["src_1", "spec"]],
+            runner_name="_capturing_chat",
+            runners={"_capturing_chat": runner},
+            aggregator_name="_no_signal_token",
+            aggregators={"_no_signal_token": _NoSignalTokenAggregator},
+            backends={"vllm_chat": VllmChatBackend},
+            specs=specs,
+        )
+        list(node._run())
+
+        s0_messages, s0_prefix = decode_vllm_chat_prompt(captured["sources"]["s0"]["prompt"])
+        s1_messages, s1_prefix = decode_vllm_chat_prompt(captured["sources"]["s1"]["prompt"])
+        assert s0_messages == [
+            {"role": "system", "content": "Be terse."},
+            {"role": "user", "content": "hi"},
+        ]
+        assert s1_messages == [{"role": "user", "content": "hello"}]
+        assert s0_prefix == ""
+        assert s1_prefix == ""
 
     def test_chat_mode_with_chat_capable_backend_passes_validation(self):
         # Sibling check to the rejection test — the same shape against
