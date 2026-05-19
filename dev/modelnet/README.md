@@ -7,8 +7,8 @@ this fork ships (`parallel-ensemble`, `token-model-source`,
 * **DuetNet** (Wang et al., 2025) — token-level parallel ensemble.
   6 dual-model + 1 triple + 1 quad combo, datasets SimpleMath / C-Eval
   (computer_network) / BoolQ / MMLU. Tables 4–5 / Fig. 7 / Fig. 11.
-* **AI-ModelNet** (Li et al., 2025) — 4 paradigms (SI / PI / S2P / P2S)
-  × 13 paths × 3 paper datasets (GSM8K, C-Eval multi-subject,
+* **AI-ModelNet** (Li et al., 2025) — hybrid S2P / P2S paths
+  × 6 paths × 3 paper datasets (GSM8K, C-Eval multi-subject,
   HendrycksMATH). Tables 4 / 6-7. Framing in
   [`docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md`](../../docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md)
   §6 (direction D) and the staged execution plan in
@@ -22,10 +22,11 @@ research scratch space.
 | File | What it does |
 |---|---|
 | `generate_duet_net_dsls.py` | Emits 8 DuetNet workflow-mode DSLs (6 dual + 1 triple + 1 quad) under `docs/ModelNet/examples/workflow_mode/duet_net_*.yml` from a single template. Idempotent. |
-| `generate_paper_dsls.py` | Emits 13 AI-ModelNet paper DSLs (`paper_*.yml`) covering 4 paradigms × 3 model roles {Q=5, D=22, Y=6}. Idempotent. SI uses standard `llm` chains; PI/S2P/P2S use `parallel-ensemble` (`sum_score`) for every paper parallel stage. |
+| `generate_paper_dsls.py` | Emits the single AI-ModelNet hybrid router DSL (`paper_hybrid_router.yml`), covering model roles {Q=5, D=22, Y=6}. Idempotent. S2P/P2S parallel stages use `parallel-ensemble` (`sum_score`) with `token-model-source`; the router selects one of the six paths with a `path` input. |
+| `build_dynamic_collab_graph.py` | Runs the mutual-evaluation stage from "Dynamic Model Routing Based on Collaborative Relationship" and emits `collaboration_graph_json` for the `dynamic_collab_route` runner. |
 | `duet_net_eval.py` | Calls Dify's `/v1/workflows/run` API for each (workflow × dataset × item) and records accuracy / token count / latency. Drives both reproductions; the script does not care what is inside each workflow — it only sees the API contract. |
 | `eval.example.yaml` | Sample config for the DuetNet 8-DSL reproduction. |
-| `eval.paper.example.yaml` | Sample config for the AI-ModelNet paper reproduction (13 paths × paper datasets). |
+| `eval.paper.example.yaml` | Sample config for the one-router-DSL AI-ModelNet hybrid-path reproduction. |
 
 ## DuetNet end-to-end recipe
 
@@ -72,26 +73,25 @@ research scratch space.
 
 1. **Bring up 3 llama.cpp endpoints** for the paper models:
    - **Q** → alias `5`: Qwen2.5-7B-Instruct (`qwen25-7b-instruct-q5km`)
-   - **D** → alias `22`: Qwen3-8B-BF16 (`qwen3-8b-bf16`, reachable thinking-model stand-in for the unavailable DeepSeek endpoint)
+   - **D** -> alias `22`: Qwen3-8B-BF16 (`qwen3-8b-bf16`, reachable thinking-model stand-in for the unavailable DeepSeek endpoint)
    - **Y** → alias `6`: GLM-4-9B-Chat (`glm-4-9b-chat-q4k`, replacing the unavailable Yi-1.5-9B per `PAPER_REPRODUCTION_PLAN.md` §2)
 
-   The PI paradigm reads aliases directly from `model_net.yaml`. SI / S2P / P2S use Dify's standard `llm` node, which does **not** read `model_net.yaml`. Pre-configure those 3 endpoints once: Dify Web → Settings → Model Provider → install OpenAI-Compatible API plugin → add 3 entries pointing at the same llama.cpp URLs.
+   Token-level stages (the parallel portions of S2P/P2S) read aliases directly from `model_net.yaml`. Serial stages use Dify's standard `llm` node, which does **not** read `model_net.yaml`. Pre-configure those 3 endpoints once: Dify Web → Settings → Model Provider → install OpenAI-Compatible API plugin → add 3 entries pointing at the same llama.cpp URLs.
 2. **Generate the paper DSLs**:
    ```sh
    uv run --project api python dev/modelnet/generate_paper_dsls.py
    ```
-   Outputs the 13 paths under `docs/ModelNet/examples/workflow_mode/paper_*.yml` (SI×6, PI×1, S2P×3, P2S×3). Idempotent.
+   Outputs one managed file under `docs/ModelNet/examples/workflow_mode/`: `paper_hybrid_router.yml`. Stale older `paper_*.yml` files are removed.
 
-   * **PI** — token-level parallel ensemble (`parallel-ensemble` + `sum_score`).
-   * **SI** — serial chain of standard `llm` nodes; each step refines the previous reply.
-   * **S2P** — `llm` → 2× `llm` parallel → `response-aggregator` (`majority_vote` with a permissive default regex covering MCQ letters, booleans, integers, and `\boxed{...}`). Edit the DSL via Studio if your prompt template forces a different answer format.
-   * **P2S** — 2× `llm` parallel → `response-aggregator` (`concat`) → `llm` synthesizer.
-3. **Import each DSL into Dify** and grab API keys.
+   * **S2P** — standard `llm` serial draft → 2× `token-model-source` using that draft as shared context → `parallel-ensemble`.
+   * **P2S** — 2× `token-model-source` → `parallel-ensemble` → standard `llm` synthesizer.
+   * **Router** — one workflow with a required `path` select input. It routes to one of the six S2P/P2S branches.
+3. **Import `paper_hybrid_router.yml` into Dify** and grab its API key.
 4. **Configure & smoke-test before the full run**:
    ```sh
    cp dev/modelnet/eval.paper.example.yaml dev/modelnet/eval.paper.yaml
    # paste API keys
-   # Smoke 5 GSM8K items end-to-end before committing to 3900 calls:
+   # Smoke 5 GSM8K items end-to-end before committing to 1800 calls:
    uv run --project api python dev/modelnet/duet_net_eval.py \
        --config dev/modelnet/eval.paper.yaml \
        --datasets gsm8k --n 5
@@ -101,8 +101,27 @@ research scratch space.
    uv run --project api python dev/modelnet/duet_net_eval.py \
        --config dev/modelnet/eval.paper.yaml
    ```
-   13 workflows × 3 datasets × 100 samples = **3900 calls**. `--resume` re-uses `dev/modelnet/checkpoints/paper.json`.
+   6 paths × 3 datasets × 100 samples = **1800 calls**. `--resume` re-uses `dev/modelnet/checkpoints/paper.json`.
 6. **Inspect the report** at `dev/modelnet/reports/paper.json`. Compare against paper Tables 4 / 6-7.
+
+## Dynamic collaborative routing recipe
+
+This reproduces the method in `docs/ModelNet/research/references/Dynamic Model Routing Based on Collaborative Relationship.pdf` at the algorithm level while using the current `model_net.yaml` aliases.
+
+1. **Build a collaboration graph** from a small JSONL task set:
+   ```sh
+   uv run --project api python dev/modelnet/build_dynamic_collab_graph.py \
+       --tasks dev/modelnet/datasets/c_eval.jsonl \
+       --sources Q=5 D=27 Y=6 \
+       --limit 20 \
+       --output dev/modelnet/dynamic_collab_graph.json
+   ```
+   Paste the printed JSON object (or the full output file) into
+   `dynamic_collab_route.runner_config.collaboration_graph_json`; the
+   runner reads both the primary C graph and the supplemental C' graph.
+2. **Import the example workflow**:
+   `docs/ModelNet/examples/workflow_mode/dynamic_collab_route.yml`
+3. **Smoke test** with `duet_net_eval.py` exactly like other workflow-mode reproductions. The final route and per-hop judgements are stored in `process_data.ensemble_trace.summary`.
 
 ## Datasets
 

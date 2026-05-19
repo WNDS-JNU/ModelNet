@@ -1,15 +1,16 @@
 # PAPER_REPRODUCTION_PLAN
 
 **Paper**: Multi-model serial and parallel collaborative inference in AI-ModelNet
-**Source**: `docs/ModelNet/Multi-model serial and parallel collaborative inference in AI-ModelNet.pdf`
+**Source**: `docs/ModelNet/research/references/Multi-model serial and parallel collaborative inference in AI-ModelNet.pdf`
 **Drafted**: 2026-05-05
-**Status**: Implementation update — strict token-level hybrid DSLs in progress
+**Status**: Implemented — single strict token-level hybrid router DSL generated; full run awaits workflow import/API key
 
 > 2026-05-19 update: the earlier response-level S2P/P2S plan below is
 > superseded for implementation. The current repo's `response-aggregator`
 > is synthesis-only and rejects legacy `strategy_name` / `strategy_config`.
-> Strict paper reproduction therefore uses `parallel-ensemble` for every
-> parallel stage: PI, S2P stage 2, and P2S stage 1. The original DeepSeek
+> Current implementation focuses on a single router DSL containing the six
+> hybrid S2P/P2S paths requested by the user. Every retained parallel stage uses
+> `parallel-ensemble`: S2P stage 2 and P2S stage 1. The original DeepSeek
 > endpoint/alias `27` is unavailable in the current runtime; the D-role DSLs
 > use reachable alias `22` (`qwen3-8b-bf16`) as a thinking-model stand-in and
 > this substitution must be reported with the final numbers.
@@ -30,15 +31,19 @@
 
 | 决策点 | 选择 | 备注 |
 |---|---|---|
-| S2P Stage 2（response-level vote） | 加 `majority_vote` 策略（~80 LOC） | 与论文 Fig 5a response-level vote 一致 |
+| S2P/P2S 并行段 | 用 `parallel-ensemble` token-level fusion | 用户已确认严格复现优先；不再走 response-level majority/concat |
 | Yi-1.5-9B 替代（model_net.yaml 未注册） | `glm-4-9b-chat-q4k` (id 6) | 9B 中文友好 normal 模式 |
-| Mathematics 数据集解读 | HendrycksMATH (`hendrycks/competition_math`) | LaTeX `\boxed{...}` 抽答 |
+| DeepSeek-R1-Distill 替代（原 alias 27 不可达） | `qwen3-8b-bf16` (alias 22) | 当前运行时可达的 thinking-model stand-in |
+| Mathematics 数据集解读 | HendrycksMATH-style mirrors (`MATH-lighteval` → `MATH-500`) | 当前 `datasets==4.8.5` 无法加载 `hendrycks/competition_math` |
 | 样本量 | n = 100 / 数据集 | 与论文严格一致 |
-| 实施顺序 | Stage A（MVP，表 4） → Stage B（路径矩阵，表 6-7） | 用户建议的两段切分 |
+| 实施顺序 | 只保留 `paper_hybrid_router.yml`，用一个 workflow 按 `path` 分支覆盖 6 条 S2P/P2S hybrid 路径 | 6 paths × 3 datasets × 100 = 1800 calls |
 
 ---
 
 ## 3. 已核实的实施事实（消除踩坑点）
+
+> 注：下表中关于 `response-aggregator majority_vote` 的条目是早期方案的历史记录。
+> 2026-05-19 的实际实现已改为 `parallel-ensemble`，因此这些条目不再是待办。
 
 | # | 事实 | 来源 |
 |---|------|---|

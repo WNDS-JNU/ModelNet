@@ -238,23 +238,46 @@ def _gsm8k(n: int, seed: int = 0) -> Iterator[EvalItem]:
         )
 
 
-def _math(n: int, seed: int = 0) -> Iterator[EvalItem]:
-    """HendrycksMATH — the AI-ModelNet paper labels this ``Mathematics``.
+_MATH_DATASET_CANDIDATES: tuple[tuple[str, str | None, str], ...] = (
+    ("DigitalLearningGmbH/MATH-lighteval", None, "test"),
+    ("HuggingFaceH4/MATH-500", None, "test"),
+)
 
-    Gold lives inside the last ``\\boxed{...}`` of the ``solution`` column.
+
+def _math(n: int, seed: int = 0) -> Iterator[EvalItem]:
+    """HendrycksMATH-style problems — paper label: ``Mathematics``.
+
+    ``hendrycks/competition_math`` no longer loads with the current
+    ``datasets`` release on this host, so use maintained mirrors with the
+    same ``problem`` / ``solution`` shape. ``MATH-lighteval`` is preferred
+    because it exposes the full 5k test set; ``MATH-500`` is the fallback
+    subset if the mirror is unavailable.
     """
     from datasets import load_dataset
 
-    ds = load_dataset(
-        "hendrycks/competition_math",
-        split="test",
-        trust_remote_code=True,
-    )
+    last_error: Exception | None = None
+    ds = None
+    loaded_name = ""
+    for dataset_name, config_name, split in _MATH_DATASET_CANDIDATES:
+        try:
+            ds = (
+                load_dataset(dataset_name, config_name, split=split)
+                if config_name
+                else load_dataset(dataset_name, split=split)
+            )
+            loaded_name = dataset_name.rsplit("/", 1)[-1].lower().replace("-", "_")
+            break
+        except Exception as exc:  # noqa: BLE001 - try the next mirror
+            last_error = exc
+    if ds is None:
+        raise RuntimeError("no Mathematics dataset mirror could be loaded") from last_error
+
     rng = random.Random(seed)
     indices = rng.sample(range(len(ds)), min(n, len(ds)))
     for i in indices:
         row = ds[i]
-        gold = _extract_math_boxed(row["solution"])
+        gold_source = row.get("answer") or row.get("solution") or ""
+        gold = _extract_math_boxed(str(gold_source))
         if not gold:
             continue
         question = (
@@ -262,7 +285,7 @@ def _math(n: int, seed: int = 0) -> Iterator[EvalItem]:
             "Reason step by step. Put the final answer in \\boxed{}."
         )
         yield EvalItem(
-            item_id=f"math_{i:05d}",
+            item_id=f"math_{loaded_name}_{i:05d}",
             question=question,
             answer=gold,
             extractor="math_boxed",
@@ -360,6 +383,12 @@ class WorkflowResult:
     """Full response payload, kept for ad-hoc diagnostics."""
 
 
+@dataclass(frozen=True)
+class WorkflowSpec:
+    api_key: str
+    inputs: dict[str, Any] = field(default_factory=dict)
+
+
 class DifyWorkflowClient:
     """Thin wrapper over Dify's blocking ``/workflows/run`` endpoint."""
 
@@ -379,15 +408,18 @@ class DifyWorkflowClient:
         self._response_mode = response_mode
         self._timeout = request_timeout_s
 
-    def run(self, api_key: str, question: str) -> WorkflowResult:
+    def run(self, api_key: str, question: str, *, extra_inputs: dict[str, Any] | None = None) -> WorkflowResult:
         """POST one question, return the parsed answer + diagnostics."""
         url = f"{self._base_url}/workflows/run"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+        inputs = {"question": question}
+        if extra_inputs:
+            inputs.update(extra_inputs)
         body = {
-            "inputs": {"question": question},
+            "inputs": inputs,
             "user": self._user,
             "response_mode": self._response_mode,
         }
@@ -418,7 +450,7 @@ class EvalConfig:
     user: str
     response_mode: str
     request_timeout_s: int
-    workflow_keys: dict[str, str]
+    workflow_keys: dict[str, WorkflowSpec]
     datasets: dict[str, dict[str, Any]]
     checkpoint_path: Path
     report_path: Path
@@ -429,12 +461,24 @@ class EvalConfig:
 
         with path.open("r", encoding="utf-8") as fh:
             raw = yaml.safe_load(fh)
+        workflow_keys: dict[str, WorkflowSpec] = {}
+        for name, value in dict(raw["workflow_keys"]).items():
+            if isinstance(value, dict):
+                api_key = str(value.get("api_key") or value.get("key") or "")
+                if not api_key:
+                    raise ValueError(f"workflow_keys.{name} must set api_key")
+                workflow_keys[name] = WorkflowSpec(
+                    api_key=api_key,
+                    inputs=dict(value.get("inputs") or {}),
+                )
+            else:
+                workflow_keys[name] = WorkflowSpec(api_key=str(value))
         return cls(
             base_url=raw["base_url"],
             user=raw.get("user", "duet-net-eval"),
             response_mode=raw.get("response_mode", "blocking"),
             request_timeout_s=int(raw.get("request_timeout_s", 600)),
-            workflow_keys=dict(raw["workflow_keys"]),
+            workflow_keys=workflow_keys,
             datasets=dict(raw.get("datasets", {})),
             checkpoint_path=Path(raw.get("checkpoint_path", "eval_checkpoint.json")),
             report_path=Path(raw.get("report_path", "eval_report.json")),
@@ -511,7 +555,7 @@ def evaluate(cfg: EvalConfig, *, resume: bool, every: int = 10) -> list[ItemReco
     ]
 
     progress_since_save = 0
-    for workflow, api_key in cfg.workflow_keys.items():
+    for workflow, spec in cfg.workflow_keys.items():
         for dataset_name, dcfg in cfg.datasets.items():
             logger.info("== %s × %s ==", workflow, dataset_name)
             for item in _items_for_dataset(dataset_name, dcfg):
@@ -519,7 +563,7 @@ def evaluate(cfg: EvalConfig, *, resume: bool, every: int = 10) -> list[ItemReco
                 if checkpoint.has(rec_key):
                     continue
                 try:
-                    result = client.run(api_key, item.question)
+                    result = client.run(spec.api_key, item.question, extra_inputs=spec.inputs)
                 except Exception as exc:  # noqa: BLE001 - surface every error in trace
                     logger.warning("%s: %s", rec_key, exc)
                     rec = ItemRecord(

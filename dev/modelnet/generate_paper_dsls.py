@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
 """Generate AI-ModelNet paper-reproduction workflow DSLs.
 
-Emits 13 workflow-mode DSLs covering 4 paradigms (SI / PI / S2P / P2S)
-× 3 paper models {Q=Qwen2.5-7B, D=DeepSeek-R1-Distill-Qwen-7B,
-Y=GLM-4-9B-Chat} into ``docs/ModelNet/examples/workflow_mode/paper_*.yml``.
-Idempotent — overwrites existing files.
+Emits one AI-ModelNet hybrid router workflow-mode DSL. The router selects
+among the 6 S2P / P2S token-level fusion paths at runtime via a required
+``path`` input. The paper-model roles are {Q=Qwen2.5-7B,
+D=Qwen3-8B thinking stand-in, Y=GLM-4-9B-Chat}. The file is written to
+``docs/ModelNet/examples/workflow_mode/paper_hybrid_router.yml``.
+Idempotent — overwrites the router file and removes stale ``paper_*.yml``
+files from older multi-file generations.
 
 Reproduction context:
 
 * Framing: ``docs/ModelNet/research/UNDERGRAD_RESEARCH_PLAYBOOK.md`` §6 (direction D).
-* Stage plan: ``docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md`` §5 (Stage B).
+* Stage plan: ``docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md`` §5.
 
 Pre-flight:
 
-1. SI / S2P / P2S use Dify's standard ``llm`` node, which does NOT read
+1. S2P / P2S serial stages use Dify's standard ``llm`` node, which does NOT read
    ``api/configs/model_net.yaml``. Pre-configure the 3 paper models
    once via Dify Web → Settings → Model Provider → OpenAI-Compatible
    API plugin. ``--provider`` defaults to
    ``langgenius/openai_api_compatible/openai_api_compatible``;
    override if your install registers a different provider.
-2. PI uses ``parallel-ensemble`` + ``token-model-source`` and *does*
-   read ``model_net.yaml``. Aliases ``5`` / ``27`` / ``6`` must be
-   present (they already are at HEAD).
+2. Hybrid parallel stages use ``parallel-ensemble`` + ``token-model-source`` and *do*
+   read ``model_net.yaml``. Aliases ``5`` / ``22`` / ``6`` must be
+   present. Alias ``22`` is the current reachable D-role stand-in because
+   the original DeepSeek endpoint is unavailable on this host.
 
-S2P paths use the ``majority_vote`` response-aggregator strategy with
-a permissive default regex covering the 3 paper datasets (MCQ letters,
-booleans, integers, ``\\boxed{...}``). The regex's first match in each
-input wins, so chain-of-thought replies that put the answer at the
-top will vote correctly; replies that *only* state the answer at the
-very end of a long preamble may pick the wrong intermediate token —
-edit the DSL via Studio to anchor the regex (e.g. ``answer is\\s*(.*)$``)
-when reproducing a specific dataset.
+S2P and P2S use ``parallel-ensemble`` for their parallel stage so the
+generated workflows match the paper's token-level fusion semantics.
+They do not use the legacy response-level ``strategy_name`` /
+``strategy_config`` response-aggregator surface.
 
 Run::
 
@@ -43,9 +43,7 @@ import argparse
 import sys
 import uuid
 from dataclasses import dataclass
-from itertools import permutations
 from pathlib import Path
-from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXAMPLES_DIR = REPO_ROOT / "docs" / "ModelNet" / "examples" / "workflow_mode"
@@ -72,7 +70,7 @@ class PaperModel:
 
 
 Q = PaperModel("Q", "5", "qwen25-7b-instruct-q5km", "Qwen2.5-7B-Instruct")
-D = PaperModel("D", "27", "deepseek-r1-distill-qwen-7b-q4", "DeepSeek-R1-Distill-Qwen-7B")
+D = PaperModel("D", "22", "qwen3-8b-bf16", "Qwen3-8B-BF16 (D-role stand-in)")
 Y = PaperModel("Y", "6", "glm-4-9b-chat-q4k", "GLM-4-9B-Chat")
 
 PAPER_MODELS: list[PaperModel] = [Q, D, Y]
@@ -82,7 +80,7 @@ PAPER_MODELS: list[PaperModel] = [Q, D, Y]
 #
 # Approximation of paper Table 2: each model is asked to reason and
 # produce a final answer; serial steps see the prior step's reply for
-# refinement; the synthesis model sees concatenated peer answers.
+# refinement; the synthesis model sees the token-level parallel answer.
 
 SYS_LEAF = (
     "You are a careful problem-solver. Read the question, reason step "
@@ -107,8 +105,14 @@ _USR_REFINE_TPL = (
 )
 _USR_SYNTHESIZE_TPL = (
     "Question:\n{{{{#start_node.question#}}}}\n\n"
-    "Candidate answers from peer models:\n{{{{#{aggregator}.text#}}}}\n\n"
+    "Candidate answer from the parallel token-level ensemble:\n{{{{#{aggregator}.text#}}}}\n\n"
     "Provide your unified final answer:"
+)
+
+_USR_S2P_PARALLEL_TPL = (
+    "Question:\n{{{{#start_node.question#}}}}\n\n"
+    "Stage-1 semantic draft:\n{{{{#{serial_node}.text#}}}}\n\n"
+    "Use the draft as shared context, refine it, and put the final answer at the end."
 )
 
 
@@ -118,6 +122,10 @@ def _refine_user(prev_node: str) -> str:
 
 def _synthesize_user(aggregator: str) -> str:
     return _USR_SYNTHESIZE_TPL.format(aggregator=aggregator)
+
+
+def _s2p_parallel_prompt(serial_node: str) -> str:
+    return _USR_S2P_PARALLEL_TPL.format(serial_node=serial_node)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -137,7 +145,29 @@ def _stack_y(index: int, total: int, anchor: int = 252, spacing: int = 152) -> i
 # ── Node builders ────────────────────────────────────────────────────
 
 
-def _start_node(y: int = 252) -> dict:
+def _start_node(y: int = 252, *, path_options: list[str] | None = None) -> dict:
+    variables: list[dict] = []
+    if path_options:
+        variables.append(
+            {
+                "label": "path",
+                "max_length": 128,
+                "options": path_options,
+                "required": True,
+                "type": "select",
+                "variable": "path",
+            }
+        )
+    variables.append(
+        {
+            "label": "question",
+            "max_length": 4096,
+            "options": [],
+            "required": True,
+            "type": "paragraph",
+            "variable": "question",
+        }
+    )
     return {
         "id": "start_node",
         "type": "custom",
@@ -146,18 +176,9 @@ def _start_node(y: int = 252) -> dict:
             "selected": False,
             "title": "Start",
             "type": "start",
-            "variables": [
-                {
-                    "label": "question",
-                    "max_length": 4096,
-                    "options": [],
-                    "required": True,
-                    "type": "paragraph",
-                    "variable": "question",
-                }
-            ],
+            "variables": variables,
         },
-        "height": 90,
+        "height": 112 if path_options else 90,
         "position": {"x": 30, "y": y},
         "positionAbsolute": {"x": 30, "y": y},
         "selected": False,
@@ -167,12 +188,20 @@ def _start_node(y: int = 252) -> dict:
     }
 
 
-def _end_node(answer_selector: list[str], x: int, y: int = 252) -> dict:
+def _end_node(
+    answer_selector: list[str],
+    x: int,
+    y: int = 252,
+    *,
+    node_id: str = "end_node",
+    title: str = "End",
+    desc: str = "Emit the paradigm's final answer.",
+) -> dict:
     return {
-        "id": "end_node",
+        "id": node_id,
         "type": "custom",
         "data": {
-            "desc": "Emit the paradigm's final answer.",
+            "desc": desc,
             "outputs": [
                 {
                     "value_selector": answer_selector,
@@ -181,7 +210,7 @@ def _end_node(answer_selector: list[str], x: int, y: int = 252) -> dict:
                 },
             ],
             "selected": False,
-            "title": "End",
+            "title": title,
             "type": "end",
         },
         "height": 90,
@@ -246,25 +275,36 @@ def _llm_node(
     }
 
 
-def _token_source_node(model: PaperModel, x: int, y: int) -> dict:
+def _token_source_node(
+    model: PaperModel,
+    x: int,
+    y: int,
+    *,
+    node_id: str | None = None,
+    prompt_template: str = "{{#start_node.question#}}",
+    title: str | None = None,
+    desc: str | None = None,
+) -> dict:
+    actual_id = node_id or f"token_{model.letter}"
     return {
-        "id": f"token_{model.letter}",
+        "id": actual_id,
         "type": "custom",
         "data": {
             "desc": (
-                f"Renders the prompt for {model.title}, "
+                desc
+                or f"Renders the prompt for {model.title}, "
                 f"alias {model.model_alias}; emits a ModelInvocationSpec."
             ),
             "extra": {},
             "model_alias": model.model_alias,
-            "prompt_template": "{{#start_node.question#}}",
+            "prompt_template": prompt_template,
             "sampling_params": {
                 "max_tokens": LLM_MAX_TOKENS,
                 "temperature": 0.7,
                 "top_k": 10,
             },
             "selected": False,
-            "title": f"Token Source ({model.letter})",
+            "title": title or f"Token Source ({model.letter})",
             "type": "token-model-source",
         },
         "height": 130,
@@ -277,13 +317,24 @@ def _token_source_node(model: PaperModel, x: int, y: int) -> dict:
     }
 
 
-def _ensemble_node(models: list[PaperModel], x: int, y: int = 252) -> dict:
+def _ensemble_node(
+    models: list[PaperModel],
+    x: int,
+    y: int = 252,
+    *,
+    node_id: str = "ensemble",
+    title: str = "Parallel Ensemble (PI)",
+    desc: str | None = None,
+    token_node_ids: list[str] | None = None,
+) -> dict:
+    source_node_ids = token_node_ids or [f"token_{m.letter}" for m in models]
     return {
-        "id": "ensemble",
+        "id": node_id,
         "type": "custom",
         "data": {
             "desc": (
-                "Token-level parallel ensemble — sum_score aggregator "
+                desc
+                or "Token-level parallel ensemble — sum_score aggregator "
                 "(probability-sum vote across the union of top-k "
                 "candidates from each backend per decode step)."
             ),
@@ -303,14 +354,14 @@ def _ensemble_node(models: list[PaperModel], x: int, y: int = 252) -> dict:
                 "token_sources": [
                     {
                         "source_id": m.letter,
-                        "spec_selector": [f"token_{m.letter}", "spec"],
+                        "spec_selector": [source_node_id, "spec"],
                         "weight": 1.0,
                     }
-                    for m in models
+                    for m, source_node_id in zip(models, source_node_ids)
                 ],
             },
             "selected": False,
-            "title": "Parallel Ensemble (PI)",
+            "title": title,
             "type": "parallel-ensemble",
         },
         "height": 200,
@@ -323,49 +374,21 @@ def _ensemble_node(models: list[PaperModel], x: int, y: int = 252) -> dict:
     }
 
 
-def _response_aggregator_node(
+def _edge(
     *,
-    node_id: str,
-    title: str,
-    desc: str,
-    inputs: list[tuple[str, list[str]]],
-    strategy_name: str,
-    strategy_config: dict[str, Any],
-    x: int,
-    y: int = 252,
+    src: str,
+    dst: str,
+    src_type: str,
+    dst_type: str,
+    source_handle: str = "source",
+    target_handle: str = "target",
 ) -> dict:
     return {
-        "id": node_id,
-        "type": "custom",
-        "data": {
-            "desc": desc,
-            "inputs": [
-                {"source_id": sid, "variable_selector": list(sel)}
-                for sid, sel in inputs
-            ],
-            "selected": False,
-            "strategy_config": strategy_config,
-            "strategy_name": strategy_name,
-            "title": title,
-            "type": "response-aggregator",
-        },
-        "height": 150,
-        "position": {"x": x, "y": y},
-        "positionAbsolute": {"x": x, "y": y},
-        "selected": False,
-        "sourcePosition": "right",
-        "targetPosition": "left",
-        "width": 244,
-    }
-
-
-def _edge(*, src: str, dst: str, src_type: str, dst_type: str) -> dict:
-    return {
-        "id": f"{src}-to-{dst}",
+        "id": f"{src}-{source_handle}-to-{dst}",
         "source": src,
-        "sourceHandle": "source",
+        "sourceHandle": source_handle,
         "target": dst,
-        "targetHandle": "target",
+        "targetHandle": target_handle,
         "type": "custom",
         "zIndex": 0,
         "data": {
@@ -470,20 +493,8 @@ def build_pi(models: list[PaperModel]) -> dict:
     )
 
 
-_S2P_DEFAULT_VOTE_REGEX = (
-    # Matches the first answer-shaped token in a reply. No capture groups —
-    # the strategy returns the full match. Covers the 3 paper datasets:
-    #   * HendrycksMATH ``\boxed{...}`` (one level of brace nesting)
-    #   * C-Eval / MMLU MCQ ``(A)``..``(D)``
-    #   * BoolQ ``true`` / ``false``
-    #   * GSM8K integer answers
-    # Re-tune via Studio if your prompt template forces a different format.
-    r"\\boxed\{[^{}]*\}|\([A-D]\)|\btrue\b|\bfalse\b|-?\d+"
-)
-
-
 def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> dict:
-    """S2P: serial → [parallel] → response-aggregator(majority_vote)."""
+    """S2P: serial LLM → token-level parallel ensemble."""
     nodes: list[dict] = [_start_node()]
     edges: list[dict] = []
 
@@ -504,57 +515,49 @@ def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> 
     )
     edges.append(_edge(src="start_node", dst=serial_id, src_type="start", dst_type="llm"))
 
-    # Stage 2 — parallel branches read from the serial stage
-    parallel_ids: list[str] = []
+    # Stage 2 — token-level parallel branches read from the serial stage.
+    token_ids: list[str] = []
     for i, m in enumerate(parallel):
-        node_id = f"llm_{m.letter}_par"
+        node_id = f"token_{m.letter}_par"
         nodes.append(
-            _llm_node(
-                node_id=node_id,
-                title=f"{m.letter} (parallel)",
-                desc=f"S2P stage 2 — {m.description} refines stage-1 reply.",
-                model_name=m.model_name,
-                provider=provider,
-                system=SYS_REFINE,
-                user=_refine_user(serial_id),
+            _token_source_node(
+                model=m,
                 x=638,
                 y=_stack_y(i, len(parallel)),
+                node_id=node_id,
+                title=f"Token Source ({m.letter}, S2P)",
+                desc=(
+                    f"S2P stage 2 source — {m.description} receives the "
+                    "stage-1 semantic draft and participates in token-level fusion."
+                ),
+                prompt_template=_s2p_parallel_prompt(serial_id),
             )
         )
-        edges.append(_edge(src=serial_id, dst=node_id, src_type="llm", dst_type="llm"))
-        parallel_ids.append(node_id)
+        edges.append(_edge(src=serial_id, dst=node_id, src_type="llm", dst_type="token-model-source"))
+        token_ids.append(node_id)
 
-    # Aggregator — paper-faithful majority vote across the parallel branches.
     nodes.append(
-        _response_aggregator_node(
-            node_id="aggregator",
-            title="Response Aggregator (S2P)",
-            desc=(
-                "Stage-2 majority vote across the parallel branches' final "
-                "answers (paper Fig. 5a). The default regex covers MCQ "
-                "letters, booleans, integers, and ``\\boxed{...}`` fragments "
-                "— tune via Studio if your prompt template forces a "
-                "different answer format."
-            ),
-            inputs=[(m.letter, [pid, "text"]) for m, pid in zip(parallel, parallel_ids)],
-            strategy_name="majority_vote",
-            strategy_config={
-                "answer_extract_regex": _S2P_DEFAULT_VOTE_REGEX,
-                "case_sensitive": False,
-                "weighted": True,
-                "tie_break": "first",
-            },
+        _ensemble_node(
+            parallel,
             x=942,
+            node_id="aggregator",
+            title="Parallel Ensemble (S2P)",
+            desc=(
+                "S2P stage 2 token-level parallel ensemble. Each selected "
+                "token is fused with sum_score across the parallel models, "
+                "matching the paper's parallel branch semantics."
+            ),
+            token_node_ids=token_ids,
         )
     )
-    for pid in parallel_ids:
+    for pid in token_ids:
         edges.append(
-            _edge(src=pid, dst="aggregator", src_type="llm", dst_type="response-aggregator")
+            _edge(src=pid, dst="aggregator", src_type="token-model-source", dst_type="parallel-ensemble")
         )
 
     nodes.append(_end_node(["aggregator", "text"], x=1246))
     edges.append(
-        _edge(src="aggregator", dst="end_node", src_type="response-aggregator", dst_type="end")
+        _edge(src="aggregator", dst="end_node", src_type="parallel-ensemble", dst_type="end")
     )
 
     return _wrap(
@@ -567,8 +570,7 @@ def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> 
             f"[{', '.join(m.letter for m in parallel)}]. Stage 1 = "
             f"{serial.description}; Stage 2 (parallel) = "
             f"{', '.join(m.description for m in parallel)}; Stage-2 outputs "
-            "feed a response-aggregator running the ``majority_vote`` "
-            "strategy (paper Fig. 5a)."
+            "are fused by a token-level parallel-ensemble node."
         ),
         nodes=nodes,
         edges=edges,
@@ -576,45 +578,44 @@ def build_s2p(serial: PaperModel, parallel: list[PaperModel], provider: str) -> 
 
 
 def build_p2s(parallel: list[PaperModel], serial: PaperModel, provider: str) -> dict:
-    """P2S: [parallel] → response-aggregator(concat) → serial."""
+    """P2S: token-level parallel ensemble → serial LLM."""
     nodes: list[dict] = [_start_node()]
     edges: list[dict] = []
 
-    # Stage 1 — parallel branches off start
-    parallel_ids: list[str] = []
+    # Stage 1 — token-level parallel branches off start.
+    token_ids: list[str] = []
     for i, m in enumerate(parallel):
-        node_id = f"llm_{m.letter}_par"
+        node_id = f"token_{m.letter}_par"
         nodes.append(
-            _llm_node(
-                node_id=node_id,
-                title=f"{m.letter} (parallel)",
-                desc=f"P2S stage 1 — {m.description} answers in parallel.",
-                model_name=m.model_name,
-                provider=provider,
-                system=SYS_LEAF,
-                user=USR_LEAF,
+            _token_source_node(
+                model=m,
                 x=334,
                 y=_stack_y(i, len(parallel)),
+                node_id=node_id,
+                title=f"Token Source ({m.letter}, P2S)",
+                desc=f"P2S stage 1 source — {m.description} participates in token-level fusion.",
+                prompt_template=USR_LEAF,
             )
         )
-        edges.append(_edge(src="start_node", dst=node_id, src_type="start", dst_type="llm"))
-        parallel_ids.append(node_id)
+        edges.append(_edge(src="start_node", dst=node_id, src_type="start", dst_type="token-model-source"))
+        token_ids.append(node_id)
 
-    # Aggregator — concat with source labels feeds the synthesizer
     nodes.append(
-        _response_aggregator_node(
-            node_id="aggregator",
-            title="Response Aggregator (P2S)",
-            desc="Concatenate stage-1 parallel answers; pipe to stage-2 model for synthesis.",
-            inputs=[(m.letter, [pid, "text"]) for m, pid in zip(parallel, parallel_ids)],
-            strategy_name="concat",
-            strategy_config={"include_source_label": True, "separator": "\n\n---\n\n"},
+        _ensemble_node(
+            parallel,
             x=638,
+            node_id="aggregator",
+            title="Parallel Ensemble (P2S)",
+            desc=(
+                "P2S stage 1 token-level parallel ensemble. The fused "
+                "intermediate sequence feeds the serial synthesizer."
+            ),
+            token_node_ids=token_ids,
         )
     )
-    for pid in parallel_ids:
+    for pid in token_ids:
         edges.append(
-            _edge(src=pid, dst="aggregator", src_type="llm", dst_type="response-aggregator")
+            _edge(src=pid, dst="aggregator", src_type="token-model-source", dst_type="parallel-ensemble")
         )
 
     # Stage 2 — serial synthesizer
@@ -633,7 +634,7 @@ def build_p2s(parallel: list[PaperModel], serial: PaperModel, provider: str) -> 
         )
     )
     edges.append(
-        _edge(src="aggregator", dst=serial_id, src_type="response-aggregator", dst_type="llm")
+        _edge(src="aggregator", dst=serial_id, src_type="parallel-ensemble", dst_type="llm")
     )
 
     nodes.append(_end_node([serial_id, "text"], x=1246))
@@ -648,7 +649,269 @@ def build_p2s(parallel: list[PaperModel], serial: PaperModel, provider: str) -> 
             f"[{', '.join(m.letter for m in parallel)}] → {serial.letter}. "
             "Stage 1 (parallel) = "
             f"{', '.join(m.description for m in parallel)}; Stage 2 = "
-            f"{serial.description} synthesizes."
+            f"{serial.description} synthesizes the fused token-level intermediate answer."
+        ),
+        nodes=nodes,
+        edges=edges,
+    )
+
+
+def _route_node(path_names: list[str], *, x: int = 334, y: int = 1180) -> dict:
+    return {
+        "id": "route_path",
+        "type": "custom",
+        "data": {
+            "desc": "Route one unified hybrid workflow to the requested S2P/P2S path.",
+            "_targetBranches": [{"id": name, "name": name} for name in path_names],
+            "cases": [
+                {
+                    "case_id": name,
+                    "logical_operator": "and",
+                    "conditions": [
+                        {
+                            "id": f"cond_{name}",
+                            "varType": "string",
+                            "variable_selector": ["start_node", "path"],
+                            "comparison_operator": "is",
+                            "value": name,
+                        }
+                    ],
+                }
+                for name in path_names
+            ],
+            "isInIteration": False,
+            "isInLoop": False,
+            "selected": False,
+            "title": "Route: hybrid path",
+            "type": "if-else",
+        },
+        "height": 250,
+        "position": {"x": x, "y": y},
+        "positionAbsolute": {"x": x, "y": y},
+        "selected": False,
+        "sourcePosition": "right",
+        "targetPosition": "left",
+        "width": 244,
+    }
+
+
+def _add_s2p_router_branch(
+    *,
+    path_name: str,
+    serial: PaperModel,
+    parallel: list[PaperModel],
+    provider: str,
+    base_y: int,
+    nodes: list[dict],
+    edges: list[dict],
+) -> None:
+    serial_id = f"{path_name}__llm_{serial.letter}_serial"
+    nodes.append(
+        _llm_node(
+            node_id=serial_id,
+            title=f"{path_name}: {serial.letter} serial",
+            desc=f"{path_name} stage 1 — {serial.description}.",
+            model_name=serial.model_name,
+            provider=provider,
+            system=SYS_LEAF,
+            user=USR_LEAF,
+            x=638,
+            y=base_y + 76,
+        )
+    )
+    edges.append(
+        _edge(
+            src="route_path",
+            dst=serial_id,
+            src_type="if-else",
+            dst_type="llm",
+            source_handle=path_name,
+        )
+    )
+
+    token_ids: list[str] = []
+    for i, m in enumerate(parallel):
+        node_id = f"{path_name}__token_{m.letter}_par"
+        nodes.append(
+            _token_source_node(
+                model=m,
+                x=942,
+                y=base_y + i * 152,
+                node_id=node_id,
+                title=f"{path_name}: token source {m.letter}",
+                desc=(
+                    f"{path_name} parallel source — {m.description} receives the "
+                    "stage-1 semantic draft and participates in token-level fusion."
+                ),
+                prompt_template=_s2p_parallel_prompt(serial_id),
+            )
+        )
+        edges.append(_edge(src=serial_id, dst=node_id, src_type="llm", dst_type="token-model-source"))
+        token_ids.append(node_id)
+
+    aggregator_id = f"{path_name}__aggregator"
+    nodes.append(
+        _ensemble_node(
+            parallel,
+            x=1246,
+            y=base_y + 76,
+            node_id=aggregator_id,
+            title=f"{path_name}: parallel ensemble",
+            desc=f"{path_name} token-level S2P parallel ensemble.",
+            token_node_ids=token_ids,
+        )
+    )
+    for token_id in token_ids:
+        edges.append(
+            _edge(
+                src=token_id,
+                dst=aggregator_id,
+                src_type="token-model-source",
+                dst_type="parallel-ensemble",
+            )
+        )
+
+    end_id = f"{path_name}__end"
+    nodes.append(
+        _end_node(
+            [aggregator_id, "text"],
+            x=1550,
+            y=base_y + 76,
+            node_id=end_id,
+            title=f"End: {path_name}",
+            desc=f"Emit answer for {path_name}.",
+        )
+    )
+    edges.append(_edge(src=aggregator_id, dst=end_id, src_type="parallel-ensemble", dst_type="end"))
+
+
+def _add_p2s_router_branch(
+    *,
+    path_name: str,
+    parallel: list[PaperModel],
+    serial: PaperModel,
+    provider: str,
+    base_y: int,
+    nodes: list[dict],
+    edges: list[dict],
+) -> None:
+    token_ids: list[str] = []
+    for i, m in enumerate(parallel):
+        node_id = f"{path_name}__token_{m.letter}_par"
+        nodes.append(
+            _token_source_node(
+                model=m,
+                x=638,
+                y=base_y + i * 152,
+                node_id=node_id,
+                title=f"{path_name}: token source {m.letter}",
+                desc=f"{path_name} parallel source — {m.description} participates in token-level fusion.",
+                prompt_template=USR_LEAF,
+            )
+        )
+        edges.append(
+            _edge(
+                src="route_path",
+                dst=node_id,
+                src_type="if-else",
+                dst_type="token-model-source",
+                source_handle=path_name,
+            )
+        )
+        token_ids.append(node_id)
+
+    aggregator_id = f"{path_name}__aggregator"
+    nodes.append(
+        _ensemble_node(
+            parallel,
+            x=942,
+            y=base_y + 76,
+            node_id=aggregator_id,
+            title=f"{path_name}: parallel ensemble",
+            desc=f"{path_name} token-level P2S parallel ensemble.",
+            token_node_ids=token_ids,
+        )
+    )
+    for token_id in token_ids:
+        edges.append(
+            _edge(
+                src=token_id,
+                dst=aggregator_id,
+                src_type="token-model-source",
+                dst_type="parallel-ensemble",
+            )
+        )
+
+    serial_id = f"{path_name}__llm_{serial.letter}_serial"
+    nodes.append(
+        _llm_node(
+            node_id=serial_id,
+            title=f"{path_name}: {serial.letter} synthesizer",
+            desc=f"{path_name} serial synthesizer — {serial.description}.",
+            model_name=serial.model_name,
+            provider=provider,
+            system=SYS_SYNTHESIZE,
+            user=_synthesize_user(aggregator_id),
+            x=1246,
+            y=base_y + 76,
+        )
+    )
+    edges.append(_edge(src=aggregator_id, dst=serial_id, src_type="parallel-ensemble", dst_type="llm"))
+
+    end_id = f"{path_name}__end"
+    nodes.append(
+        _end_node(
+            [serial_id, "text"],
+            x=1550,
+            y=base_y + 76,
+            node_id=end_id,
+            title=f"End: {path_name}",
+            desc=f"Emit answer for {path_name}.",
+        )
+    )
+    edges.append(_edge(src=serial_id, dst=end_id, src_type="llm", dst_type="end"))
+
+
+def build_hybrid_router(provider: str) -> dict:
+    """One workflow DSL that routes to any S2P/P2S hybrid path."""
+    specs = hybrid_specs()
+    path_names = [name for name, *_ in specs]
+    nodes: list[dict] = [_start_node(y=1180, path_options=path_names), _route_node(path_names)]
+    edges: list[dict] = [_edge(src="start_node", dst="route_path", src_type="start", dst_type="if-else")]
+
+    for i, spec in enumerate(specs):
+        path_name = spec[0]
+        kind = spec[1]
+        base_y = 80 + i * 360
+        if kind == "s2p":
+            _, _, serial, parallel = spec
+            _add_s2p_router_branch(
+                path_name=path_name,
+                serial=serial,
+                parallel=parallel,
+                provider=provider,
+                base_y=base_y,
+                nodes=nodes,
+                edges=edges,
+            )
+        else:
+            _, _, parallel, serial = spec
+            _add_p2s_router_branch(
+                path_name=path_name,
+                parallel=parallel,
+                serial=serial,
+                provider=provider,
+                base_y=base_y,
+                nodes=nodes,
+                edges=edges,
+            )
+
+    return _wrap(
+        name="paper_hybrid_router (workflow)",
+        desc=(
+            "Unified AI-ModelNet hybrid workflow. The required `path` input selects "
+            "one of the six S2P/P2S token-level fusion paths, while `question` is "
+            "routed into that branch."
         ),
         nodes=nodes,
         edges=edges,
@@ -695,31 +958,21 @@ def _wrap(*, name: str, desc: str, nodes: list[dict], edges: list[dict]) -> dict
 # ── Path enumeration ─────────────────────────────────────────────────
 
 
+def hybrid_specs() -> list[tuple[str, str, PaperModel | list[PaperModel], PaperModel | list[PaperModel]]]:
+    """The six S2P/P2S hybrid paths the current reproduction keeps."""
+    return [
+        ("paper_s2p_Q_DY", "s2p", Q, [D, Y]),
+        ("paper_s2p_D_QY", "s2p", D, [Q, Y]),
+        ("paper_s2p_Y_QD", "s2p", Y, [Q, D]),
+        ("paper_p2s_QD_Y", "p2s", [Q, D], Y),
+        ("paper_p2s_QY_D", "p2s", [Q, Y], D),
+        ("paper_p2s_DY_Q", "p2s", [D, Y], Q),
+    ]
+
+
 def all_paths(provider: str) -> list[tuple[str, dict]]:
-    """Enumerate the 13 paper paths used to reproduce paper Tables 6-7."""
-    paths: list[tuple[str, dict]] = []
-
-    # SI: 3! = 6 permutations
-    for perm in permutations(PAPER_MODELS):
-        letters = "".join(m.letter for m in perm)
-        paths.append((f"paper_si_{letters}", build_si(list(perm), provider)))
-
-    # PI: single 3-model PI
-    paths.append(("paper_pi_QDY", build_pi(PAPER_MODELS)))
-
-    # S2P: one path per serial choice (3 paths)
-    for serial in PAPER_MODELS:
-        parallel = [m for m in PAPER_MODELS if m is not serial]
-        name = f"paper_s2p_{serial.letter}_{''.join(m.letter for m in parallel)}"
-        paths.append((name, build_s2p(serial, parallel, provider)))
-
-    # P2S: one path per serial choice (3 paths)
-    for serial in PAPER_MODELS:
-        parallel = [m for m in PAPER_MODELS if m is not serial]
-        name = f"paper_p2s_{''.join(m.letter for m in parallel)}_{serial.letter}"
-        paths.append((name, build_p2s(parallel, serial, provider)))
-
-    return paths
+    """Enumerate managed DSLs: the single unified hybrid router."""
+    return [("paper_hybrid_router", build_hybrid_router(provider))]
 
 
 # ── main ─────────────────────────────────────────────────────────────
@@ -756,7 +1009,18 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
-    for name, dsl in all_paths(args.provider):
+    paths = all_paths(args.provider)
+    expected_files = {f"{name}.yml" for name, _ in paths}
+    for stale in sorted(out_dir.glob("paper_*.yml")):
+        if stale.name not in expected_files:
+            stale.unlink()
+            try:
+                display_path = str(stale.relative_to(REPO_ROOT))
+            except ValueError:
+                display_path = str(stale)
+            print(f"removed {display_path}")
+
+    for name, dsl in paths:
         path = out_dir / f"{name}.yml"
         with path.open("w", encoding="utf-8") as fh:
             yaml.safe_dump(
@@ -767,7 +1031,11 @@ def main() -> int:
                 width=80,
                 default_flow_style=False,
             )
-        written.append(str(path.relative_to(REPO_ROOT)))
+        try:
+            display_path = str(path.relative_to(REPO_ROOT))
+        except ValueError:
+            display_path = str(path)
+        written.append(display_path)
     for p in written:
         print(f"wrote {p}")
     print(f"\nGenerated {len(written)} DSL files.")

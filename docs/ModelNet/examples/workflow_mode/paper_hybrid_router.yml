@@ -1,0 +1,1724 @@
+app:
+  description: Unified AI-ModelNet hybrid workflow. The required `path` input selects
+    one of the six S2P/P2S token-level fusion paths, while `question` is routed into
+    that branch.
+  icon: 🎼
+  icon_background: '#DCE5FF'
+  mode: workflow
+  name: paper_hybrid_router (workflow)
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: if-else
+      id: start_node-source-to-route_path
+      source: start_node
+      sourceHandle: source
+      target: route_path
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: route_path-paper_s2p_Q_DY-to-paper_s2p_Q_DY__llm_Q_serial
+      source: route_path
+      sourceHandle: paper_s2p_Q_DY
+      target: paper_s2p_Q_DY__llm_Q_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: token-model-source
+      id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_D_par
+      source: paper_s2p_Q_DY__llm_Q_serial
+      sourceHandle: source
+      target: paper_s2p_Q_DY__token_D_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: token-model-source
+      id: paper_s2p_Q_DY__llm_Q_serial-source-to-paper_s2p_Q_DY__token_Y_par
+      source: paper_s2p_Q_DY__llm_Q_serial
+      sourceHandle: source
+      target: paper_s2p_Q_DY__token_Y_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_s2p_Q_DY__token_D_par-source-to-paper_s2p_Q_DY__aggregator
+      source: paper_s2p_Q_DY__token_D_par
+      sourceHandle: source
+      target: paper_s2p_Q_DY__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_s2p_Q_DY__token_Y_par-source-to-paper_s2p_Q_DY__aggregator
+      source: paper_s2p_Q_DY__token_Y_par
+      sourceHandle: source
+      target: paper_s2p_Q_DY__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: end
+      id: paper_s2p_Q_DY__aggregator-source-to-paper_s2p_Q_DY__end
+      source: paper_s2p_Q_DY__aggregator
+      sourceHandle: source
+      target: paper_s2p_Q_DY__end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: route_path-paper_s2p_D_QY-to-paper_s2p_D_QY__llm_D_serial
+      source: route_path
+      sourceHandle: paper_s2p_D_QY
+      target: paper_s2p_D_QY__llm_D_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: token-model-source
+      id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Q_par
+      source: paper_s2p_D_QY__llm_D_serial
+      sourceHandle: source
+      target: paper_s2p_D_QY__token_Q_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: token-model-source
+      id: paper_s2p_D_QY__llm_D_serial-source-to-paper_s2p_D_QY__token_Y_par
+      source: paper_s2p_D_QY__llm_D_serial
+      sourceHandle: source
+      target: paper_s2p_D_QY__token_Y_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_s2p_D_QY__token_Q_par-source-to-paper_s2p_D_QY__aggregator
+      source: paper_s2p_D_QY__token_Q_par
+      sourceHandle: source
+      target: paper_s2p_D_QY__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_s2p_D_QY__token_Y_par-source-to-paper_s2p_D_QY__aggregator
+      source: paper_s2p_D_QY__token_Y_par
+      sourceHandle: source
+      target: paper_s2p_D_QY__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: end
+      id: paper_s2p_D_QY__aggregator-source-to-paper_s2p_D_QY__end
+      source: paper_s2p_D_QY__aggregator
+      sourceHandle: source
+      target: paper_s2p_D_QY__end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: route_path-paper_s2p_Y_QD-to-paper_s2p_Y_QD__llm_Y_serial
+      source: route_path
+      sourceHandle: paper_s2p_Y_QD
+      target: paper_s2p_Y_QD__llm_Y_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: token-model-source
+      id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_Q_par
+      source: paper_s2p_Y_QD__llm_Y_serial
+      sourceHandle: source
+      target: paper_s2p_Y_QD__token_Q_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: token-model-source
+      id: paper_s2p_Y_QD__llm_Y_serial-source-to-paper_s2p_Y_QD__token_D_par
+      source: paper_s2p_Y_QD__llm_Y_serial
+      sourceHandle: source
+      target: paper_s2p_Y_QD__token_D_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_s2p_Y_QD__token_Q_par-source-to-paper_s2p_Y_QD__aggregator
+      source: paper_s2p_Y_QD__token_Q_par
+      sourceHandle: source
+      target: paper_s2p_Y_QD__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_s2p_Y_QD__token_D_par-source-to-paper_s2p_Y_QD__aggregator
+      source: paper_s2p_Y_QD__token_D_par
+      sourceHandle: source
+      target: paper_s2p_Y_QD__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: end
+      id: paper_s2p_Y_QD__aggregator-source-to-paper_s2p_Y_QD__end
+      source: paper_s2p_Y_QD__aggregator
+      sourceHandle: source
+      target: paper_s2p_Y_QD__end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: token-model-source
+      id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_Q_par
+      source: route_path
+      sourceHandle: paper_p2s_QD_Y
+      target: paper_p2s_QD_Y__token_Q_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: token-model-source
+      id: route_path-paper_p2s_QD_Y-to-paper_p2s_QD_Y__token_D_par
+      source: route_path
+      sourceHandle: paper_p2s_QD_Y
+      target: paper_p2s_QD_Y__token_D_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_p2s_QD_Y__token_Q_par-source-to-paper_p2s_QD_Y__aggregator
+      source: paper_p2s_QD_Y__token_Q_par
+      sourceHandle: source
+      target: paper_p2s_QD_Y__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_p2s_QD_Y__token_D_par-source-to-paper_p2s_QD_Y__aggregator
+      source: paper_p2s_QD_Y__token_D_par
+      sourceHandle: source
+      target: paper_p2s_QD_Y__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: llm
+      id: paper_p2s_QD_Y__aggregator-source-to-paper_p2s_QD_Y__llm_Y_serial
+      source: paper_p2s_QD_Y__aggregator
+      sourceHandle: source
+      target: paper_p2s_QD_Y__llm_Y_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: paper_p2s_QD_Y__llm_Y_serial-source-to-paper_p2s_QD_Y__end
+      source: paper_p2s_QD_Y__llm_Y_serial
+      sourceHandle: source
+      target: paper_p2s_QD_Y__end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: token-model-source
+      id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Q_par
+      source: route_path
+      sourceHandle: paper_p2s_QY_D
+      target: paper_p2s_QY_D__token_Q_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: token-model-source
+      id: route_path-paper_p2s_QY_D-to-paper_p2s_QY_D__token_Y_par
+      source: route_path
+      sourceHandle: paper_p2s_QY_D
+      target: paper_p2s_QY_D__token_Y_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_p2s_QY_D__token_Q_par-source-to-paper_p2s_QY_D__aggregator
+      source: paper_p2s_QY_D__token_Q_par
+      sourceHandle: source
+      target: paper_p2s_QY_D__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_p2s_QY_D__token_Y_par-source-to-paper_p2s_QY_D__aggregator
+      source: paper_p2s_QY_D__token_Y_par
+      sourceHandle: source
+      target: paper_p2s_QY_D__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: llm
+      id: paper_p2s_QY_D__aggregator-source-to-paper_p2s_QY_D__llm_D_serial
+      source: paper_p2s_QY_D__aggregator
+      sourceHandle: source
+      target: paper_p2s_QY_D__llm_D_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: paper_p2s_QY_D__llm_D_serial-source-to-paper_p2s_QY_D__end
+      source: paper_p2s_QY_D__llm_D_serial
+      sourceHandle: source
+      target: paper_p2s_QY_D__end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: token-model-source
+      id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_D_par
+      source: route_path
+      sourceHandle: paper_p2s_DY_Q
+      target: paper_p2s_DY_Q__token_D_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: token-model-source
+      id: route_path-paper_p2s_DY_Q-to-paper_p2s_DY_Q__token_Y_par
+      source: route_path
+      sourceHandle: paper_p2s_DY_Q
+      target: paper_p2s_DY_Q__token_Y_par
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_p2s_DY_Q__token_D_par-source-to-paper_p2s_DY_Q__aggregator
+      source: paper_p2s_DY_Q__token_D_par
+      sourceHandle: source
+      target: paper_p2s_DY_Q__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: token-model-source
+        targetType: parallel-ensemble
+      id: paper_p2s_DY_Q__token_Y_par-source-to-paper_p2s_DY_Q__aggregator
+      source: paper_p2s_DY_Q__token_Y_par
+      sourceHandle: source
+      target: paper_p2s_DY_Q__aggregator
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parallel-ensemble
+        targetType: llm
+      id: paper_p2s_DY_Q__aggregator-source-to-paper_p2s_DY_Q__llm_Q_serial
+      source: paper_p2s_DY_Q__aggregator
+      sourceHandle: source
+      target: paper_p2s_DY_Q__llm_Q_serial
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: paper_p2s_DY_Q__llm_Q_serial-source-to-paper_p2s_DY_Q__end
+      source: paper_p2s_DY_Q__llm_Q_serial
+      sourceHandle: source
+      target: paper_p2s_DY_Q__end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: User question routed to the paradigm topology.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - label: path
+          max_length: 128
+          options:
+          - paper_s2p_Q_DY
+          - paper_s2p_D_QY
+          - paper_s2p_Y_QD
+          - paper_p2s_QD_Y
+          - paper_p2s_QY_D
+          - paper_p2s_DY_Q
+          required: true
+          type: select
+          variable: path
+        - label: question
+          max_length: 4096
+          options: []
+          required: true
+          type: paragraph
+          variable: question
+      height: 112
+      id: start_node
+      position:
+        x: 30
+        y: 1180
+      positionAbsolute:
+        x: 30
+        y: 1180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        _targetBranches:
+        - id: paper_s2p_Q_DY
+          name: paper_s2p_Q_DY
+        - id: paper_s2p_D_QY
+          name: paper_s2p_D_QY
+        - id: paper_s2p_Y_QD
+          name: paper_s2p_Y_QD
+        - id: paper_p2s_QD_Y
+          name: paper_p2s_QD_Y
+        - id: paper_p2s_QY_D
+          name: paper_p2s_QY_D
+        - id: paper_p2s_DY_Q
+          name: paper_p2s_DY_Q
+        cases:
+        - case_id: paper_s2p_Q_DY
+          conditions:
+          - comparison_operator: is
+            id: cond_paper_s2p_Q_DY
+            value: paper_s2p_Q_DY
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+          logical_operator: and
+        - case_id: paper_s2p_D_QY
+          conditions:
+          - comparison_operator: is
+            id: cond_paper_s2p_D_QY
+            value: paper_s2p_D_QY
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+          logical_operator: and
+        - case_id: paper_s2p_Y_QD
+          conditions:
+          - comparison_operator: is
+            id: cond_paper_s2p_Y_QD
+            value: paper_s2p_Y_QD
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+          logical_operator: and
+        - case_id: paper_p2s_QD_Y
+          conditions:
+          - comparison_operator: is
+            id: cond_paper_p2s_QD_Y
+            value: paper_p2s_QD_Y
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+          logical_operator: and
+        - case_id: paper_p2s_QY_D
+          conditions:
+          - comparison_operator: is
+            id: cond_paper_p2s_QY_D
+            value: paper_p2s_QY_D
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+          logical_operator: and
+        - case_id: paper_p2s_DY_Q
+          conditions:
+          - comparison_operator: is
+            id: cond_paper_p2s_DY_Q
+            value: paper_p2s_DY_Q
+            varType: string
+            variable_selector:
+            - start_node
+            - path
+          logical_operator: and
+        desc: Route one unified hybrid workflow to the requested S2P/P2S path.
+        isInIteration: false
+        isInLoop: false
+        selected: false
+        title: 'Route: hybrid path'
+        type: if-else
+      height: 250
+      id: route_path
+      position:
+        x: 334
+        y: 1180
+      positionAbsolute:
+        x: 334
+        y: 1180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: paper_s2p_Q_DY stage 1 — Qwen2.5-7B-Instruct.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: qwen25-7b-instruct-q5km
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: ea49def7-e102-5f4a-8e43-24c9e705d179
+          role: system
+          text: You are a careful problem-solver. Read the question, reason step by
+            step, and provide your final answer at the end of the reply.
+        - id: fb68696e-42a1-52d7-aba9-6b54b5ea9b63
+          role: user
+          text: '{{#start_node.question#}}'
+        selected: false
+        title: 'paper_s2p_Q_DY: Q serial'
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: paper_s2p_Q_DY__llm_Q_serial
+      position:
+        x: 638
+        y: 156
+      positionAbsolute:
+        x: 638
+        y: 156
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_Q_DY parallel source — Qwen3-8B-BF16 (D-role stand-in) receives
+          the stage-1 semantic draft and participates in token-level fusion.
+        extra: {}
+        model_alias: '22'
+        prompt_template: 'Question:
+
+          {{#start_node.question#}}
+
+
+          Stage-1 semantic draft:
+
+          {{#paper_s2p_Q_DY__llm_Q_serial.text#}}
+
+
+          Use the draft as shared context, refine it, and put the final answer at
+          the end.'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_s2p_Q_DY: token source D'
+        type: token-model-source
+      height: 130
+      id: paper_s2p_Q_DY__token_D_par
+      position:
+        x: 942
+        y: 80
+      positionAbsolute:
+        x: 942
+        y: 80
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_Q_DY parallel source — GLM-4-9B-Chat receives the stage-1
+          semantic draft and participates in token-level fusion.
+        extra: {}
+        model_alias: '6'
+        prompt_template: 'Question:
+
+          {{#start_node.question#}}
+
+
+          Stage-1 semantic draft:
+
+          {{#paper_s2p_Q_DY__llm_Q_serial.text#}}
+
+
+          Use the draft as shared context, refine it, and put the final answer at
+          the end.'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_s2p_Q_DY: token source Y'
+        type: token-model-source
+      height: 130
+      id: paper_s2p_Q_DY__token_Y_par
+      position:
+        x: 942
+        y: 232
+      positionAbsolute:
+        x: 942
+        y: 232
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_Q_DY token-level S2P parallel ensemble.
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_p: 1.0
+            use_weights: false
+          aggregator_name: sum_score
+          diagnostics:
+            include_aggregator_reasoning: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_token_candidates: false
+            max_trace_tokens: 2000
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 512
+          runner_name: token_step
+          token_sources:
+          - source_id: D
+            spec_selector:
+            - paper_s2p_Q_DY__token_D_par
+            - spec
+            weight: 1.0
+          - source_id: Y
+            spec_selector:
+            - paper_s2p_Q_DY__token_Y_par
+            - spec
+            weight: 1.0
+        selected: false
+        title: 'paper_s2p_Q_DY: parallel ensemble'
+        type: parallel-ensemble
+      height: 200
+      id: paper_s2p_Q_DY__aggregator
+      position:
+        x: 1246
+        y: 156
+      positionAbsolute:
+        x: 1246
+        y: 156
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit answer for paper_s2p_Q_DY.
+        outputs:
+        - value_selector:
+          - paper_s2p_Q_DY__aggregator
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: 'End: paper_s2p_Q_DY'
+        type: end
+      height: 90
+      id: paper_s2p_Q_DY__end
+      position:
+        x: 1550
+        y: 156
+      positionAbsolute:
+        x: 1550
+        y: 156
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: paper_s2p_D_QY stage 1 — Qwen3-8B-BF16 (D-role stand-in).
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: qwen3-8b-bf16
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 3fba5bed-fda3-52e6-afcf-3cd051421cff
+          role: system
+          text: You are a careful problem-solver. Read the question, reason step by
+            step, and provide your final answer at the end of the reply.
+        - id: 80e956a0-a62c-5115-a9c2-82db082e2127
+          role: user
+          text: '{{#start_node.question#}}'
+        selected: false
+        title: 'paper_s2p_D_QY: D serial'
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: paper_s2p_D_QY__llm_D_serial
+      position:
+        x: 638
+        y: 516
+      positionAbsolute:
+        x: 638
+        y: 516
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_D_QY parallel source — Qwen2.5-7B-Instruct receives the stage-1
+          semantic draft and participates in token-level fusion.
+        extra: {}
+        model_alias: '5'
+        prompt_template: 'Question:
+
+          {{#start_node.question#}}
+
+
+          Stage-1 semantic draft:
+
+          {{#paper_s2p_D_QY__llm_D_serial.text#}}
+
+
+          Use the draft as shared context, refine it, and put the final answer at
+          the end.'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_s2p_D_QY: token source Q'
+        type: token-model-source
+      height: 130
+      id: paper_s2p_D_QY__token_Q_par
+      position:
+        x: 942
+        y: 440
+      positionAbsolute:
+        x: 942
+        y: 440
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_D_QY parallel source — GLM-4-9B-Chat receives the stage-1
+          semantic draft and participates in token-level fusion.
+        extra: {}
+        model_alias: '6'
+        prompt_template: 'Question:
+
+          {{#start_node.question#}}
+
+
+          Stage-1 semantic draft:
+
+          {{#paper_s2p_D_QY__llm_D_serial.text#}}
+
+
+          Use the draft as shared context, refine it, and put the final answer at
+          the end.'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_s2p_D_QY: token source Y'
+        type: token-model-source
+      height: 130
+      id: paper_s2p_D_QY__token_Y_par
+      position:
+        x: 942
+        y: 592
+      positionAbsolute:
+        x: 942
+        y: 592
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_D_QY token-level S2P parallel ensemble.
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_p: 1.0
+            use_weights: false
+          aggregator_name: sum_score
+          diagnostics:
+            include_aggregator_reasoning: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_token_candidates: false
+            max_trace_tokens: 2000
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 512
+          runner_name: token_step
+          token_sources:
+          - source_id: Q
+            spec_selector:
+            - paper_s2p_D_QY__token_Q_par
+            - spec
+            weight: 1.0
+          - source_id: Y
+            spec_selector:
+            - paper_s2p_D_QY__token_Y_par
+            - spec
+            weight: 1.0
+        selected: false
+        title: 'paper_s2p_D_QY: parallel ensemble'
+        type: parallel-ensemble
+      height: 200
+      id: paper_s2p_D_QY__aggregator
+      position:
+        x: 1246
+        y: 516
+      positionAbsolute:
+        x: 1246
+        y: 516
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit answer for paper_s2p_D_QY.
+        outputs:
+        - value_selector:
+          - paper_s2p_D_QY__aggregator
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: 'End: paper_s2p_D_QY'
+        type: end
+      height: 90
+      id: paper_s2p_D_QY__end
+      position:
+        x: 1550
+        y: 516
+      positionAbsolute:
+        x: 1550
+        y: 516
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: paper_s2p_Y_QD stage 1 — GLM-4-9B-Chat.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: glm-4-9b-chat-q4k
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 41e67bf0-f746-5473-a239-5e4221309f03
+          role: system
+          text: You are a careful problem-solver. Read the question, reason step by
+            step, and provide your final answer at the end of the reply.
+        - id: 512578bc-29f3-5947-a0ce-b71a35bd43a2
+          role: user
+          text: '{{#start_node.question#}}'
+        selected: false
+        title: 'paper_s2p_Y_QD: Y serial'
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: paper_s2p_Y_QD__llm_Y_serial
+      position:
+        x: 638
+        y: 876
+      positionAbsolute:
+        x: 638
+        y: 876
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_Y_QD parallel source — Qwen2.5-7B-Instruct receives the stage-1
+          semantic draft and participates in token-level fusion.
+        extra: {}
+        model_alias: '5'
+        prompt_template: 'Question:
+
+          {{#start_node.question#}}
+
+
+          Stage-1 semantic draft:
+
+          {{#paper_s2p_Y_QD__llm_Y_serial.text#}}
+
+
+          Use the draft as shared context, refine it, and put the final answer at
+          the end.'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_s2p_Y_QD: token source Q'
+        type: token-model-source
+      height: 130
+      id: paper_s2p_Y_QD__token_Q_par
+      position:
+        x: 942
+        y: 800
+      positionAbsolute:
+        x: 942
+        y: 800
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_Y_QD parallel source — Qwen3-8B-BF16 (D-role stand-in) receives
+          the stage-1 semantic draft and participates in token-level fusion.
+        extra: {}
+        model_alias: '22'
+        prompt_template: 'Question:
+
+          {{#start_node.question#}}
+
+
+          Stage-1 semantic draft:
+
+          {{#paper_s2p_Y_QD__llm_Y_serial.text#}}
+
+
+          Use the draft as shared context, refine it, and put the final answer at
+          the end.'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_s2p_Y_QD: token source D'
+        type: token-model-source
+      height: 130
+      id: paper_s2p_Y_QD__token_D_par
+      position:
+        x: 942
+        y: 952
+      positionAbsolute:
+        x: 942
+        y: 952
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_s2p_Y_QD token-level S2P parallel ensemble.
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_p: 1.0
+            use_weights: false
+          aggregator_name: sum_score
+          diagnostics:
+            include_aggregator_reasoning: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_token_candidates: false
+            max_trace_tokens: 2000
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 512
+          runner_name: token_step
+          token_sources:
+          - source_id: Q
+            spec_selector:
+            - paper_s2p_Y_QD__token_Q_par
+            - spec
+            weight: 1.0
+          - source_id: D
+            spec_selector:
+            - paper_s2p_Y_QD__token_D_par
+            - spec
+            weight: 1.0
+        selected: false
+        title: 'paper_s2p_Y_QD: parallel ensemble'
+        type: parallel-ensemble
+      height: 200
+      id: paper_s2p_Y_QD__aggregator
+      position:
+        x: 1246
+        y: 876
+      positionAbsolute:
+        x: 1246
+        y: 876
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit answer for paper_s2p_Y_QD.
+        outputs:
+        - value_selector:
+          - paper_s2p_Y_QD__aggregator
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: 'End: paper_s2p_Y_QD'
+        type: end
+      height: 90
+      id: paper_s2p_Y_QD__end
+      position:
+        x: 1550
+        y: 876
+      positionAbsolute:
+        x: 1550
+        y: 876
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_QD_Y parallel source — Qwen2.5-7B-Instruct participates in
+          token-level fusion.
+        extra: {}
+        model_alias: '5'
+        prompt_template: '{{#start_node.question#}}'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_p2s_QD_Y: token source Q'
+        type: token-model-source
+      height: 130
+      id: paper_p2s_QD_Y__token_Q_par
+      position:
+        x: 638
+        y: 1160
+      positionAbsolute:
+        x: 638
+        y: 1160
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_QD_Y parallel source — Qwen3-8B-BF16 (D-role stand-in) participates
+          in token-level fusion.
+        extra: {}
+        model_alias: '22'
+        prompt_template: '{{#start_node.question#}}'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_p2s_QD_Y: token source D'
+        type: token-model-source
+      height: 130
+      id: paper_p2s_QD_Y__token_D_par
+      position:
+        x: 638
+        y: 1312
+      positionAbsolute:
+        x: 638
+        y: 1312
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_QD_Y token-level P2S parallel ensemble.
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_p: 1.0
+            use_weights: false
+          aggregator_name: sum_score
+          diagnostics:
+            include_aggregator_reasoning: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_token_candidates: false
+            max_trace_tokens: 2000
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 512
+          runner_name: token_step
+          token_sources:
+          - source_id: Q
+            spec_selector:
+            - paper_p2s_QD_Y__token_Q_par
+            - spec
+            weight: 1.0
+          - source_id: D
+            spec_selector:
+            - paper_p2s_QD_Y__token_D_par
+            - spec
+            weight: 1.0
+        selected: false
+        title: 'paper_p2s_QD_Y: parallel ensemble'
+        type: parallel-ensemble
+      height: 200
+      id: paper_p2s_QD_Y__aggregator
+      position:
+        x: 942
+        y: 1236
+      positionAbsolute:
+        x: 942
+        y: 1236
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: paper_p2s_QD_Y serial synthesizer — GLM-4-9B-Chat.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: glm-4-9b-chat-q4k
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: f1a8369a-bc73-597f-a2e5-b7f0d5be4071
+          role: system
+          text: You are a careful problem-solver. Read the question and the candidate
+            answers from peer models, then provide a unified final answer that you
+            have validated.
+        - id: 4f5668be-ce10-5479-a05e-c32309cfe8c6
+          role: user
+          text: 'Question:
+
+            {{#start_node.question#}}
+
+
+            Candidate answer from the parallel token-level ensemble:
+
+            {{#paper_p2s_QD_Y__aggregator.text#}}
+
+
+            Provide your unified final answer:'
+        selected: false
+        title: 'paper_p2s_QD_Y: Y synthesizer'
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: paper_p2s_QD_Y__llm_Y_serial
+      position:
+        x: 1246
+        y: 1236
+      positionAbsolute:
+        x: 1246
+        y: 1236
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit answer for paper_p2s_QD_Y.
+        outputs:
+        - value_selector:
+          - paper_p2s_QD_Y__llm_Y_serial
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: 'End: paper_p2s_QD_Y'
+        type: end
+      height: 90
+      id: paper_p2s_QD_Y__end
+      position:
+        x: 1550
+        y: 1236
+      positionAbsolute:
+        x: 1550
+        y: 1236
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_QY_D parallel source — Qwen2.5-7B-Instruct participates in
+          token-level fusion.
+        extra: {}
+        model_alias: '5'
+        prompt_template: '{{#start_node.question#}}'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_p2s_QY_D: token source Q'
+        type: token-model-source
+      height: 130
+      id: paper_p2s_QY_D__token_Q_par
+      position:
+        x: 638
+        y: 1520
+      positionAbsolute:
+        x: 638
+        y: 1520
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_QY_D parallel source — GLM-4-9B-Chat participates in token-level
+          fusion.
+        extra: {}
+        model_alias: '6'
+        prompt_template: '{{#start_node.question#}}'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_p2s_QY_D: token source Y'
+        type: token-model-source
+      height: 130
+      id: paper_p2s_QY_D__token_Y_par
+      position:
+        x: 638
+        y: 1672
+      positionAbsolute:
+        x: 638
+        y: 1672
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_QY_D token-level P2S parallel ensemble.
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_p: 1.0
+            use_weights: false
+          aggregator_name: sum_score
+          diagnostics:
+            include_aggregator_reasoning: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_token_candidates: false
+            max_trace_tokens: 2000
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 512
+          runner_name: token_step
+          token_sources:
+          - source_id: Q
+            spec_selector:
+            - paper_p2s_QY_D__token_Q_par
+            - spec
+            weight: 1.0
+          - source_id: Y
+            spec_selector:
+            - paper_p2s_QY_D__token_Y_par
+            - spec
+            weight: 1.0
+        selected: false
+        title: 'paper_p2s_QY_D: parallel ensemble'
+        type: parallel-ensemble
+      height: 200
+      id: paper_p2s_QY_D__aggregator
+      position:
+        x: 942
+        y: 1596
+      positionAbsolute:
+        x: 942
+        y: 1596
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: paper_p2s_QY_D serial synthesizer — Qwen3-8B-BF16 (D-role stand-in).
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: qwen3-8b-bf16
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 2b869b8f-593c-5b6a-98dc-312fcd1fd09a
+          role: system
+          text: You are a careful problem-solver. Read the question and the candidate
+            answers from peer models, then provide a unified final answer that you
+            have validated.
+        - id: 90d08100-4828-51e4-b7e0-83673460e4af
+          role: user
+          text: 'Question:
+
+            {{#start_node.question#}}
+
+
+            Candidate answer from the parallel token-level ensemble:
+
+            {{#paper_p2s_QY_D__aggregator.text#}}
+
+
+            Provide your unified final answer:'
+        selected: false
+        title: 'paper_p2s_QY_D: D synthesizer'
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: paper_p2s_QY_D__llm_D_serial
+      position:
+        x: 1246
+        y: 1596
+      positionAbsolute:
+        x: 1246
+        y: 1596
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit answer for paper_p2s_QY_D.
+        outputs:
+        - value_selector:
+          - paper_p2s_QY_D__llm_D_serial
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: 'End: paper_p2s_QY_D'
+        type: end
+      height: 90
+      id: paper_p2s_QY_D__end
+      position:
+        x: 1550
+        y: 1596
+      positionAbsolute:
+        x: 1550
+        y: 1596
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_DY_Q parallel source — Qwen3-8B-BF16 (D-role stand-in) participates
+          in token-level fusion.
+        extra: {}
+        model_alias: '22'
+        prompt_template: '{{#start_node.question#}}'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_p2s_DY_Q: token source D'
+        type: token-model-source
+      height: 130
+      id: paper_p2s_DY_Q__token_D_par
+      position:
+        x: 638
+        y: 1880
+      positionAbsolute:
+        x: 638
+        y: 1880
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_DY_Q parallel source — GLM-4-9B-Chat participates in token-level
+          fusion.
+        extra: {}
+        model_alias: '6'
+        prompt_template: '{{#start_node.question#}}'
+        sampling_params:
+          max_tokens: 512
+          temperature: 0.7
+          top_k: 10
+        selected: false
+        title: 'paper_p2s_DY_Q: token source Y'
+        type: token-model-source
+      height: 130
+      id: paper_p2s_DY_Q__token_Y_par
+      position:
+        x: 638
+        y: 2032
+      positionAbsolute:
+        x: 638
+        y: 2032
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: paper_p2s_DY_Q token-level P2S parallel ensemble.
+        ensemble:
+          aggregator_config:
+            seed: null
+            tau_p: 1.0
+            use_weights: false
+          aggregator_name: sum_score
+          diagnostics:
+            include_aggregator_reasoning: true
+            include_per_backend_errors: true
+            include_response_timings: true
+            include_token_candidates: false
+            max_trace_tokens: 2000
+            storage: metadata
+          runner_config:
+            enable_think: false
+            max_len: 512
+          runner_name: token_step
+          token_sources:
+          - source_id: D
+            spec_selector:
+            - paper_p2s_DY_Q__token_D_par
+            - spec
+            weight: 1.0
+          - source_id: Y
+            spec_selector:
+            - paper_p2s_DY_Q__token_Y_par
+            - spec
+            weight: 1.0
+        selected: false
+        title: 'paper_p2s_DY_Q: parallel ensemble'
+        type: parallel-ensemble
+      height: 200
+      id: paper_p2s_DY_Q__aggregator
+      position:
+        x: 942
+        y: 1956
+      positionAbsolute:
+        x: 942
+        y: 1956
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: paper_p2s_DY_Q serial synthesizer — Qwen2.5-7B-Instruct.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params:
+            max_tokens: 512
+            temperature: 0.0
+          mode: chat
+          name: qwen25-7b-instruct-q5km
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        prompt_template:
+        - id: 9d98d1a6-580b-56d4-95ff-89753baac9b0
+          role: system
+          text: You are a careful problem-solver. Read the question and the candidate
+            answers from peer models, then provide a unified final answer that you
+            have validated.
+        - id: b3d669e4-591d-5df2-a04b-f5f63d72d14d
+          role: user
+          text: 'Question:
+
+            {{#start_node.question#}}
+
+
+            Candidate answer from the parallel token-level ensemble:
+
+            {{#paper_p2s_DY_Q__aggregator.text#}}
+
+
+            Provide your unified final answer:'
+        selected: false
+        title: 'paper_p2s_DY_Q: Q synthesizer'
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 90
+      id: paper_p2s_DY_Q__llm_Q_serial
+      position:
+        x: 1246
+        y: 1956
+      positionAbsolute:
+        x: 1246
+        y: 1956
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Emit answer for paper_p2s_DY_Q.
+        outputs:
+        - value_selector:
+          - paper_p2s_DY_Q__llm_Q_serial
+          - text
+          value_type: string
+          variable: answer
+        selected: false
+        title: 'End: paper_p2s_DY_Q'
+        type: end
+      height: 90
+      id: paper_p2s_DY_Q__end
+      position:
+        x: 1550
+        y: 1956
+      positionAbsolute:
+        x: 1550
+        y: 1956
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7
