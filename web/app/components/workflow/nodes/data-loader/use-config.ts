@@ -1,8 +1,10 @@
-import type { DataLoaderNodeType } from './types'
+import type { ValueSelector, Var } from '../../types'
+import type { DataLoaderNodeType, DataLoaderSourceMode } from './types'
 import { produce } from 'immer'
 import { useCallback, useMemo, useState } from 'react'
 import { useNodesReadOnly } from '@/app/components/workflow/hooks'
 import useNodeCrud from '@/app/components/workflow/nodes/_base/hooks/use-node-crud'
+import { VarType } from '../../types'
 
 const formatConfig = (config: Record<string, unknown>) => JSON.stringify(config ?? {}, null, 2)
 
@@ -11,6 +13,17 @@ const useConfig = (id: string, payload: DataLoaderNodeType) => {
   const { inputs, setInputs } = useNodeCrud<DataLoaderNodeType>(id, payload)
   const [configText, setConfigText] = useState(() => formatConfig(inputs.loader_config))
   const [configError, setConfigError] = useState<string | null>(null)
+
+  const filterFileVar = useCallback((varPayload: Var) => {
+    return varPayload.type === VarType.file || varPayload.type === VarType.arrayFile
+  }, [])
+
+  const handleSourceModeChange = useCallback((sourceMode: DataLoaderSourceMode) => {
+    const next = produce(inputs, (draft) => {
+      draft.source_mode = sourceMode
+    })
+    setInputs(next)
+  }, [inputs, setInputs])
 
   const handleLoaderNameChange = useCallback((loaderName: string) => {
     const next = produce(inputs, (draft) => {
@@ -50,6 +63,13 @@ const useConfig = (id: string, payload: DataLoaderNodeType) => {
     setInputs(next)
   }, [inputs, setInputs])
 
+  const handleFileSelectorChange = useCallback((field: 'data_file_selector' | 'code_file_selector', variable: ValueSelector | string) => {
+    const next = produce(inputs, (draft) => {
+      draft[field] = variable as ValueSelector
+    })
+    setInputs(next)
+  }, [inputs, setInputs])
+
   const handleShuffleChange = useCallback((checked: boolean) => {
     const next = produce(inputs, (draft) => {
       draft.shuffle = checked
@@ -62,18 +82,24 @@ const useConfig = (id: string, payload: DataLoaderNodeType) => {
     inputs,
     configText,
     configError,
+    filterFileVar,
+    handleSourceModeChange,
     handleLoaderNameChange,
     handleConfigTextChange,
     handleNumberChange,
+    handleFileSelectorChange,
     handleShuffleChange,
   }), [
     readOnly,
     inputs,
     configText,
     configError,
+    filterFileVar,
+    handleSourceModeChange,
     handleLoaderNameChange,
     handleConfigTextChange,
     handleNumberChange,
+    handleFileSelectorChange,
     handleShuffleChange,
   ])
 }

@@ -3,7 +3,7 @@ import type { DataLoaderNodeType } from './types'
 import { BlockClassificationEnum } from '@/app/components/workflow/block-selector/types'
 import { BlockEnum, VarType } from '@/app/components/workflow/types'
 import { genNodeMetaData } from '@/app/components/workflow/utils'
-import { DEFAULT_LOADER_CONFIG } from './types'
+import { DataLoaderCodeLanguage, DataLoaderSourceMode, DEFAULT_LOADER_CONFIG } from './types'
 
 const i18nPrefix = 'nodes.dataLoader'
 
@@ -18,6 +18,11 @@ const isPositiveInt = (value: unknown, max?: number): value is number =>
 
 const isNonNegativeInt = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
+
+const isValidSelector = (value: unknown): value is string[] =>
+  Array.isArray(value)
+  && value.length >= 2
+  && value.every(item => typeof item === 'string' && item.length > 0)
 
 const metaData = genNodeMetaData({
   author: 'xianghe',
@@ -42,8 +47,12 @@ const outputVars: Var[] = [
 const nodeDefault: NodeDefault<DataLoaderNodeType> = {
   metaData,
   defaultValue: {
+    source_mode: DataLoaderSourceMode.configured,
     loader_name: 'inline_json',
     loader_config: { ...DEFAULT_LOADER_CONFIG },
+    data_file_selector: [],
+    code_file_selector: [],
+    code_language: DataLoaderCodeLanguage.python3,
     limit: 100,
     offset: 0,
     shuffle: false,
@@ -51,17 +60,32 @@ const nodeDefault: NodeDefault<DataLoaderNodeType> = {
   },
   checkValid(payload, t) {
     let errorMessage = ''
+    const sourceMode = payload.source_mode ?? DataLoaderSourceMode.configured
 
-    if (typeof payload.loader_name !== 'string' || payload.loader_name.trim().length === 0) {
+    if (sourceMode === DataLoaderSourceMode.configured && (typeof payload.loader_name !== 'string' || payload.loader_name.trim().length === 0)) {
       errorMessage = t('errorMsg.fieldRequired', {
         ns: 'workflow',
         field: t(`${i18nPrefix}.loaderName`, { ns: 'workflow' }),
       })
     }
 
-    if (!errorMessage && !isPlainObject(payload.loader_config)) {
+    if (!errorMessage && sourceMode === DataLoaderSourceMode.configured && !isPlainObject(payload.loader_config)) {
       errorMessage = t(`${i18nPrefix}.errorMsg.loaderConfigObject`, {
         ns: 'workflow',
+      })
+    }
+
+    if (!errorMessage && sourceMode === DataLoaderSourceMode.uploadedCode && !isValidSelector(payload.data_file_selector)) {
+      errorMessage = t('errorMsg.fieldRequired', {
+        ns: 'workflow',
+        field: t(`${i18nPrefix}.dataFile`, { ns: 'workflow' }),
+      })
+    }
+
+    if (!errorMessage && sourceMode === DataLoaderSourceMode.uploadedCode && !isValidSelector(payload.code_file_selector)) {
+      errorMessage = t('errorMsg.fieldRequired', {
+        ns: 'workflow',
+        field: t(`${i18nPrefix}.codeFile`, { ns: 'workflow' }),
       })
     }
 

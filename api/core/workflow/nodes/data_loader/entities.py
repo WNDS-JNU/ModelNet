@@ -10,7 +10,7 @@ or a different node type.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -33,6 +33,10 @@ class DataLoaderNodeData(BaseNodeData):
 
     loader_name: str = Field(default="inline_json", min_length=1)
     loader_config: dict[str, Any] = Field(default_factory=dict)
+    source_mode: Literal["configured", "uploaded_code"] = "configured"
+    data_file_selector: list[str] = Field(default_factory=list)
+    code_file_selector: list[str] = Field(default_factory=list)
+    code_language: Literal["python3"] = "python3"
     limit: int = Field(default=100, gt=0, le=10000)
     offset: int = Field(default=0, ge=0)
     shuffle: bool = False

@@ -3,12 +3,16 @@ import type { DataLoaderNodeType } from './types'
 import type { NodeProps } from '@/app/components/workflow/types'
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
+import { DataLoaderSourceMode } from './types'
 
 const i18nPrefix = 'nodes.dataLoader'
 
 const Node: FC<NodeProps<DataLoaderNodeType>> = ({ data }) => {
   const { t } = useTranslation()
-  const loaderName = data.loader_name
+  const sourceMode = data.source_mode ?? DataLoaderSourceMode.configured
+  const loaderName = sourceMode === DataLoaderSourceMode.uploadedCode
+    ? t(`${i18nPrefix}.sourceModeUploadedCode`, { ns: 'workflow' })
+    : data.loader_name
 
   if (!loaderName)
     return null
