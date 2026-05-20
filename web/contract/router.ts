@@ -18,6 +18,8 @@ import { notificationContract, notificationDismissContract } from './console/not
 import {
   parallelEnsembleAggregatorsContract,
   parallelEnsembleLocalModelsContract,
+  parallelEnsembleLocalModelsRefreshContract,
+  parallelEnsembleLocalModelsRefreshStatusContract,
   parallelEnsembleRunnersContract,
 } from './console/parallel-ensemble'
 import { pluginCheckInstalledContract, pluginLatestVersionsContract } from './console/plugins'
@@ -105,6 +107,8 @@ export const consoleRouterContract = {
   workflowComments: workflowCommentContracts,
   parallelEnsemble: {
     localModels: parallelEnsembleLocalModelsContract,
+    localModelsRefresh: parallelEnsembleLocalModelsRefreshContract,
+    localModelsRefreshStatus: parallelEnsembleLocalModelsRefreshStatusContract,
     runners: parallelEnsembleRunnersContract,
     aggregators: parallelEnsembleAggregatorsContract,
   },

@@ -234,6 +234,12 @@ def init_app(app: DifyApp) -> Celery:
             "task": "schedule.trigger_provider_refresh_task.trigger_provider_refresh",
             "schedule": timedelta(minutes=dify_config.TRIGGER_PROVIDER_REFRESH_INTERVAL),
         }
+    if dify_config.MODEL_NET_K8S_DISCOVERY_ENABLED:
+        imports.append("schedule.model_net_k8s_refresh_task")
+        beat_schedule["model_net_k8s_refresh"] = {
+            "task": "schedule.model_net_k8s_refresh_task.refresh_model_net_k8s_registry",
+            "schedule": timedelta(minutes=dify_config.MODEL_NET_K8S_REFRESH_INTERVAL),
+        }
 
     if dify_config.ENABLE_API_TOKEN_LAST_USED_UPDATE_TASK:
         imports.append("schedule.update_api_token_last_used_task")

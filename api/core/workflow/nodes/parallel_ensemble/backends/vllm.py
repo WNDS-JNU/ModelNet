@@ -63,7 +63,7 @@ class VllmSpec(BaseSpec):
     backend: Literal["vllm"]  # pyright: ignore[reportIncompatibleVariableOverride]
     model_url: AnyUrl
     EOS: str = Field(min_length=1)
-    type: Literal["normal"] = "normal"
+    type: Literal["normal", "think"] = "normal"
     stop_think: str | None = None
     expose_raw_logits: bool = False
 

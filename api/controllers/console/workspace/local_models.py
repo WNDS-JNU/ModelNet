@@ -15,9 +15,17 @@ a service layer would just reflect the same call.
 from flask_restx import Resource, fields
 
 from controllers.console import console_ns
-from controllers.console.wraps import account_initialization_required, setup_required
+from controllers.console.wraps import (
+    account_initialization_required,
+    is_admin_or_owner_required,
+    setup_required,
+)
 from core.workflow.nodes.parallel_ensemble.registry import ModelRegistry
 from libs.login import login_required
+from services.model_net_k8s_registry_service import (
+    get_model_net_k8s_refresh_status,
+    refresh_model_net_registry_from_k8s,
+)
 
 
 @console_ns.route("/workspaces/current/local-models")
@@ -34,3 +42,26 @@ class LocalModelsApi(Resource):
     @account_initialization_required
     def get(self):
         return {"models": list(ModelRegistry.instance().list_aliases())}
+
+
+@console_ns.route("/workspaces/current/local-models/refresh")
+class LocalModelsRefreshApi(Resource):
+    @console_ns.doc("refresh_local_models_from_k8s")
+    @console_ns.doc(description="Refresh the ModelNet model registry from Kubernetes Ingress discovery.")
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @is_admin_or_owner_required
+    def post(self):
+        return refresh_model_net_registry_from_k8s(triggered_by="manual"), 200
+
+
+@console_ns.route("/workspaces/current/local-models/refresh-status")
+class LocalModelsRefreshStatusApi(Resource):
+    @console_ns.doc("get_local_models_refresh_status")
+    @console_ns.doc(description="Return the latest ModelNet k8s discovery refresh status.")
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self):
+        return get_model_net_k8s_refresh_status(), 200

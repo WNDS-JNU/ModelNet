@@ -1415,6 +1415,40 @@ class ModelNetConfig(BaseSettings):
         default=8,
     )
 
+    MODEL_NET_K8S_DISCOVERY_ENABLED: bool = Field(
+        description="Enable Kubernetes Ingress discovery for the ModelNet registry.",
+        default=False,
+    )
+    MODEL_NET_K8S_NAMESPACES: str = Field(
+        description="Comma-separated Kubernetes namespaces to scan for model Ingress routes.",
+        default="",
+    )
+    MODEL_NET_K8S_KUBECONFIG_PATH: str = Field(
+        description="Optional kubeconfig path for ModelNet k8s discovery. "
+        "When empty, in-cluster service account credentials are used.",
+        default="",
+    )
+    MODEL_NET_K8S_REFRESH_INTERVAL: PositiveInt = Field(
+        description="ModelNet k8s discovery refresh interval in minutes.",
+        default=5,
+    )
+    MODEL_NET_K8S_PROBE_TIMEOUT_SECONDS: PositiveInt = Field(
+        description="Timeout in seconds for probing discovered model /v1/models endpoints.",
+        default=10,
+    )
+    MODEL_NET_K8S_ROUTE_DEFAULT_SCHEME: str = Field(
+        description="Default scheme for discovered Ingress routes when TLS is not declared.",
+        default="https",
+    )
+    MODEL_NET_K8S_DEFAULT_BACKEND: str = Field(
+        description="Default ModelNet backend assigned to healthy k8s-discovered routes.",
+        default="vllm_chat",
+    )
+    MODEL_NET_K8S_REQUEST_TIMEOUT_MS: PositiveInt = Field(
+        description="Request timeout stored on k8s-discovered ModelNet registry entries.",
+        default=180000,
+    )
+
 
 class FeatureConfig(
     # place the configs in alphabet order

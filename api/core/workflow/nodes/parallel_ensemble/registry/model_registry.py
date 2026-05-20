@@ -114,6 +114,7 @@ class ModelRegistry:
     def __init__(self) -> None:
         self._models: dict[str, BaseSpec] = {}
         self._source_path: str | None = None
+        self._source_mtime_ns: int | None = None
 
     @classmethod
     def instance(cls) -> ModelRegistry:
@@ -123,6 +124,8 @@ class ModelRegistry:
                     inst = cls()
                     inst._load()
                     cls._instance = inst
+        else:
+            cls._instance.reload_if_changed()
         return cls._instance
 
     @classmethod
@@ -154,6 +157,7 @@ class ModelRegistry:
                 path_str,
             )
             self._models = {}
+            self._source_mtime_ns = None
             return
 
         try:
@@ -164,6 +168,10 @@ class ModelRegistry:
 
         if raw is None:
             self._models = {}
+            try:
+                self._source_mtime_ns = path.stat().st_mtime_ns
+            except OSError:
+                self._source_mtime_ns = None
             return
         if not isinstance(raw, dict):
             raise RegistryFileError(path_str, "top-level yaml must be a mapping")
@@ -172,6 +180,13 @@ class ModelRegistry:
         if not isinstance(entries, list):
             raise RegistryFileError(path_str, "'models' must be a list")
 
+        self._models = self._parse_entries(entries, path_str)
+        try:
+            self._source_mtime_ns = path.stat().st_mtime_ns
+        except OSError:
+            self._source_mtime_ns = None
+
+    def _parse_entries(self, entries: list[Any], path_str: str) -> dict[str, BaseSpec]:
         models: dict[str, BaseSpec] = {}
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
@@ -211,7 +226,46 @@ class ModelRegistry:
                 raise RegistryFileError(path_str, f"duplicate model id '{spec.id}'")
             models[spec.id] = spec
 
-        self._models = models
+        return models
+
+    def reload_if_changed(self) -> bool:
+        """Reload the registry if the source yaml changed on disk.
+
+        k8s discovery writes ``MODEL_NET_REGISTRY_PATH`` from a Celery
+        worker, while API and workflow worker processes keep their own
+        ``ModelRegistry`` singleton. Checking mtime at access time lets
+        every process observe the generated registry without a restart.
+        """
+        if self._source_path is None:
+            return False
+
+        path = Path(self._source_path)
+        try:
+            mtime_ns = path.stat().st_mtime_ns
+        except OSError:
+            mtime_ns = None
+
+        if mtime_ns == self._source_mtime_ns:
+            return False
+
+        with self._instance_lock:
+            try:
+                current_mtime_ns = path.stat().st_mtime_ns
+            except OSError:
+                current_mtime_ns = None
+            if current_mtime_ns == self._source_mtime_ns:
+                return False
+            self._load(self._source_path)
+        return True
+
+    @classmethod
+    def reload(cls) -> ModelRegistry:
+        """Force a process-local reload from ``MODEL_NET_REGISTRY_PATH``."""
+        with cls._instance_lock:
+            inst = cls()
+            inst._load()
+            cls._instance = inst
+            return inst
 
     def get(self, alias: str) -> BaseSpec:
         try:

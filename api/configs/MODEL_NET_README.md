@@ -59,3 +59,41 @@ the entire file at boot, not silently.
 All HTTP traffic to `model_url` goes through `core.helper.ssrf_proxy`.
 Private-IP allowlisting and blocklisting are governed by the
 deployment-wide `SSRF_PROXY_*` env vars, not per-entry.
+
+## Kubernetes auto-discovery
+
+ModelNet can replace the manual registry from Kubernetes Ingress routes.
+Enable it only after the API or worker process has read-only k8s
+credentials:
+
+```env
+MODEL_NET_K8S_DISCOVERY_ENABLED=true
+MODEL_NET_K8S_NAMESPACES=vllm-test,inference,llama-cpp
+MODEL_NET_K8S_REFRESH_INTERVAL=5
+```
+
+Credential lookup:
+
+- If `MODEL_NET_K8S_KUBECONFIG_PATH` is set, that kubeconfig is used.
+- Otherwise in-cluster service-account credentials are used.
+- The account only needs `get/list` on namespaces, services, pods,
+  endpoints, and `networking.k8s.io/v1` ingresses.
+
+Discovery behavior:
+
+- Each configured namespace is scanned for Ingress rules.
+- A route becomes a candidate URL by joining scheme, host, and path.
+  Kuboard's route view should look like
+  `https://inference.cluster.aimodelnetwork.cn/Qwen/Qwen3-4B-AWQ`.
+- The scanner calls `<base_url>/v1/models` through the SSRF proxy.
+- Only routes with a successful model probe are written to
+  `MODEL_NET_REGISTRY_PATH`; failed routes appear in refresh status.
+- If a refresh finds zero healthy routes, the previous registry file is
+  left unchanged.
+
+Manual operations:
+
+- `POST /console/api/workspaces/current/local-models/refresh` triggers a
+  refresh immediately. Admin or owner permission is required.
+- `GET /console/api/workspaces/current/local-models/refresh-status`
+  returns the latest refresh report.
