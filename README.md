@@ -2,7 +2,9 @@
 
 ModelNet 是一个基于 [Dify](https://github.com/langgenius/dify) 的二次开发分支，用于把“模型互联网（AI-ModelNet）”从论文概念落到可运行、可导入、可复现、可扩展的工作流系统中。
 
-本仓库保留 Dify 的可视化工作流画布、模型管理、RAG 流水线、API 服务和 Docker 部署体系，并在此基础上增加模型互联所需的模型节点、协作通路、动态路由、token 级并联推理、响应级综合、数据集加载和实验复现能力。
+它保留 Dify 的可视化工作流画布、模型管理、RAG 流水线、API 服务和 Docker 部署体系，并在此基础上增加模型互联所需的模型节点、协作通路、动态路由、token 级并联推理、响应级综合、数据集加载和实验复现能力。
+
+如果你第一次进入本仓库，建议先读本 README，再进入 [ModelNet 文档入口](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/README.md)。如果只想跑起来，直接看 [快速开始](#快速开始)。
 
 > 本项目基于 Dify 开发。上游 Dify 的版权、署名和 [LICENSE](./LICENSE) 中的修改版 Apache 2.0 许可证条款仍然适用。
 
@@ -12,7 +14,7 @@ ModelNet 的概念以 [《模型互联网：概念、现状和未来》](./docs/
 
 在这个范式中，模型不再只是某个应用内部的推理后端，而是可以被发现、组合、调用和协作的能力节点。模型互联网希望解决“模型孤岛”问题，让云端模型、边缘模型、端侧模型、通用模型、领域模型和私有模型能够在统一任务中形成动态链路。
 
-本仓库当前更接近一个工程化原型和研究平台，重点验证以下问题：
+本仓库当前定位为工程化原型和研究平台，重点验证以下问题：
 
 - 如何在 Dify 工作流中表达模型节点、模型通路和协作策略。
 - 如何支持响应级、路由级、span/token 级等不同粒度的模型协作。
@@ -23,18 +25,30 @@ ModelNet 的概念以 [《模型互联网：概念、现状和未来》](./docs/
 
 论文中的模型互联网由资源层、服务层、交互层和应用层组成。ModelNet 在 Dify 上做了一个面向研发验证的对应实现：
 
-- **资源层**：通过 `model_net.yaml`、llama.cpp / vLLM 后端适配器、Docker 与本地/远程推理端点管理异构模型资源。
+- **资源层**：由 Kubernetes 管理模型部署、Service、Ingress 和命名空间隔离；ModelNet 通过 K8s Ingress 自动发现将这些模型资源同步为服务端模型别名，本地开发也可用 `model_net.yaml` 手动注册。
 - **服务层**：借助 Dify workflow 对任务进行拆解、编排、变量传递、数据集加载和执行状态管理。
 - **交互层**：通过 `token-model-source`、`parallel-ensemble`、`response-aggregator` 等节点构建模型间的协作通路，支持串联、并联、路由和融合。
 - **应用层**：通过可导入 DSL、workflow API 和评测脚本，把模型互联能力用于问答、选择题评测、论文复现和动态路由实验。
 
-这不是完整的全球模型互联网基础设施，而是围绕“模型如何互联、如何协作、如何被调度和复现”的第一版实验系统。
+这不是完整的全球模型互联网基础设施，而是围绕“模型如何互联、如何协作、如何被调度和复现”的实验系统。
+
+## 当前状态
+
+当前仓库已经提供一组可在 Dify workflow 中直接使用的 ModelNet 能力：
+
+- **工作流节点**：`token-model-source`、`parallel-ensemble`、`response-aggregator` 和 `data-loader` 已形成基本闭环。
+- **服务端模型注册表**：生产环境可由 K8s 自动发现刷新模型别名、后端类型、能力标签和推理端点；本地开发可用 `model_net.yaml` 手动维护，workflow DSL 默认只引用别名。
+- **协作推理路径**：支持响应级综合、token 级并联推理、DuetNet 聚合、动态协作路由和串并联混合路径。
+- **示例与复现脚本**：`docs/ModelNet/examples/workflow_mode` 提供可导入 DSL，`dev/modelnet` 提供 DSL 生成、数据集评测和论文复现实验工具。
+- **进行中方向**：vLLM token-level 兼容、chat logprob 探测、后端能力矩阵完善和自动 DSL 生成仍按路线图推进。
+
+本文档只描述当前能力和入口路径，不把本地 smoke run 结果写成正式 benchmark 结论。实验数字以完整复现配置和报告为准。
 
 ## 核心能力
 
 - **Token Model Source**：把一个模型抽象为可被下游消费的调用规格。它负责 prompt 模板、chat messages、采样参数、模型别名或内联后端配置。
 - **Parallel Ensemble**：读取多个 `token-model-source` 输出，执行 token 级协作推理。内置 `sum_score`、`max_score`、`duet_net` 等 token 聚合器，并支持动态协作路由 runner。
-- **Response Aggregator**：收集多个上游节点的完整回复，再调用聚合模型生成最终答案。适合投票、综合、互评、辩论后总结等响应级协作。
+- **Response Aggregator**：收集多个上游节点的完整回复，再按策略生成最终答案。适合投票、拼接、综合、互评、辩论后总结等响应级协作。
 - **Data Loader**：在工作流中加载 benchmark 数据。内置 `inline_json` 和 `jsonl_file` loader，便于构建可重复评测流程。
 - **模型注册表**：通过服务端 `model_net.yaml` 管理模型能力、后端类型和推理端点，工作流中默认只引用别名，避免把内部 URL 暴露给 DSL。
 - **Trace 与诊断**：记录 token 决策、模型错误、路由结果、运行摘要和 artifact 下载信息，便于复现实验和排查模型协作过程。
@@ -81,6 +95,8 @@ Start / Data Loader
 
 ## 快速开始
 
+最短路径是：启动 Dify / ModelNet 服务栈，配置服务端模型别名，导入示例 DSL，然后从 Dify Studio 或 workflow API 运行。
+
 ### 1. 启动 Dify / ModelNet 服务栈
 
 Docker 部署方式继承自 Dify：
@@ -97,7 +113,7 @@ docker compose up -d --build
 http://localhost/install
 ```
 
-公开部署时请从本 fork 构建并发布 API / Web 镜像。上游 `langgenius/dify-*` 镜像不包含 ModelNet 新增的工作流节点。
+公开部署时请从本 fork 构建并发布 API / Web 镜像。上游 `langgenius/dify-*` 镜像不包含 ModelNet 新增的工作流节点、控制台面板或 ModelNet 后端逻辑。
 
 源码开发仍沿用 Dify 的前后端分工：
 
@@ -113,15 +129,15 @@ pnpm dev
 
 ### 2. 配置模型别名
 
-如果使用服务端注册表模式，先复制样例配置，再按当前实际部署填写模型别名：
+生产环境推荐开启 K8s 自动发现，由后端从 Kubernetes Ingress 刷新服务端模型注册表；本地开发或没有集群权限时，可以复制样例配置并手动填写模型别名：
 
 ```bash
 cp api/configs/model_net.yaml.example api/configs/model_net.yaml
 ```
 
-每个条目至少需要确认 `id`、`backend`、`model_name`、`model_url` 和 `EOS`。如果是思考模型，还需要设置 `type: think` 和 `stop_think`；如果 llama.cpp fork 暴露 raw logits，再设置 `expose_raw_logits: true`。当前组内模型服务通常部署在 `219.222.20.79` 的高端口段，端口和模型名以实际启动的服务为准。
+每个条目至少需要确认 `id`、`backend`、`model_name`、`model_url` 和 `EOS`。如果是思考模型，还需要设置 `type: think` 和 `stop_think`；如果 llama.cpp fork 暴露 raw logits，再设置 `expose_raw_logits: true`。端口和模型名以实际启动的服务为准。
 
-真实的 `api/configs/model_net.yaml` 已被 git 忽略。容器部署时，需要把 registry 挂载到 API / worker 容器中；如果不使用默认路径，请设置 `MODEL_NET_REGISTRY_PATH`。
+真实的 `api/configs/model_net.yaml` 已被 git 忽略。容器部署时，需要把 registry 挂载到 API / worker 容器中；如果不使用默认路径，请设置 `MODEL_NET_REGISTRY_PATH`。K8s 自动发现的开关、命名空间和刷新周期见下方注册表契约文档。
 
 注册表契约见 [api/configs/MODEL_NET_README.md](./api/configs/MODEL_NET_README.md)。
 
@@ -134,7 +150,7 @@ cp api/configs/model_net.yaml.example api/configs/model_net.yaml
 - [AI-ModelNet 混合路由流程](./docs/ModelNet/examples/workflow_mode/multi_model_serial_and_parallel_collaborative_inference_in_ai_modelnet/paper_hybrid_router.yml)
 - [动态协作路由流程](./docs/ModelNet/examples/workflow_mode/dynamic_model_routing_based_on_collaborative_relationship/dynamic_collab_route.yml)
 
-在 Dify Studio 中导入 DSL，配置对应模型别名或 Dify 模型供应商，即可从画布或 workflow API 运行。
+在 Dify Studio 中导入 DSL，配置对应模型别名或 Dify 模型供应商，即可从画布或 workflow API 运行。第一次联调建议先做小样本 smoke run，再启动完整 benchmark。
 
 ## 架构与扩展
 
@@ -223,17 +239,22 @@ pnpm test -- --run app/components/workflow/nodes/response-aggregator app/compone
 
 ## 文档入口
 
-ModelNet 文档入口见 [docs/ModelNet/README.md](./docs/ModelNet/README.md)。
+ModelNet 文档入口见 [docs/ModelNet/README.md](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/README.md)。按角色阅读时，可以从下面几条线进入：
 
-常用入口：
+- **工作流使用者**：先读 [三节点开发思路](./docs/ModelNet/architecture/THREE_NODES_BEGINNER_GUIDE.md)，再导入 [示例工作流](./docs/ModelNet/examples/workflow_mode)。
+- **二开开发者**：先读 [二次开发指南](./docs/ModelNet/architecture/EXTENSION_GUIDE.md) 和 [扩展性规范](./docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md)。
+- **后端与推理服务实现者**：先读 [后端能力矩阵](./docs/ModelNet/architecture/BACKEND_CAPABILITIES.md)、[模型注册表说明](./api/configs/MODEL_NET_README.md) 和 [TokenLevel vLLM 计划](./docs/ModelNet/operations/vllm/TOKENLEVEL_VLLM_PLAN.md)。
+- **研究与复现使用者**：先读 [dev/modelnet/README.md](./dev/modelnet/README.md)、[论文复现计划](./docs/ModelNet/research/PAPER_REPRODUCTION_PLAN.md) 和 [顶会相似工作复现候选](./docs/ModelNet/research/TOP_CONFERENCE_REPRODUCTION_CANDIDATES.md)。
 
-- [模型互联网 PDF](./docs/ModelNet/模型互联网.pdf)
-- [当前路线图](./docs/ModelNet/active/ROADMAP.md)
-- [扩展性规范](./docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md)
-- [二次开发指南](./docs/ModelNet/architecture/EXTENSION_GUIDE.md)
-- [后端能力矩阵](./docs/ModelNet/architecture/BACKEND_CAPABILITIES.md)
-- [TokenLevel vLLM 计划](./docs/ModelNet/operations/vllm/TOKENLEVEL_VLLM_PLAN.md)
-- [Auto DSL 生成计划](./docs/ModelNet/operations/auto-dsl-gen/AUTO_DSL_GEN_PLAN.md)
+常用长期入口：
+
+- [模型互联网 PDF](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/%E6%A8%A1%E5%9E%8B%E4%BA%92%E8%81%94%E7%BD%91.pdf)
+- [当前路线图](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/active/ROADMAP.md)
+- [扩展性规范](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/architecture/EXTENSIBILITY_SPEC.md)
+- [二次开发指南](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/architecture/EXTENSION_GUIDE.md)
+- [后端能力矩阵](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/architecture/BACKEND_CAPABILITIES.md)
+- [TokenLevel vLLM 计划](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/operations/vllm/TOKENLEVEL_VLLM_PLAN.md)
+- [Auto DSL 生成计划](https://github.com/WNDS-JNU/ModelNet/blob/main/docs/ModelNet/operations/auto-dsl-gen/AUTO_DSL_GEN_PLAN.md)
 
 ## 来源与许可证
 

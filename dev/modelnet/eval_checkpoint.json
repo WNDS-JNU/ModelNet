@@ -1,0 +1,82 @@
+{
+  "duet_net_q1_q2|simple_math|simple_math_000": {
+    "workflow": "duet_net_q1_q2",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_q1_g4|simple_math|simple_math_000": {
+    "workflow": "duet_net_q1_g4",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_q1_L3|simple_math|simple_math_000": {
+    "workflow": "duet_net_q1_L3",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_q2_g4|simple_math|simple_math_000": {
+    "workflow": "duet_net_q2_g4",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_q2_L3|simple_math|simple_math_000": {
+    "workflow": "duet_net_q2_L3",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_g4_L3|simple_math|simple_math_000": {
+    "workflow": "duet_net_g4_L3",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_q1_q2_g4|simple_math|simple_math_000": {
+    "workflow": "duet_net_q1_q2_g4",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  },
+  "duet_net_q1_q2_g4_L3|simple_math|simple_math_000": {
+    "workflow": "duet_net_q1_q2_g4_L3",
+    "dataset": "simple_math",
+    "item_id": "simple_math_000",
+    "expected": "-13",
+    "predicted": "",
+    "correct": false,
+    "elapsed_ms": 0,
+    "token_count": 0
+  }
+}
