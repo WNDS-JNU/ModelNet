@@ -13,10 +13,12 @@ import type { ListProps, ListRef } from '@/app/components/workflow/block-selecto
 import type { OnSelectBlock } from '@/app/components/workflow/types'
 import { Button } from '@langgenius/dify-ui/button'
 import { cn } from '@langgenius/dify-ui/cn'
+import { RiArrowRightUpLine } from '@remixicon/react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Divider from '@/app/components/base/divider'
+import { SearchMenu } from '@/app/components/base/icons/src/vender/line/general'
 import PluginList from '@/app/components/workflow/block-selector/market-place-plugin/list'
 import { useGetLanguage } from '@/context/i18n'
 import Link from '@/next/link'
@@ -79,7 +81,7 @@ const AllTools = ({
   const { t } = useTranslation()
   const language = useGetLanguage()
   const tabs = useToolTabs()
-  const [activeTab, setActiveTab] = useState<ToolTypeEnum>(ToolTypeEnum.All)
+  const [activeTab, setActiveTab] = useState(ToolTypeEnum.All)
   const [activeView, setActiveView] = useState<ViewType>(ViewType.flat)
   const trimmedSearchText = searchText.trim()
   const hasSearchText = trimmedSearchText.length > 0
@@ -185,7 +187,7 @@ const AllTools = ({
 
   const pluginRef = useRef<ListRef>(null)
   const wrapElemRef = useRef<HTMLDivElement>(null)
-  const isSupportGroupView = activeTab === ToolTypeEnum.All || activeTab === ToolTypeEnum.BuiltIn
+  const isSupportGroupView = [ToolTypeEnum.All, ToolTypeEnum.BuiltIn].includes(activeTab)
 
   const isShowRAGRecommendations = isInRAGPipeline && activeTab === ToolTypeEnum.All && !hasFilter
   const hasToolsListContent = tools.length > 0 || isShowRAGRecommendations
@@ -293,7 +295,7 @@ const AllTools = ({
 
           {shouldShowEmptyState && (
             <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center">
-              <span className="i-custom-vender-line-general-search-menu h-8 w-8 text-text-quaternary" />
+              <SearchMenu className="size-8 text-text-quaternary" />
               <div className="text-sm font-medium text-text-secondary">
                 {t('tabs.noPluginsFound', { ns: 'workflow' })}
               </div>
@@ -319,7 +321,7 @@ const AllTools = ({
             target="_blank"
           >
             <span>{t('findMoreInMarketplace', { ns: 'plugin' })}</span>
-            <span className="ml-0.5 i-ri-arrow-right-up-line h-3 w-3" />
+            <RiArrowRightUpLine className="ml-0.5 size-3" />
           </Link>
         )}
       </div>

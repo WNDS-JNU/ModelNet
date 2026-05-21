@@ -1,5 +1,6 @@
 'use client'
 import { cn } from '@langgenius/dify-ui/cn'
+import { RiArrowRightUpLine } from '@remixicon/react'
 import { useTranslation } from 'react-i18next'
 import useTheme from '@/hooks/use-theme'
 import Link from '@/next/link'
@@ -28,10 +29,11 @@ const Empty = ({
   const { t } = useTranslation()
   const { theme } = useTheme()
 
-  const hasLink = type === ToolTypeEnum.Custom || type === ToolTypeEnum.MCP
+  const hasLink = type && [ToolTypeEnum.Custom, ToolTypeEnum.MCP].includes(type)
+  const Comp = (hasLink ? Link : 'div') as any
+  const linkProps = hasLink ? { href: getLink(type), target: '_blank' } : {}
   const renderType = isAgent ? 'agent' as const : type
   const hasTitle = renderType && t(`addToolModal.${renderType}.title`, { ns: 'tools' }) !== `addToolModal.${renderType}.title`
-  const tipClassName = cn('flex items-center text-[13px] leading-[18px] text-text-tertiary', hasLink && 'cursor-pointer hover:text-text-accent')
 
   return (
     <div className="flex flex-col items-center justify-center">
@@ -40,19 +42,11 @@ const Empty = ({
         {(hasTitle && renderType) ? t(`addToolModal.${renderType}.title`, { ns: 'tools' }) : 'No tools available'}
       </div>
       {!!(!isAgent && hasTitle && renderType) && (
-        hasLink
-          ? (
-              <Link className={tipClassName} href={getLink(type)} target="_blank">
-                {t(`addToolModal.${renderType}.tip`, { ns: 'tools' })}
-                {' '}
-                <span className="ml-0.5 i-ri-arrow-right-up-line h-3 w-3" />
-              </Link>
-            )
-          : (
-              <div className={tipClassName}>
-                {t(`addToolModal.${renderType}.tip`, { ns: 'tools' })}
-              </div>
-            )
+        <Comp className={cn('flex items-center text-[13px] leading-[18px] text-text-tertiary', hasLink && 'cursor-pointer hover:text-text-accent')} {...linkProps}>
+          {t(`addToolModal.${renderType}.tip`, { ns: 'tools' })}
+          {' '}
+          {hasLink && <RiArrowRightUpLine className="ml-0.5 size-3" />}
+        </Comp>
       )}
     </div>
   )

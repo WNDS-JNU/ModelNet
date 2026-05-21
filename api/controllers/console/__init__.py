@@ -46,6 +46,8 @@ from . import (
     version,
     workflow_probe_model,
 )
+from .agent import composer as agent_composer
+from .agent import roster as agent_roster
 
 # Import app controllers
 from .app import (
@@ -150,7 +152,9 @@ __all__ = [
     "admin",
     "advanced_prompt_template",
     "agent",
+    "agent_composer",
     "agent_providers",
+    "agent_roster",
     "aggregators",
     "annotation",
     "api",

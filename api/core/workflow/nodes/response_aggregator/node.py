@@ -25,7 +25,7 @@ from graphon.nodes.llm import llm_utils
 from graphon.nodes.llm.file_saver import LLMFileSaver
 from graphon.nodes.llm.node import LLMNode
 from graphon.nodes.llm.runtime_protocols import (
-    PreparedLLMProtocol,
+    LLMProtocol,
     PromptMessageSerializerProtocol,
 )
 
@@ -53,24 +53,24 @@ class ResponseAggregatorNode(Node[ResponseAggregatorNodeData]):
     """
 
     node_type: ClassVar[NodeType] = RESPONSE_AGGREGATOR_NODE_TYPE
-    _model_instance: PreparedLLMProtocol | None
+    _model_instance: LLMProtocol | None
     _prompt_message_serializer: PromptMessageSerializerProtocol | None
     _llm_file_saver: LLMFileSaver | None
 
     def __init__(
         self,
         node_id: str,
-        config: ResponseAggregatorNodeData,
+        data: ResponseAggregatorNodeData | Mapping[str, Any],
         *,
         graph_init_params: Any,
         graph_runtime_state: Any,
-        model_instance: PreparedLLMProtocol | None = None,
+        model_instance: LLMProtocol | None = None,
         prompt_message_serializer: PromptMessageSerializerProtocol | None = None,
         llm_file_saver: LLMFileSaver | None = None,
     ) -> None:
         super().__init__(
             node_id=node_id,
-            config=config,
+            data=data,
             graph_init_params=graph_init_params,
             graph_runtime_state=graph_runtime_state,
         )
@@ -83,7 +83,7 @@ class ResponseAggregatorNode(Node[ResponseAggregatorNodeData]):
         return "1"
 
     @property
-    def model_instance(self) -> PreparedLLMProtocol | None:
+    def model_instance(self) -> LLMProtocol | None:
         """Prepared aggregation model; surfaced for the LLM quota layer."""
         return self._model_instance
 
