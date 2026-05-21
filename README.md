@@ -40,7 +40,7 @@ ModelNet 的概念以 [《模型互联网：概念、现状和未来》](./docs/
 - **服务端模型注册表**：生产环境可由 K8s 自动发现刷新模型别名、后端类型、能力标签和推理端点；本地开发可用 `model_net.yaml` 手动维护，workflow DSL 默认只引用别名。
 - **协作推理路径**：支持响应级综合、token 级并联推理、DuetNet 聚合、动态协作路由和串并联混合路径。
 - **示例与复现脚本**：`docs/ModelNet/examples/workflow_mode` 提供可导入 DSL，`dev/modelnet` 提供 DSL 生成、数据集评测和论文复现实验工具。
-- **进行中方向**：vLLM token-level 兼容、chat logprob 探测、后端能力矩阵完善和自动 DSL 生成仍按路线图推进。
+- **进行中方向**：vLLM token-level 兼容、模型部署探测和自动 DSL 生成仍按路线图推进。
 
 本文档只描述当前能力和入口路径，不把本地 smoke run 结果写成正式 benchmark 结论。实验数字以完整复现配置和报告为准。
 
@@ -57,6 +57,8 @@ ModelNet 的概念以 [《模型互联网：概念、现状和未来》](./docs/
 
 ### 响应级协作
 
+![响应级协作工作流示意](./docs/ModelNet/assets/readme/workflow-response-collaboration.svg)
+
 适合多个模型、工具或 Agent 已经分别产出完整答案的场景。
 
 ```text
@@ -68,6 +70,8 @@ LLM / HTTP / Code / Agent 输出
 典型用途包括多模型投票、候选答案综合、互评结果汇总、不同角色输出整合。
 
 ### Token 级协作
+
+![Token 级协作工作流示意](./docs/ModelNet/assets/readme/workflow-token-collaboration.svg)
 
 适合希望多个模型在解码过程中逐 token 或逐 span 协同的场景。
 
@@ -81,6 +85,8 @@ Start / Data Loader
 每个 `token-model-source` 渲染自己的 prompt 与采样参数。`parallel-ensemble` 解析这些 spec，实例化对应后端，应用每路 source 的权重和 `top_k_override`，再运行选定 runner 与 token 聚合器。
 
 ### 动态路由协作
+
+![动态路由协作工作流示意](./docs/ModelNet/assets/readme/workflow-dynamic-routing.svg)
 
 适合模型能力、任务属性和协作关系需要动态匹配的场景。
 
