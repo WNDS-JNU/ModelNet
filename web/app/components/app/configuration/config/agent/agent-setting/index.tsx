@@ -66,15 +66,15 @@ const AgentSetting: FC<Props> = ({
           <div className="flex items-center">
             <div
               onClick={onCancel}
-              className="flex h-6 w-6 cursor-pointer items-center justify-center"
+              className="flex size-6 cursor-pointer items-center justify-center"
             >
-              <RiCloseLine className="h-4 w-4 text-text-tertiary" />
+              <RiCloseLine className="size-4 text-text-tertiary" />
             </div>
           </div>
         </div>
         {/* Body */}
         <div
-          className="grow overflow-y-auto border-b p-6 pt-5 pb-[68px]"
+          className="grow overflow-y-auto border-b border-divider-regular p-6 pt-5 pb-[68px]"
           style={{
             borderBottom: 'rgba(0, 0, 0, 0.05)',
           }}
@@ -83,7 +83,7 @@ const AgentSetting: FC<Props> = ({
           <ItemPanel
             className="mb-4"
             icon={
-              <CuteRobot className="h-4 w-4 text-indigo-600" />
+              <CuteRobot className="size-4 text-indigo-600" />
             }
             name={t('agent.agentMode', { ns: 'appDebug' })}
             description={t('agent.agentModeDes', { ns: 'appDebug' })}
@@ -139,7 +139,7 @@ const AgentSetting: FC<Props> = ({
 
           {!isFunctionCall && (
             <div className="rounded-xl bg-background-section-burn py-2 shadow-xs">
-              <div className="flex h-8 items-center px-4 text-sm leading-6 font-semibold text-text-secondary">{t('builtInPromptTitle', { ns: 'tools' })}</div>
+              <div className="flex h-8 items-center px-4 text-sm/6 font-semibold text-text-secondary">{t('builtInPromptTitle', { ns: 'tools' })}</div>
               <div className="h-[396px] overflow-y-auto px-4 text-sm leading-5 font-normal whitespace-pre-line text-text-secondary">
                 {isChatModel ? DEFAULT_AGENT_PROMPT.chat : DEFAULT_AGENT_PROMPT.completion}
               </div>

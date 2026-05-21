@@ -63,7 +63,8 @@ type CallbackContext = {
   invalidateRunHistory: (url: string) => void
   clearAbortController: () => void
   clearListeningState: () => void
-  trackWorkflowRunFailed: (params: unknown) => void
+  getWorkflowRunningData: () => unknown
+  trackWorkflowRunFailed: (params: unknown, workflowData: unknown) => void
   handlers: WorkflowRunEventHandlers
   callbacks: UserCallbackHandlers
   restCallback: IOtherOptions
@@ -89,6 +90,7 @@ export const createBaseWorkflowRunCallbacks = ({
   invalidateRunHistory,
   clearAbortController,
   clearListeningState,
+  getWorkflowRunningData,
   trackWorkflowRunFailed,
   handlers,
   callbacks,
@@ -142,13 +144,14 @@ export const createBaseWorkflowRunCallbacks = ({
   const wrappedOnError: IOtherOptions['onError'] = (params, code) => {
     clearAbortController()
     handleWorkflowFailed()
+    const workflowData = getWorkflowRunningData()
     invalidateRunHistory(runHistoryUrl)
     clearListeningState()
 
     if (onError)
       onError(params, code)
 
-    trackWorkflowRunFailed(params)
+    trackWorkflowRunFailed(params, workflowData)
   }
 
   const wrappedOnCompleted: IOtherOptions['onCompleted'] = async (hasError, errorMessage) => {
@@ -303,9 +306,10 @@ export const createFinalWorkflowRunCallbacks = ({
   fetchInspectVars,
   invalidAllLastRun,
   invalidateRunHistory,
-  clearAbortController: _clearAbortController,
-  clearListeningState: _clearListeningState,
-  trackWorkflowRunFailed: _trackWorkflowRunFailed,
+  clearAbortController,
+  clearListeningState,
+  getWorkflowRunningData,
+  trackWorkflowRunFailed,
   handlers,
   callbacks,
   restCallback,
@@ -371,11 +375,15 @@ export const createFinalWorkflowRunCallbacks = ({
       }
     },
     onError: (params, code) => {
+      clearAbortController()
       handleWorkflowFailed()
+      const workflowData = getWorkflowRunningData()
       invalidateRunHistory(runHistoryUrl)
+      clearListeningState()
 
       if (onError)
         onError(params, code)
+      trackWorkflowRunFailed(params, workflowData)
     },
     onNodeStarted: (params) => {
       handleWorkflowNodeStarted(params, { clientWidth, clientHeight })
