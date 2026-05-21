@@ -43,7 +43,7 @@ from models.account import (
     TenantPluginAutoUpgradeStrategy,
     TenantStatus,
 )
-from models.model import DifySetup
+from models.model import App, DifySetup, InstalledApp
 from services.billing_service import BillingService
 from services.errors.account import (
     AccountAlreadyInTenantError,
@@ -1114,9 +1114,68 @@ class TenantService:
         else:
             tenant = TenantService.create_tenant(name=f"{account.name}'s Workspace", is_setup=is_setup)
         TenantService.create_tenant_member(tenant, account, role="owner")
+        TenantService.auto_install_explore_apps(tenant)
         account.current_tenant = tenant
         db.session.commit()
         tenant_was_created.send(tenant)
+
+    @staticmethod
+    def auto_install_explore_apps(tenant: Tenant):
+        """Install configured default Explore apps into a newly created workspace."""
+        app_ids = [app_id.strip() for app_id in dify_config.AUTO_INSTALL_EXPLORE_APP_IDS.split(",") if app_id.strip()]
+        if not app_ids:
+            return
+
+        unique_app_ids = list(dict.fromkeys(app_ids))
+        existing_app_ids = set(
+            db.session.scalars(
+                select(InstalledApp.app_id).where(
+                    InstalledApp.tenant_id == tenant.id,
+                    InstalledApp.app_id.in_(unique_app_ids),
+                )
+            ).all()
+        )
+        apps = db.session.scalars(select(App).where(App.id.in_(unique_app_ids))).all()
+        apps_by_id = {app.id: app for app in apps}
+
+        missing_app_ids = sorted(set(unique_app_ids) - set(apps_by_id))
+        if missing_app_ids:
+            logger.warning(
+                "Skipping missing auto-install Explore apps for tenant %s: %s",
+                tenant.id,
+                ", ".join(missing_app_ids),
+            )
+
+        next_position = (
+            db.session.scalar(
+                select(func.coalesce(func.max(InstalledApp.position), 0) + 1).where(
+                    InstalledApp.tenant_id == tenant.id
+                )
+            )
+            or 1
+        )
+        installed_any = False
+        now = naive_utc_now()
+        for app_id in unique_app_ids:
+            app = apps_by_id.get(app_id)
+            if app is None or app_id in existing_app_ids:
+                continue
+
+            db.session.add(
+                InstalledApp(
+                    app_id=app.id,
+                    tenant_id=tenant.id,
+                    app_owner_tenant_id=app.tenant_id,
+                    position=next_position,
+                    is_pinned=True,
+                    last_used_at=now,
+                )
+            )
+            next_position += 1
+            installed_any = True
+
+        if installed_any:
+            db.session.commit()
 
     @staticmethod
     def create_tenant_member(tenant: Tenant, account: Account, role: str = "normal") -> TenantAccountJoin:

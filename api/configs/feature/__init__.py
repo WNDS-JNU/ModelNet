@@ -1327,6 +1327,10 @@ class LoginConfig(BaseSettings):
         description="whether to enable create workspace",
         default=False,
     )
+    AUTO_INSTALL_EXPLORE_APP_IDS: str = Field(
+        description="Comma-separated app IDs to auto-install into Explore for newly created workspaces",
+        default="",
+    )
 
 
 class AccountConfig(BaseSettings):

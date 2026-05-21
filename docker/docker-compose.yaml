@@ -35,11 +35,15 @@ x-shared-env: &shared-api-worker-env
   MIGRATION_ENABLED: ${MIGRATION_ENABLED:-true}
   FILES_ACCESS_TIMEOUT: ${FILES_ACCESS_TIMEOUT:-300}
   ENABLE_COLLABORATION_MODE: ${ENABLE_COLLABORATION_MODE:-false}
+  ALLOW_REGISTER: ${ALLOW_REGISTER:-false}
+  ALLOW_CREATE_WORKSPACE: ${ALLOW_CREATE_WORKSPACE:-false}
+  AUTO_INSTALL_EXPLORE_APP_IDS: ${AUTO_INSTALL_EXPLORE_APP_IDS:-}
   ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
   REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
   APP_DEFAULT_ACTIVE_REQUESTS: ${APP_DEFAULT_ACTIVE_REQUESTS:-0}
   APP_MAX_ACTIVE_REQUESTS: ${APP_MAX_ACTIVE_REQUESTS:-0}
   APP_MAX_EXECUTION_TIME: ${APP_MAX_EXECUTION_TIME:-1200}
+  MODEL_NET_REGISTRY_PATH: ${MODEL_NET_REGISTRY_PATH:-/app/api/configs/model_net.yaml}
   DIFY_BIND_ADDRESS: ${DIFY_BIND_ADDRESS:-0.0.0.0}
   DIFY_PORT: ${DIFY_PORT:-5001}
   SERVER_WORKER_AMOUNT: ${SERVER_WORKER_AMOUNT:-1}
@@ -745,7 +749,10 @@ services:
 
   # API service
   api:
-    image: langgenius/dify-api:1.14.0
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    image: langgenius/dify-api:1.14.0-local
     restart: always
     environment:
       # Use the shared environment variables.
@@ -780,6 +787,8 @@ services:
     volumes:
       # Mount the storage directory to the container, for storing user files.
       - ./volumes/app/storage:/app/api/storage
+      # Mount ModelNet local datasets used by workflow data loaders.
+      - /home/duxianghe/dify/dev/modelnet:/home/duxianghe/dify/dev/modelnet:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
       interval: 30s
@@ -828,6 +837,8 @@ services:
     volumes:
       # Mount the storage directory to the container, for storing user files.
       - ./volumes/app/storage:/app/api/storage
+      # Mount ModelNet local datasets used by workflow data loaders.
+      - /home/duxianghe/dify/dev/modelnet:/home/duxianghe/dify/dev/modelnet:ro
     healthcheck:
       test: ["CMD-SHELL", "celery -A celery_healthcheck.celery inspect ping"]
       interval: ${COMPOSE_WORKER_HEALTHCHECK_INTERVAL:-30s}
