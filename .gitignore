@@ -150,9 +150,18 @@ api/.idea
 
 api/.env
 api/.env.bak.codex-*
+api/.env.codex-bak-*
+api/.env.bak.codex-*
+docker/.env.codex-bak-*
 docker/middleware.env.bak.codex-*
 web/.env.local.bak.codex-*
 api/storage/*
+
+# Dify developer-mode runtime state and local secrets.
+.dev-services/middleware.env
+.dev-services/celery/
+.dev-services/storage/
+.dev-services/volumes/
 
 docker-legacy/volumes/app/storage/*
 docker-legacy/volumes/db/data/*
