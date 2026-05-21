@@ -1448,6 +1448,104 @@ class ModelNetConfig(BaseSettings):
         description="Request timeout stored on k8s-discovered ModelNet registry entries.",
         default=180000,
     )
+    MODEL_NET_PROMETHEUS_URL: str = Field(
+        description="Optional Prometheus base URL used for ModelNet load-aware routing.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_TIMEOUT_SECONDS: PositiveInt = Field(
+        description="Timeout in seconds for ModelNet Prometheus instant queries.",
+        default=5,
+    )
+    MODEL_NET_PROMETHEUS_HEALTH_QUERY: str = Field(
+        description="Prometheus instant-query template for model health. Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_QPS_QUERY: str = Field(
+        description="Prometheus instant-query template for model QPS. Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_P95_LATENCY_QUERY: str = Field(
+        description="Prometheus instant-query template for p95 latency in milliseconds. "
+        "Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_QUEUE_DEPTH_QUERY: str = Field(
+        description="Prometheus instant-query template for model queue depth. Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_GPU_UTILIZATION_QUERY: str = Field(
+        description="Prometheus instant-query template for GPU utilization as 0..1 or percent. "
+        "Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_GPU_MEMORY_USED_RATIO_QUERY: str = Field(
+        description="Prometheus instant-query template for GPU memory used ratio as 0..1 or percent. "
+        "Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_PROMETHEUS_ERROR_RATE_QUERY: str = Field(
+        description="Prometheus instant-query template for model error rate as 0..1 or percent. "
+        "Supports {alias} and {model_name}.",
+        default="",
+    )
+    MODEL_NET_LOAD_METRIC_STALE_SECONDS: PositiveInt = Field(
+        description="Maximum age in seconds before a Prometheus sample is considered stale for routing diagnostics.",
+        default=180,
+    )
+    MODEL_NET_ROUTE_TOP_K: PositiveInt = Field(
+        description="Default number of model aliases returned by load-aware routing.",
+        default=1,
+    )
+    MODEL_NET_K8S_DATA_NAMESPACES: str = Field(
+        description="Comma-separated Kubernetes namespaces scanned by the ModelNet k8s data-plane snapshot API.",
+        default="inference,llama-cpp",
+    )
+    MODEL_NET_K8S_DATA_MONITORING_NAMESPACE: str = Field(
+        description="Kubernetes namespace containing the Prometheus service used by the ModelNet k8s data-plane API.",
+        default="kuboard",
+    )
+    MODEL_NET_K8S_DATA_PROMETHEUS_SERVICE_PROXY: str = Field(
+        description="Kubernetes service proxy name for Prometheus, for example http:prometheus-k8s:9090.",
+        default="http:prometheus-k8s:9090",
+    )
+    MODEL_NET_K8S_DATA_PROMETHEUS_ENABLED: bool = Field(
+        description="Enable Prometheus-backed GPU, Jetson, kubelet, and kube-state metric reads for "
+        "ModelNet data-plane API.",
+        default=True,
+    )
+    MODEL_NET_K8S_DATA_NODEPORT_HOST: str = Field(
+        description="Externally reachable host for llama.cpp NodePort services. "
+        "Leave empty to report NodePort routes as unconfigured.",
+        default="",
+    )
+    MODEL_NET_K8S_DATA_K8S_API_TIMEOUT_SECONDS: PositiveInt = Field(
+        description="Timeout in seconds for Kubernetes API reads by the ModelNet k8s data-plane API.",
+        default=10,
+    )
+    MODEL_NET_K8S_DATA_PROBE_ENABLED: bool = Field(
+        description="Enable /v1/models health probes while building ModelNet k8s model snapshots.",
+        default=True,
+    )
+    MODEL_NET_K8S_DATA_PROBE_TIMEOUT_SECONDS: PositiveInt = Field(
+        description="Timeout in seconds for ModelNet k8s /v1/models health probes.",
+        default=5,
+    )
+    MODEL_NET_K8S_DATA_VLLM_METRICS_ENABLED: bool = Field(
+        description="Enable direct vLLM /metrics reads for ModelNet k8s model snapshots.",
+        default=True,
+    )
+    MODEL_NET_K8S_DATA_VLLM_METRICS_TIMEOUT_SECONDS: PositiveInt = Field(
+        description="Timeout in seconds for direct vLLM /metrics reads by the ModelNet k8s data-plane API.",
+        default=5,
+    )
+    MODEL_NET_K8S_DATA_EVENT_LIMIT: PositiveInt = Field(
+        description="Maximum Kubernetes events returned per ModelNet k8s data-plane snapshot.",
+        default=100,
+    )
+    MODEL_NET_K8S_DATA_CACHE_TTL_SECONDS: PositiveInt = Field(
+        description="Redis TTL in seconds for the latest ModelNet k8s data-plane snapshot.",
+        default=120,
+    )
 
 
 class FeatureConfig(

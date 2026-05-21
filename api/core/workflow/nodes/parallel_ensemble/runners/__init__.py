@@ -21,6 +21,7 @@ therefore enough to make the built-in discoverable.
 from __future__ import annotations
 
 from . import dynamic_collab_route as dynamic_collab_route
+from . import load_aware_route as load_aware_route
 from . import token_step as token_step
 
-__all__ = ["dynamic_collab_route", "token_step"]
+__all__ = ["dynamic_collab_route", "load_aware_route", "token_step"]

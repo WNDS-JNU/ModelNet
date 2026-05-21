@@ -12,6 +12,7 @@ authoritative source the node will consume at runtime; routing through
 a service layer would just reflect the same call.
 """
 
+from flask import request
 from flask_restx import Resource, fields
 
 from controllers.console import console_ns
@@ -25,6 +26,10 @@ from libs.login import login_required
 from services.model_net_k8s_registry_service import (
     get_model_net_k8s_refresh_status,
     refresh_model_net_registry_from_k8s,
+)
+from services.model_net_load_service import (
+    get_model_net_load_status,
+    route_model_from_payload,
 )
 
 
@@ -65,3 +70,28 @@ class LocalModelsRefreshStatusApi(Resource):
     @account_initialization_required
     def get(self):
         return get_model_net_k8s_refresh_status(), 200
+
+
+@console_ns.route("/workspaces/current/local-models/load-status")
+class LocalModelsLoadStatusApi(Resource):
+    @console_ns.doc("get_local_model_load_status")
+    @console_ns.doc(description="Return ModelNet aliases enriched with Prometheus-backed load status.")
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self):
+        return get_model_net_load_status(), 200
+
+
+@console_ns.route("/workspaces/current/local-models/route")
+class LocalModelsRouteApi(Resource):
+    @console_ns.doc("route_local_model")
+    @console_ns.doc(description="Rank ModelNet aliases and select the best model for a load-aware call.")
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def post(self):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            payload = {}
+        return route_model_from_payload(payload), 200
